@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { FormStepper } from "@/components/voting/FormStepper";
 import { FormStep, PlanType, VotingSessionType, VotingMode, AccessControlType, CandidateEntryType } from "@/lib/voting";
 import { Button } from "@/components/shadcn-ui/button";
@@ -12,6 +13,8 @@ import { VoterVerificationStep } from "@/components/voting/steps/VoterVerificati
 import { VotingOptionsStep } from "@/components/voting/steps/VotingOptionsStep";
 import { SummaryStep } from "@/components/voting/steps/SummaryStep";
 import { ArrowLeft, ArrowRight, CheckIcon, CreditCard } from "lucide-react";
+import {toast, useToast } from "@/hooks/use-toast";
+import router from "next/router";
 
 interface VotingSessionFormProps {
     plan: PlanType;
@@ -70,10 +73,46 @@ export default function VotingSessionForm({ plan }: VotingSessionFormProps) {
         }
     };
 
-    const handleSubmit = () => {
-        // Here you would typically send the form data to your backend
-        console.log("Form submitted:", formData);
-        // Show success message or redirect
+    const handleSubmit = async () => {
+        try {
+            const sessionRequestData = {
+                ...formData,
+                startDate: formData.startDate.toISOString(),
+                endDate: formData.endDate.toISOString(),
+                preparationSchedule: formData.preparationSchedule?.toISOString()
+            };
+
+            if (plan === "free") {
+                // For free plan, directly create session through API
+                const { default: apiClient } = await import('@/lib/api');
+                const response = await apiClient.post('/sessionRequests', sessionRequestData);
+                
+                // Show success message and redirect
+                toast({
+                    title: "Success!",
+                    description: "Your voting session has been created successfully.",
+                    duration: 3000,
+                });
+                
+                // Redirect to sessions page or dashboard
+                router.push('/dashboard/sessions');
+            } else {
+                // For paid plans, handle payment flow
+                // Store session data in localStorage for after payment
+                localStorage.setItem('pendingSession', JSON.stringify(sessionRequestData));
+                
+                // Redirect to payment page
+                router.push('/subscription/payment');
+            }
+        } catch (error) {
+            console.error('Error creating session:', error);
+            toast({
+                title: "Error",
+                description: "Failed to create voting session. Please try again.",
+                variant: "destructive",
+                duration: 3000,
+            });
+        }
     };
 
     const updateFormData = (newData: Partial<typeof formData>) => {

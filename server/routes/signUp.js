@@ -29,6 +29,14 @@ router.post("/", async (req, res) => {
 
   const token = user.generateAuthToken();
   res.setHeader("authorization", token);
-  res.send(user);
+  res.status(201).json({
+    message: "User created successfully.",
+    user: {
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      role: user.role
+    }
+  });
 });
 export default router;

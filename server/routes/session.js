@@ -29,57 +29,60 @@ router.get("/:id", async (req, res) => {
 });
 
 router.post("/", IsAdmin, async (req, res) => {
-  const { error, value } = sessionSchema.validate(req.body);
-  if (error) {
-    return res.send("session input is wrong");
-  }
-  const { name, type } = value;
-  const requestId=new mongoose.Types.ObjectId(req.body.requestId)
-  const sessionRequest=await Request.findById(requestId)
+  const requestId = new mongoose.Types.ObjectId(req.body.requestId);
+  const sessionRequest = await Request.findById(requestId);
+  
   if (!sessionRequest) {
     return res.status(404).send("Session request not found");
   }
-  if(sessionRequest.status!=="approved"){
+  if (sessionRequest.status !== "approved") {
     return res.status(404).send("Session request not approved");
   }
-  
+
   let details;
-  
-  
-  if (type === "election") {
-    details =  new ElectionDetails({
-      candidates: [],
+  const { sessionType, options, candidates } = sessionRequest;
+
+  if (sessionType === "election") {
+    details = new ElectionDetails({
+      candidates: candidates || [],
     });
-  } else if (type === "approval") {
-    details =  new ApprovalDetails({
-        });
-    } else if (type === "poll") {
-      details =  new PollDetails({
-            options: [],
-        });
-    } else if (type === "tournament") {
-      details =  new TournamentDetails({
-      });
-    } else if (type === "ranked") {
-      details =  new RankedDetails({
-      });
-    } else {
-      return res.status(400).send("Invalid session type");
-    }
-   
-    const owner=sessionRequest.user;
-    // Save the details document
-    await details.save();
-    const session = await new Session({
-      name,
-      type,
-      requestId,
-    createdBy: owner,
-    details:details._id,
-    ...value,
+  } else if (sessionType === "approval") {
+    details = new ApprovalDetails({
+      options: options || [],
+    });
+  } else if (sessionType === "poll") {
+    details = new PollDetails({
+      options: options || [],
+    });
+  } else if (sessionType === "tournament") {
+    details = new TournamentDetails({
+      candidates: candidates || [],
+    });
+  } else if (sessionType === "ranked") {
+    details = new RankedDetails({
+      options: options || [],
+    });
+  } else {
+    return res.status(400).send("Invalid session type");
+  }
+
+  await details.save();
+
+  const session = new Session({
+    name: sessionRequest.title,
+    type: sessionRequest.sessionType,
+    description: sessionRequest.description,
+    requestId,
+    createdBy: sessionRequest.user,
+    details: details._id,
+    startTime: sessionRequest.startDate,
+    endTime: sessionRequest.endDate,
+    status: "scheduled",
+    available: false,
   });
+
   await session.save();
-  sessionRequest.isArchived=true;
+  sessionRequest.isArchived = true;
   await sessionRequest.save();
   res.send(session);
 });

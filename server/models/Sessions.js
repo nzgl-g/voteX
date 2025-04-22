@@ -1,69 +1,55 @@
-import mongoose from 'mongoose';
-
+const mongoose = require("mongoose");
 const sessionSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-  },
+  name: { type: String, required: true },
   type: {
     type: String,
-    enum: ["election", "approval ", "poll", "tournament", "ranked"],
+    enum: ["election", "poll", "tournament"],
     required: true,
   },
-  details: {
-    type: mongoose.Schema.Types.ObjectId,
-    refPath: "type",
-  },
-  description: {
+  voteMode: {
     type: String,
-    default: null,
+    enum: [
+      "single",
+      "multiple",
+      "ranked",
+      "single elimination",
+      "double elimination",
+    ],
+    required: true,
   },
-  requestId:{
+  blockchainAddress: String, // Stores blockchain contract reference (i am not sure if u need this but i guess u do . this is the only blockchain data in the models)
+
+  details: { type: mongoose.Schema.Types.ObjectId, ref: "SessionDetails" }, // Single reference now
+  sessionRequest: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "requests",
-  },
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-  },
-  results: {
-    type: mongoose.Schema.Types.Mixed,
-    default: null,
-  },
-  voterList: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
-  ],
-  isApproved: {
-    type: Boolean,
-    default: false,
-  },
+    ref: "SessionRequest",
+  }, // Tracks the request it came from
+
+  description: { type: String, default: null },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  team: { type: mongoose.Schema.Types.ObjectId, ref: "Team", required: true },
+  results: { type: mongoose.Schema.Types.Mixed, default: null },
+  voterList: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  isApproved: { type: Boolean, default: false },
+
   status: {
     type: String,
-    enum: ["ongoing", "completed", "canceled", "scheduled"],
-    default: "scheduled",
+    enum: ["InProgress", "Complete", "Rejected", "Approved", "Pending"],
+    default: "Approved",
   },
-  startTime: {
-    type: Date,
-    default: Date.now,
+  startTime: { type: Date, required: true },
+  endTime: { type: Date, required: true },
+  visibility: {
+    type: String,
+    enum: ["Public", "Private"],
+    default: "Public",
   },
-  endTime: {
-    type: Date,
-    default: Date.now,
-  },
-  available: {
-    type: Boolean,
-    default: false,
-  },
-  hiddenAt: {
-    type: Date,
-    default: null,
-  },
-  visibleAt: {
-    type: Date,
-    default: null,
+  secretPhrase: { type: String, default: "" },
+  locationRestriction: { type: String, default: "" },
+  resultVisibility: {
+    type: String,
+    enum: ["Visible", "Hidden"],
+    default: "Visible",
   },
 });
-export default mongoose.model("Session", sessionSchema);
+module.exports = mongoose.model("Session", sessionSchema);

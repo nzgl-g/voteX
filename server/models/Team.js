@@ -1,9 +1,16 @@
 const mongoose = require("mongoose");
+
 const teamSchema = new mongoose.Schema({
-  name: {
-    type: String,
+  session: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Session",
+    required: false,
+  },
+  sessionName: String,
+  leader: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
     required: true,
-    unique: true,
   },
   members: [
     {
@@ -11,10 +18,9 @@ const teamSchema = new mongoose.Schema({
       ref: "User",
     },
   ],
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
 });
 
 module.exports = mongoose.model("Team", teamSchema);
+
+//added a team model to keep api requests simple we getting data for the dashboard
+//idk how it would work with the drop down menu idea but it should still be needed

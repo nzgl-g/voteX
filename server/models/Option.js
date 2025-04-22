@@ -12,3 +12,4 @@ const optionSchema = new mongoose.Schema({
   //might need to know who made each option as a feature for teams
 });
 module.exports = mongoose.model("option", optionSchema);
+//this route cant be used for now . idk how the blockchain works with it

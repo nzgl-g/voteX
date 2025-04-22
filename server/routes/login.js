@@ -3,10 +3,10 @@
 //find user with email
 //check if password is correct
 //get token and put in header
-import express from "express";
-import User from "../models/User.js"; 
-import bcrypt from "bcrypt";
-import Joi from "joi";
+const express = require("express");
+const User = require("../models/User");
+const bcrypt = require("bcrypt");
+const Joi = require("joi");
 const schema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().min(6).required(),
@@ -25,12 +25,11 @@ router.post("/", async (req, res) => {
   }
   const match = await bcrypt.compare(password, user.password);
 
-  if (match) {
-    const token = user.generateAuthToken();
-    res.setHeader("authorization", token);
+  if (!match) {
+    return res.status(400).json({ message: "Invalid password" });
   }
-
-  res.send(user);
+  const token = user.generateAuthToken();
+  res.json({ token, user: { id: user._id, email: user.email } });
 });
 
-export default router;
+module.exports = router;

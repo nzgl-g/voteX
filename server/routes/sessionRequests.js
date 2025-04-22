@@ -1,73 +1,125 @@
-import express from 'express';
-import mongoose from 'mongoose';
-import auth from '../middleware/auth.js';
-import sessionRequest from '../models/SessionRequest.js';
-import IsAdmin from '../middleware/IsAdmin.js';
-import Joi from 'joi';
+const express = require("express");
+const mongoose = require("mongoose");
+const auth = require("../middleware/auth");
+const Session = require("../models/Sessions");
+const User = require("../models/User");
+const SessionRequest = require("../models/SessionRequest");
+const SessionDetails = require("../models/SessionDetails");
+const Team = require("../models/Team");
 const router = express.Router();
+const IsAdmin = require("../middleware/IsAdmin");
 // be sure to change this into only team members can see requests when done with initial testing
-
-router.get("/",IsAdmin,async(req,res)=>{
- const requests = await sessionRequest.find();
-  if (!requests) {
-    res.send("error");
+router.get("/", IsAdmin, async (req, res) => {
+  try {
+    const requests = await SessionRequest.find().populate(
+      "createdBy",
+      "username email"
+    );
+    res.send(requests);
+  } catch (err) {
+    console.error("Error fetching session requests:", err);
+    res.status(500).send("Server error");
   }
-  res.send(requests);
 });
 router.post("/", auth, async (req, res) => {
-    const schema = Joi.object({
-        title: Joi.string().required(),
-        description: Joi.string(),
-        organization: Joi.string(),
-        banner: Joi.object({
-            id: Joi.string(),
-            url: Joi.string()
-        }),
-        sessionType: Joi.string().valid("election", "approval", "poll", "tournament", "ranked").required(),
-        votingMode: Joi.string().required(),
-        startDate: Joi.date().required(),
-        endDate: Joi.date().required(),
-        preparationSchedule: Joi.date(),
-        accessControl: Joi.string().valid("public", "private", "invite").default("public"),
-        secretPhrase: Joi.string(),
-        displayLiveResults: Joi.boolean().default(true),
-        verificationMethod: Joi.string(),
-        options: Joi.array().items(Joi.object({
-            title: Joi.string(),
-            description: Joi.string()
-        })),
-        candidates: Joi.array().items(Joi.object({
-            name: Joi.string(),
-            email: Joi.string().email()
-        }))
-    });
-
-    const { error, value } = schema.validate(req.body);
-    if (error) {
-        return res.status(400).send(error.details[0].message);
+  try {
+    console.log("Authenticated User:", req.user);
+    if (!req.user || !req.user._id) {
+      return res.status(401).send("Unauthorized: User not found");
     }
-
-    const request = await new sessionRequest({
-        user: req.user._id,
-        ...value
-    });
-    
+    const requestData = {
+      ...req.body, // Spread first to get all fields
+      createdBy: req.user._id, // Override `createdBy` with correct user ID
+    };
+    console.log("Creating session request:", requestData);
+    const request = new SessionRequest(requestData);
+    console.log("Before Saving - Request Object:", request); // Log the object before saving
     await request.save();
-    res.send(request);
+
+    res.status(201).send(request);
+  } catch (err) {
+    res.status(400).send(err.message);
+  }
 });
 // might add a route for declining requests without using the creation route in sessions
 // or make session creation logic here?
-router.put("/approve",IsAdmin,async(req,res)=>{
-  const requestId=new mongoose.Types.ObjectId(req.body.id);
-  const request = await sessionRequest.findById(requestId);
-  if (!request) {
-    res.send("error");
+
+//decided to make the session directly when approving a request this way the second its approved we link the request id with the newly created session
+
+router.put("/approve", IsAdmin, async (req, res) => {
+  try {
+    const requestId = req.body.id;
+    if (!mongoose.Types.ObjectId.isValid(requestId)) {
+      return res.status(400).send("Invalid request ID");
+    }
+
+    const request = await SessionRequest.findById(requestId);
+    if (!request) {
+      return res.status(404).send("Session request not found");
+    }
+
+    if (request.status === "approved") {
+      return res.status(400).send("Session request already approved");
+    }
+    console.log("Created by:", request.createdBy);
+    const newTeam = new Team({
+      leader: request.createdBy, // Session creator is the team leader
+      members: [request.createdBy], // Leader is the first member
+    });
+    await newTeam.save();
+    // **Create the session**
+    const newSession = new Session({
+      name: request.name,
+      description: request.description,
+      type: request.type,
+      voteMode: request.voteMode,
+      startTime: request.startTime,
+      endTime: request.endTime,
+      sessionRequest: request._id,
+      createdBy: request.createdBy,
+      team: newTeam._id,
+      available: request.visibility === "Public",
+      status: "Approved",
+      isApproved: true,
+      visibility: request.visibility,
+      secretPhrase: request.secretPhrase,
+      locationRestriction: request.locationRestriction,
+      resultVisibility: request.resultVisibility,
+    });
+    await newSession.save();
+    newTeam.session = newSession._id;
+    newTeam.sessionName = newSession.name;
+    await newTeam.save();
+    // **Create session details**
+    const sessionDetails = new SessionDetails({
+      session: newSession._id, // Link session ID
+      type: request.type,
+      voteMode: request.voteMode,
+      candidates: [],
+      candidateRequests: [],
+      options: [],
+      participants: [],
+    });
+    await sessionDetails.save();
+
+    const user = await User.findById(request.createdBy);
+    if (user && user.role !== "team_leader") {
+      user.role = "team_leader";
+      await user.save();
+    }
+    // **Update the request status**
+    request.status = "approved";
+    await request.save();
+    res.send({
+      message: "Session approved, team created",
+      session: newSession,
+      team: newTeam,
+    });
+  } catch (err) {
+    res.status(500).send(err.message);
   }
-  if(request.status==="approved"){
-    return res.send("session request already approved")
-  }
-  request.status="approved";
-  await request.save();
-  res.send(request)
-})
-export default router;
+});
+module.exports = router;
+
+// currently using simple middleware to make testing the logic easy
+// after everything is done we can add moed detailed middleware .

@@ -275,31 +275,6 @@ export const mockCandidates: Candidate[] = [
         sessionId: 'session-1001',
     }
 ];
-export const mockSession: Session = {
-    id: "session-005",
-    title: "National Youth Election 2025",
-    description: "A nationwide election to select youth representatives.",
-    organizationName: "National Youth Council",
-    banner: "https://example.com/banners/youth-election.png",
-    sessionLifecycle: {
-        createdAt: "2025-03-01 10:00:00",
-        scheduledAt: "2025-05-01 09:00:00",
-        startedAt: "2025-05-01 09:15:00",
-        endedAt: "2025-05-10 18:00:00"
-    },
-    type: "election",
-    subtype: "Single",
-    tournamentType: null,
-    accessLevel: "Public",
-    securityMethod: "Secret Phrase",
-    verificationMethod: "KYC",
-    candidateStep: "Nomination",
-    options: null,
-    secretPhrase: "youth_power_2025",
-    subscription: freeSubscription,
-    candidates: mockCandidates,
-    teamMembers:mockTeamMember,
-};
 export const mockVoters: Voter[] = [
     {
         id: "voter-001",

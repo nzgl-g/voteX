@@ -1,11 +1,11 @@
-import express from 'express';
-import User from '../models/User.js';
-import bcrypt from 'bcrypt';
-import Joi from 'joi';
-import userSchema from '../validation/user.js';
+const express = require("express");
+const User = require("../models/User");
+const bcrypt = require("bcrypt");
+const Joi = require("joi");
+const userSchema = require("../validation/user");
 const router = express.Router();
 router.post("/", async (req, res) => {
-  const { username, email, password,role } = req.body;
+  const { username, email, password } = req.body;
 
   const { value, error } = userSchema.validate(req.body);
   if (error) {
@@ -17,26 +17,17 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ message: "User already exists." });
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(password, salt);
   const user = await new User({
     username,
     email,
-    role,
     password: hashedPassword,
-    
   });
   await user.save();
 
   const token = user.generateAuthToken();
-  res.setHeader("authorization", token);
-  res.status(201).json({
-    message: "User created successfully.",
-    user: {
-      id: user._id,
-      username: user.username,
-      email: user.email,
-      role: user.role
-    }
-  });
+
+  res.json({ user, token });
 });
-export default router;
+module.exports = router;

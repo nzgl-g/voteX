@@ -19,7 +19,7 @@ export interface Session {
     banner?: string | null; // Background image URL
     sessionLifecycle: {
         createdAt: string;     // Format: YYYY-MM-DD HH:mm:ss
-        scheduledAt?: string | null; // Optional future scheduling
+        scheduledAt?: string | null; // Optional future scheduling (its a time range)
         startedAt: string;     // Format: YYYY-MM-DD HH:mm:ss
         endedAt: string;       // Format: YYYY-MM-DD HH:mm:ss
     };

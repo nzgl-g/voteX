@@ -95,14 +95,14 @@ export default function VotingSessionForm({ plan }: VotingSessionFormProps) {
                 });
                 
                 // Redirect to sessions page or dashboard
-                router.push('/dashboard/sessions');
+                await router.push('/team-leader/real-time-analytics');
             } else {
                 // For paid plans, handle payment flow
                 // Store session data in localStorage for after payment
                 localStorage.setItem('pendingSession', JSON.stringify(sessionRequestData));
                 
                 // Redirect to payment page
-                router.push('/subscription/payment');
+                await router.push('/subscription');
             }
         } catch (error) {
             console.error('Error creating session:', error);

@@ -31,9 +31,13 @@ const sessionDetailsSchema = new mongoose.Schema({
   ],
 
   // Tournament Fields
+  tournamentType: {
+    type: String,
+    enum: ["Round Robin", "Knockout", "Swiss", null],
+    default: null,
+  },
   bracket: { type: mongoose.Schema.Types.Mixed, default: {} }, // Stores matchups dynamically
   maxRounds: { type: Number, default: 1 },
-
   createdAt: { type: Date, default: Date.now },
 });
 

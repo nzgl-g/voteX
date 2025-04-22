@@ -37,8 +37,12 @@ const sessionSchema = new mongoose.Schema({
     enum: ["InProgress", "Complete", "Rejected", "Approved", "Pending"],
     default: "Approved",
   },
-  startTime: { type: Date, required: true },
-  endTime: { type: Date, required: true },
+  sessionLifecycle: {
+    createdAt: { type: Date, default: Date.now }, // optional if you use timestamps
+    scheduledAt: { type: Date, default: null }, // if scheduling is ever used
+    startedAt: { type: Date, required: true },
+    endedAt: { type: Date, required: true },
+  },
   visibility: {
     type: String,
     enum: ["Public", "Private"],
@@ -50,6 +54,31 @@ const sessionSchema = new mongoose.Schema({
     type: String,
     enum: ["Visible", "Hidden"],
     default: "Visible",
+  },
+
+  organizationName: { type: String, default: null },
+  banner: { type: String, default: null }, // Background image URL
+  verificationMethod: {
+    type: String,
+    enum: ["KYC", "CVC", null],
+    default: null,
+  },
+  candidateStep: {
+    type: String,
+    enum: ["Nomination", "Invitation"],
+    default: "Nomination",
+  },
+  subscription: {
+    id: { type: String }, // Optional, mostly for frontend matching
+    name: {
+      type: String,
+      enum: ["free", "pro", "enterprise"],
+      required: true,
+    },
+    price: { type: Number, required: true },
+    voterLimit: { type: Number, default: null },
+    features: [{ type: String }],
+    isRecommended: { type: Boolean, default: false },
   },
 });
 module.exports = mongoose.model("Session", sessionSchema);

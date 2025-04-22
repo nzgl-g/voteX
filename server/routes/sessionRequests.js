@@ -73,8 +73,6 @@ router.put("/approve", IsAdmin, async (req, res) => {
       description: request.description,
       type: request.type,
       voteMode: request.voteMode,
-      startTime: request.startTime,
-      endTime: request.endTime,
       sessionRequest: request._id,
       createdBy: request.createdBy,
       team: newTeam._id,
@@ -85,6 +83,23 @@ router.put("/approve", IsAdmin, async (req, res) => {
       secretPhrase: request.secretPhrase,
       locationRestriction: request.locationRestriction,
       resultVisibility: request.resultVisibility,
+      organizationName: request.organizationName,
+      banner: request.banner,
+      verificationMethod: request.verificationMethod,
+      candidateStep: request.candidateStep || "Nomination",
+      sessionLifecycle: {
+        scheduledAt: request.scheduledAt || null,
+        startedAt: request.startTime,
+        endedAt: request.endTime,
+      },
+      subscription: {
+        id: request.subscription?.id || "",
+        name: request.subscription?.name || "free",
+        price: request.subscription?.price || 0,
+        voterLimit: request.subscription?.voterLimit || null,
+        features: request.subscription?.features || [],
+        isRecommended: request.subscription?.isRecommended || false,
+      },
     });
     await newSession.save();
     newTeam.session = newSession._id;
@@ -92,16 +107,18 @@ router.put("/approve", IsAdmin, async (req, res) => {
     await newTeam.save();
     // **Create session details**
     const sessionDetails = new SessionDetails({
-      session: newSession._id, // Link session ID
-      type: request.type,
-      voteMode: request.voteMode,
+      session: newSession._id,
       candidates: [],
       candidateRequests: [],
       options: [],
-      participants: [],
+      tournamentType: request.tournamentType || null,
+      bracket: {},
+      maxRounds: request.maxRounds || 1,
+      maxChoices: request.maxChoices || 1, // Optional, based on your notes
     });
     await sessionDetails.save();
-
+    newSession.details = sessionDetails._id;
+    await newSession.save();
     const user = await User.findById(request.createdBy);
     if (user && user.role !== "team_leader") {
       user.role = "team_leader";

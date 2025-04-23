@@ -12,8 +12,8 @@ const IsAdmin = require("../middleware/IsAdmin");
 router.get("/", IsAdmin, async (req, res) => {
   try {
     const requests = await SessionRequest.find().populate(
-      "createdBy",
-      "username email"
+        "createdBy",
+        "username email"
     );
     res.send(requests);
   } catch (err) {
@@ -29,7 +29,7 @@ router.post("/", auth, async (req, res) => {
     }
     const requestData = {
       ...req.body, // Spread first to get all fields
-      createdBy: req.user._id, // Override `createdBy` with correct user ID
+      createdBy: req.user._id, // Override createdBy with correct user ID
     };
     console.log("Creating session request:", requestData);
     const request = new SessionRequest(requestData);

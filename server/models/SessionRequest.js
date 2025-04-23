@@ -1,20 +1,7 @@
 const mongoose = require("mongoose");
-const SessionRequestSchema = new mongoose.Schema({
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true,
-  },
-  status: {
-    type: String,
-    enum: ["pending", "approved", "rejected"],
-    default: "pending",
-  },
-  isArchived: { type: Boolean, default: false },
 
-  // Session details from the form
-  name: { type: String, required: true }, // Consistent with `Session` model
-  description: { type: String, default: "" },
+const sessionRequestSchema = new mongoose.Schema({
+  name: { type: String, required: true },
   type: {
     type: String,
     enum: ["election", "poll", "tournament"],
@@ -31,8 +18,11 @@ const SessionRequestSchema = new mongoose.Schema({
     ],
     required: true,
   },
-  startTime: { type: Date }, // Matches `Session` model   required: true
-  endTime: { type: Date }, // Matches `Session`  model  required: true
+
+  description: { type: String, default: null },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  team: { type: mongoose.Schema.Types.ObjectId, ref: "Team" },
+  results: { type: mongoose.Schema.Types.Mixed, default: null },
   visibility: {
     type: String,
     enum: ["Public", "Private"],
@@ -45,12 +35,44 @@ const SessionRequestSchema = new mongoose.Schema({
     enum: ["Visible", "Hidden"],
     default: "Visible",
   },
+
+  organizationName: { type: String, default: null },
+  banner: { type: String, default: null }, // Background image URL
+  verificationMethod: {
+    type: String,
+    enum: ["KYC", "CVC", null],
+    default: null,
+  },
+  candidateStep: {
+    type: String,
+    enum: ["Nomination", "Invitation"],
+    default: "Nomination",
+  },
+  subscription: {
+    id: { type: String }, // Optional, mostly for frontend matching
+    name: {
+      type: String,
+      enum: ["free", "pro", "enterprise"],
+      required: true,
+    },
+    price: { type: Number, required: true },
+    voterLimit: { type: Number, default: null },
+    features: [{ type: String }],
+    isRecommended: { type: Boolean, default: false },
+  },
+
+  status: {
+    type: String,
+    enum: ["pending", "approved", "rejected"],
+    default: "pending",
+  },
+
+  sessionLifecycle: {
+    createdAt: { type: Date, default: Date.now },
+    scheduledAt: { type: Date, default: null },
+    startedAt: { type: Date, default: null },
+    endedAt: { type: Date, default: null },
+  },
 });
 
-// Future Offer Feature
-// offer: {
-//   type: mongoose.Schema.Types.ObjectId,
-//   ref: "Offer",
-// }
-//this depends on the payment plans . can be ignored for now
-module.exports = mongoose.model("SessionRequest", SessionRequestSchema);
+module.exports = mongoose.model("SessionRequest", sessionRequestSchema);

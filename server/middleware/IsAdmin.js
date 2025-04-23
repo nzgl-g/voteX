@@ -1,25 +1,19 @@
-const jwt = require("jsonwebtoken");
-module.exports = function (req, res, next) {
-  const token = req.header("Authorization");
+import jwt from 'jsonwebtoken';
+
+export default function IsAdmin(req, res, next) {
+  const token = req.header("authorization");
   if (!token) {
-    return res.status(401).send("No token provided");
+    return res.send("no token provided");
   }
   try {
-    const tokenParts = token.split(" ");
-    const actualToken =
-      tokenParts.length === 2 && tokenParts[0] === "Bearer"
-        ? tokenParts[1]
-        : token;
+    const decoded = jwt.verify(token, "hello");
+    if(decoded.role!=="admin"){
+      return res.send("not allowed");
 
-    const decoded = jwt.verify(actualToken, process.env.JWT_SECRET || "hello");
-
-    if (decoded.role !== "admin") {
-      return res.status(403).send("Not allowed");
     }
-
     req.user = decoded;
     next();
   } catch (ex) {
-    return res.status(401).send("Invalid token");
+    return res.send("invalid token");
   }
-};
+}

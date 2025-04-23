@@ -21,10 +21,6 @@ const userSchema = new mongoose.Schema({
     enum: ["admin", "team_leader", "team_member", "candidate", "voter"],
     default: "voter",
   },
-  teamMembers: {
-    type: [String],
-    default: [],
-  },
   createdAt: {
     type: Date,
     default: Date.now,

@@ -171,7 +171,7 @@ export function EventDialog({
 
     onSave({
       id: event?.id || "",
-      title: eventTitle,
+      name: eventTitle,
       description,
       start,
       end,

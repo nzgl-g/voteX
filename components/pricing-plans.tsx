@@ -1,175 +1,162 @@
-import {Button} from "@/components/shadcn-ui/button";
-import {BadgeCheck, Building, Check, ChevronRight, FileText, Lock, Shield, Users, X} from "lucide-react";
-import {Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} from "@/components/shadcn-ui/card";
-import {Badge} from "@/components/shadcn-ui/badge";
+"use client";
 
-interface PlanFeature {
-    text: string;
-    included: boolean;
-    icon?: React.ReactNode;
-}
+import { CheckIcon } from "@radix-ui/react-icons";
+import { motion } from "framer-motion";
+import { Loader } from "lucide-react";
+import React, { useState } from "react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/shadcn-ui/button";
+import { useRouter } from "next/navigation";
 
-interface PricingPlan {
-    id: string;
-    name: string;
-    description: string;
-    price: string;
-    period?: string;
-    buttonText: string;
-    buttonVariant: "outline" | "default" | "secondary";
-    features: PlanFeature[];
-    popularPlan?: boolean;
-    recommendation?: string;
-    accent?: string;
-}
+// Extracted pricing plan data
+const pricingPlans = [
+    {
+        id: "free",
+        name: "Free",
+        subtitle: "100 voter limit",
+        price: "$0.00",
+        buttonText: "Create",
+        actionUrl: "/session-creation?plan=free",
+        selectId: "sub-free-001",
+        isHighlighted: false,
+        features: [
+            "Poll voting only",
+            "Standard verification",
+            "Up to 100 voters",
+            "No support"
+        ]
+    },
+    {
+        id: "pro",
+        name: "Pro",
+        subtitle: "10,000 voter limit",
+        price: "$49.99",
+        buttonText: "Buy",
+        actionUrl: "/session-creation?plan=pro",
+        selectId: "sub-pro-001",
+        isHighlighted: true,
+        features: [
+            "All voting types (polls, elections, tournement)",
+            "KYC verification",
+            "Full-time priority support",
+            "Up to 10,000 voters"
+        ]
+    },
+    {
+        id: "enterprise",
+        name: "Enterprise",
+        subtitle: "Unlimited voters",
+        price: "$199.99",
+        buttonText: "Contact Sales",
+        actionUrl: "/contact",
+        selectId: "sub-ent-001",
+        isHighlighted: false,
+        features: [
+            "Private blockchain deployment",
+            "Unlimited voters and votes",
+            "Full-time priority support",
+            "Every Thing on pro"
+        ]
+    }
+];
 
-interface PricingPlansProps {
-    onPlanSelect?: (plan: string) => void;
-}
+export function PricingSection() {
+    const router = useRouter();
+    const [isLoading, setIsLoading] = useState(false);
+    const [selectedId, setSelectedId] = useState<string | null>(null);
 
-export default function PricingPlans({onPlanSelect}: PricingPlansProps) {
-    const plans: PricingPlan[] = [
-        {
-            id: "free",
-            name: "Free Plan",
-            description: "Perfect for trying out basic voting",
-            price: "Free",
-            buttonText: "Get Started",
-            buttonVariant: "outline",
-            accent: "bg-muted/50",
-            recommendation: "Small communities, informal decisions, testing the platform",
-            features: [
-                {text: "Poll voting only", included: true, icon: <FileText className="w-4 h-4 text-primary"/>},
-                {text: "Up to 100 voters", included: true, icon: <Users className="w-4 h-4 text-primary"/>},
-                {text: "Standard verification", included: true, icon: <BadgeCheck className="w-4 h-4 text-primary"/>},
-                {text: "No support", included: false, icon: <X className="w-4 h-4 text-destructive"/>},
-            ]
-        },
-        {
-            id: "pro",
-            name: "Pro Plan",
-            description: "For growing teams and serious decision-making",
-            price: "$49",
-            period: "per session",
-            buttonText: "Upgrade Now",
-            buttonVariant: "default",
-            popularPlan: true,
-            accent: "bg-primary/5",
-            recommendation: "Companies, organizations, events, and secure digital governance",
-            features: [
-                {
-                    text: "All voting types (polls, elections, referendums, etc.)",
-                    included: true,
-                    icon: <FileText className="w-4 h-4 text-primary"/>
-                },
-                {text: "Up to 10,000 voters", included: true, icon: <Users className="w-4 h-4 text-primary"/>},
-                {text: "KYC verification", included: true, icon: <Shield className="w-4 h-4 text-primary"/>},
-                {text: "Full-time priority support", included: true, icon: <Check className="w-4 h-4 text-primary"/>},
-            ]
-        },
-        {
-            id: "enterprise",
-            name: "Enterprise Plan",
-            description: "Tailored for large-scale, high-security operations",
-            price: "Contact Sales",
-            buttonText: "Contact Us",
-            buttonVariant: "secondary",
-            accent: "bg-secondary/50",
-            recommendation: "Governments, large enterprises, or mission-critical voting scenarios",
-            features: [
-                {text: "Private blockchain deployment", included: true, icon: <Lock className="w-4 h-4 text-primary"/>},
-                {text: "Unlimited voters and votes", included: true, icon: <Users className="w-4 h-4 text-primary"/>},
-                {text: "All advanced voting types", included: true, icon: <FileText className="w-4 h-4 text-primary"/>},
-                {text: "Advanced KYC verification", included: true, icon: <Shield className="w-4 h-4 text-primary"/>},
-                {
-                    text: "Dedicated full-time support & onboarding",
-                    included: true,
-                    icon: <Building className="w-4 h-4 text-primary"/>
-                },
-            ]
-        }
-    ];
+    const handlePlanSelection = (plan: typeof pricingPlans[0]) => {
+        setIsLoading(true);
+        setSelectedId(plan.selectId);
+        router.push(plan.actionUrl);
+    };
 
     return (
-        <div className="container px-4 py-12 mx-auto">
-            <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold tracking-tight mb-4">Choose Your Plan</h2>
-                <p className="text-muted-foreground mx-auto max-w-3xl">
-                    Select the perfect voting solution for your needs. From small community decisions to large-scale
-                    secure elections.
-                </p>
-            </div>
+        <section id="pricing">
+            <div className="mx-auto flex max-w-screen-xl flex-col gap-8 px-4 py-14 md:px-8">
+                <div className="mx-auto max-w-5xl text-center">
+                    <h4 className="text-xl font-bold tracking-tight text-black dark:text-white">
+                        Pricing Plans
+                    </h4>
+                </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {plans.map((plan, index) => (
-                    <div key={index} className="relative">
-                        {plan.popularPlan && (
-                            <Badge
-                                variant="default"
-                                className="absolute top-0 right-0 transform translate-x-2 -translate-y-2 z-10"
-                            >
-                                Popular
-                            </Badge>
-                        )}
-                        <Card
-                            className={`flex flex-col h-full border transition-all duration-200 hover:shadow-md ${plan.accent} ${plan.popularPlan ? 'ring-2 ring-primary/20 shadow-lg' : ''}`}>
-                            <CardHeader className="pb-8">
-                                <CardTitle className="text-2xl">{plan.name}</CardTitle>
-                                <CardDescription className="pt-1.5">{plan.description}</CardDescription>
-                                <div className="mt-4">
-                                    <span className="text-4xl font-bold">{plan.price}</span>
-                                    {plan.period && <span className="text-muted-foreground ml-1">{plan.period}</span>}
+                <div className="mx-auto grid w-full flex-col justify-center gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {pricingPlans.map((plan, index) => (
+                        <div
+                            key={plan.id}
+                            className={cn(
+                                "relative flex max-w-[400px] flex-col gap-8 overflow-hidden rounded-2xl border p-4 text-black dark:text-white",
+                                {
+                                    "border-2 border-[var(--color-one)] dark:border-[var(--color-one)]": plan.isHighlighted,
+                                }
+                            )}
+                        >
+                            <div className="flex items-center">
+                                <div className="ml-4">
+                                    <h2 className="text-base font-semibold leading-7">{plan.name}</h2>
+                                    <p className="text-sm leading-5 text-black/70 dark:text-white">
+                                        {plan.subtitle}
+                                    </p>
                                 </div>
-                            </CardHeader>
-                            <CardContent className="flex-grow">
-                                <ul className="space-y-4">
-                                    {plan.features.map((feature, featureIndex) => (
-                                        <li key={featureIndex} className="flex items-start">
-                      <span className="mr-2 mt-0.5">
-                        {feature.icon || (feature.included ? <Check className="w-4 h-4 text-primary"/> :
-                            <X className="w-4 h-4 text-destructive"/>)}
-                      </span>
-                                            <span className={feature.included ? "" : "text-muted-foreground"}>
-                        {feature.text}
-                      </span>
-                                        </li>
-                                    ))}
-                                </ul>
-                                {plan.recommendation && (
-                                    <div className="mt-6 pt-4 border-t">
-                                        <p className="text-sm font-medium">Great for:</p>
-                                        <p className="text-sm text-muted-foreground">{plan.recommendation}</p>
-                                    </div>
-                                )}
-                            </CardContent>
-                            <CardFooter className="pt-4">
-                                <Button
-                                    variant={plan.buttonVariant}
-                                    className="w-full group"
-                                    onClick={() => {
-                                        onPlanSelect?.(plan.id.toLowerCase().split(' ')[0]);
-                                        window.location.href = `/session-creation?plan=${plan.id}`;
-                                    }}
-                                >
-                                    {plan.buttonText}
-                                    <ChevronRight
-                                        className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1"/>
-                                </Button>
-                            </CardFooter>
-                        </Card>
-                    </div>
-                ))}
-            </div>
+                            </div>
 
-            <div className="text-center mt-16">
-                <p className="text-sm text-muted-foreground">
-                    All plans include our core voting infrastructure, security, and 99.9% uptime guarantee.
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                    Need a custom solution? <Button variant="link" className="p-0 h-auto font-normal">Contact our sales
-                    team</Button>
-                </p>
+                            <motion.div
+                                key={plan.selectId}
+                                initial="initial"
+                                animate="animate"
+                                variants={{
+                                    initial: { opacity: 0, y: 12 },
+                                    animate: { opacity: 1, y: 0 },
+                                }}
+                                transition={{
+                                    duration: 0.4,
+                                    delay: 0.1 + index * 0.05,
+                                    ease: [0.21, 0.47, 0.32, 0.98],
+                                }}
+                                className="flex flex-row gap-1"
+                            >
+                <span className="text-4xl font-bold text-black dark:text-white">
+                  {plan.price}
+                    <span className="text-xs"> /session</span>
+                </span>
+                            </motion.div>
+
+                            <Button
+                                className={cn(
+                                    "group relative w-full gap-2 overflow-hidden text-lg font-semibold tracking-tighter",
+                                    "transform-gpu ring-offset-current transition-all duration-300 ease-out hover:ring-2 hover:ring-primary hover:ring-offset-2"
+                                )}
+                                disabled={isLoading}
+                                onClick={() => handlePlanSelection(plan)}
+                            >
+                <span
+                    className="absolute right-0 -mt-12 h-32 w-8 translate-x-12 rotate-12 transform-gpu bg-white opacity-10 transition-all duration-1000 ease-out group-hover:-translate-x-96 dark:bg-black"
+                />
+                                {!isLoading || selectedId !== plan.selectId ? (
+                                    <p>{plan.buttonText}</p>
+                                ) : (
+                                    <p>{plan.id === "enterprise" ? "Redirecting" : "Creating"}</p>
+                                )}
+                                {isLoading && selectedId === plan.selectId && (
+                                    <Loader className="mr-2 size-4 animate-spin" />
+                                )}
+                            </Button>
+
+                            <hr className="m-0 h-px w-full border-none bg-gradient-to-r from-neutral-200/0 via-neutral-500/30 to-neutral-200/0" />
+                            <ul className="flex flex-col gap-2 font-normal">
+                                {plan.features.map((feature, featureIndex) => (
+                                    <li key={`${plan.id}-feature-${featureIndex}`} className="flex items-center gap-3 text-xs font-medium text-black dark:text-white">
+                                        <CheckIcon
+                                            className="size-5 shrink-0 rounded-full bg-green-400 p-[2px] text-black dark:text-white"
+                                        />
+                                        <span className="flex">{feature}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
+                </div>
             </div>
-        </div>
+        </section>
     );
 }

@@ -13,7 +13,7 @@ export interface Candidate {
 // Session Related Data Types
 export interface Session {
     id: string;
-    title: string;
+    name: string;
     description?: string | null;
     organizationName?: string | null;
     banner?: string | null; // Background image URL
@@ -28,7 +28,7 @@ export interface Session {
     tournamentType?: 'Round Robin' | 'Knockout' | 'Swiss' | null;
     accessLevel: 'Public' | 'Private';
     securityMethod?: 'Secret Phrase' | 'Area Restriction' | null;
-    verificationMethod?: 'KYC' | 'CVC' | null;
+    verificationMethod?: 'S' | 'CVC' | null;
     candidateStep: 'Nomination' | 'Invitation';
     candidates?: Candidate[] | null;
     options?: string | null;
@@ -100,17 +100,54 @@ export interface Vote {
 export interface Subscription {
     id: string;
     name: 'free' | 'pro' | 'enterprise';
-    price: number;
+    price: number | null;
     voterLimit?: number | null;
     features: string[];
     isRecommended: boolean;
-    addOns: {
-        id: string;
-        name: string;
-        description: string;
-        price: number;
-    }[];
 }
+
+export const subscriptions: Subscription[] = [
+    {
+        id: "free",
+        name: "free",
+        price: 0,
+        voterLimit: 100,
+        features: [
+            "Poll voting only",
+            "Up to 100 voters",
+            "Standard verification",
+            "No support",
+        ],
+        isRecommended: false,
+    },
+    {
+        id: "pro",
+        name: "pro",
+        price: 49, // Assuming this is per session
+        voterLimit: 10000,
+        features: [
+            "All voting types (polls, elections, referendums, etc.)",
+            "Up to 10,000 voters",
+            "KYC verification",
+            "Full-time priority support",
+        ],
+        isRecommended: true,
+    },
+    {
+        id: "enterprise",
+        name: "enterprise",
+        price: null, // "Contact Sales"
+        voterLimit: null, // unlimited
+        features: [
+            "Private blockchain deployment",
+            "Unlimited voters and votes",
+            "All advanced voting types",
+            "Advanced KYC verification",
+            "Dedicated full-time support & onboarding",
+        ],
+        isRecommended: false,
+    },
+];
 
 export interface AreaChartData {
     period:string;

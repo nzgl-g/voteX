@@ -10,7 +10,6 @@ export const freeSubscription: Subscription = {
     voterLimit: 500,
     features: ["Basic Dashboard", "Public Voting", "Limited Support"],
     isRecommended: false,
-    addOns: []
 };
 export const proSubscription: Subscription = {
     id: "sub-pro-001",
@@ -19,20 +18,6 @@ export const proSubscription: Subscription = {
     voterLimit: 10000,
     features: ["Custom Branding", "Priority Support", "Analytics Dashboard", "Secret Phrase Voting"],
     isRecommended: true,
-    addOns: [
-        {
-            id: "addon-pro-001",
-            name: "Extra Voter Pack",
-            description: "Add 5,000 more voters",
-            price: 9.99
-        },
-        {
-            id: "addon-pro-002",
-            name: "Data Export",
-            description: "Export data in CSV and JSON formats",
-            price: 4.99
-        }
-    ]
 };
 export const enterpriseSubscription: Subscription = {
     id: "sub-ent-001",
@@ -41,20 +26,6 @@ export const enterpriseSubscription: Subscription = {
     voterLimit: null, // Unlimited voters
     features: ["Custom Workflows", "Dedicated Manager", "Full API Access", "Unlimited Voters"],
     isRecommended: false,
-    addOns: [
-        {
-            id: "addon-ent-001",
-            name: "White Labeling",
-            description: "Remove all platform branding",
-            price: 29.99
-        },
-        {
-            id: "addon-ent-002",
-            name: "24/7 SLA Support",
-            description: "Round-the-clock technical support",
-            price: 49.99
-        }
-    ]
 };
 export const mockTeamMember: TeamMember[] = [
     {

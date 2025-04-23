@@ -1,6 +1,38 @@
 const mongoose = require("mongoose");
+
+// Define the candidate schema
+const candidateSchema = new mongoose.Schema({
+  fullName: {type: String, required: true},
+  status: {
+    type: String,
+    enum: ["Verified", "Pending", "Refused"],
+    default: "Pending"
+  },
+  assignedReviewer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null
+  },
+  partyName: {type: String, required: true},
+  totalVotes: {type: Number, default: 0},
+  requiresReview: {type: Boolean, default: false},
+});
+
+// Define the option schema
+const optionSchema = new mongoose.Schema({
+  name: {type: String, required: true},
+  description: {type: String, default: null},
+  totalVotes: {type: Number, default: 0},
+});
+
 const sessionSchema = new mongoose.Schema({
+  // Basic information
   name: { type: String, required: true },
+  description: {type: String, default: null},
+  organizationName: {type: String, default: null},
+  banner: {type: String, default: null}, // Background image URL
+
+  // Session type and voting mode
   type: {
     type: String,
     enum: ["election", "poll", "tournament"],
@@ -17,57 +49,51 @@ const sessionSchema = new mongoose.Schema({
     ],
     required: true,
   },
-  blockchainAddress: String, // Stores blockchain contract reference (i am not sure if u need this but i guess u do . this is the only blockchain data in the models)
-
-  details: { type: mongoose.Schema.Types.ObjectId, ref: "SessionDetails" }, // Single reference now
-  sessionRequest: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "SessionRequest",
-  }, // Tracks the request it came from
-
-  description: { type: String, default: null },
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  team: { type: mongoose.Schema.Types.ObjectId, ref: "Team", required: true },
-  results: { type: mongoose.Schema.Types.Mixed, default: null },
-  voterList: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-  isApproved: { type: Boolean, default: false },
-
-  status: {
+  tournamentType: {
     type: String,
-    enum: ["InProgress", "Complete", "Rejected", "Approved", "Pending"],
-    default: "Approved",
+    enum: ["Round Robin", "Knockout", "Swiss", null],
+    default: null,
   },
-  sessionLifecycle: {
-    createdAt: { type: Date, default: Date.now }, // optional if you use timestamps
-    scheduledAt: { type: Date, default: null }, // if scheduling is ever used
-    startedAt: { type: Date, required: true },
-    endedAt: { type: Date, required: true },
-  },
+  blockchainAddress: String, // Stores blockchain contract reference
+
+  // Access control
   visibility: {
     type: String,
     enum: ["Public", "Private"],
     default: "Public",
   },
+  securityMethod: {
+    type: String,
+    enum: ["Secret Phrase", "CSV", null],
+    default: null,
+  },
   secretPhrase: { type: String, default: "" },
   locationRestriction: { type: String, default: "" },
+  
+  // Results display
   resultVisibility: {
     type: String,
     enum: ["Visible", "Hidden"],
     default: "Visible",
   },
 
-  organizationName: { type: String, default: null },
-  banner: { type: String, default: null }, // Background image URL
+  // Verification
   verificationMethod: {
     type: String,
-    enum: ["KYC", "CVC", null],
+    enum: ["standard", "kyc", null],
     default: null,
   },
   candidateStep: {
     type: String,
-    enum: ["Nomination", "Invitation"],
+    enum: ["Nomination", "Manual"],
     default: "Nomination",
   },
+
+  // Candidates and options
+  candidates: [candidateSchema],
+  options: [optionSchema],
+
+  // Subscription details
   subscription: {
     id: { type: String }, // Optional, mostly for frontend matching
     name: {
@@ -80,5 +106,34 @@ const sessionSchema = new mongoose.Schema({
     features: [{ type: String }],
     isRecommended: { type: Boolean, default: false },
   },
+
+  // Session lifecycle
+  sessionLifecycle: {
+    createdAt: { type: Date, default: Date.now },
+    scheduledAt: {
+      start: {type: Date, default: null},
+      end: {type: Date, default: null}
+    },
+    startedAt: { type: Date, default: null },
+    endedAt: { type: Date, default: null },
+  },
+
+  // References and status
+  details: { type: mongoose.Schema.Types.ObjectId, ref: "SessionDetails" },
+  sessionRequest: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "SessionRequest",
+  },
+  createdBy: {type: mongoose.Schema.Types.ObjectId, ref: "User"},
+  team: {type: mongoose.Schema.Types.ObjectId, ref: "Team"},
+  results: {type: mongoose.Schema.Types.Mixed, default: null},
+  voterList: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  isApproved: { type: Boolean, default: false },
+  status: {
+    type: String,
+    enum: ["InProgress", "Complete", "Rejected", "Approved", "Pending"],
+    default: "Approved",
+  },
 });
-module.exports = mongoose.model("Session", sessionSchema);
+
+module.exports = mongoose.models.Session || mongoose.model("Session", sessionSchema);

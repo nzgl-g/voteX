@@ -165,7 +165,7 @@ export function EventCalendar({
 
     const newEvent: CalendarEvent = {
       id: "",
-      title: "",
+      name: "",
       start: startTime,
       end: addHoursToDate(startTime, 1),
       allDay: false,

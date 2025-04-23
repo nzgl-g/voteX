@@ -18,4 +18,4 @@ module.exports = function (app) {
   app.use("/votex/api/sessions/:sessionId/vote", voteRouter);
   app.use("/votex/api/sessions/:sessionId/candidate", candidateRouter);
 };
-//dont bother with this file . it just makes the routes work
+//don't bother with this file . it just makes the routes work

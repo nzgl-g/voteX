@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 
-module.exports = function (req, res, next) {
+const auth = function (req, res, next) {
   let token = req.header("authorization"); // Authorization header
 
   console.log("Received Token:", token); // Debugging
@@ -25,3 +25,34 @@ module.exports = function (req, res, next) {
     return res.status(401).send("Token not valid");
   }
 };
+
+const IsAdmin = function(req, res, next) {
+  let token = req.header("authorization");
+
+  if (!token) {
+    return res.status(401).send("No token provided");
+  }
+
+  // Remove "Bearer " prefix if present
+  if (token.startsWith("Bearer ")) {
+    token = token.slice(7, token.length);
+  }
+
+  try {
+    const decoded = jwt.verify(token, "hello");
+    req.user = decoded;
+    
+    // Check if user is admin
+    if (req.user.role !== "admin") {
+      return res.status(403).send("Access denied. Admin role required.");
+    }
+    
+    next();
+  } catch (ex) {
+    console.error("Token verification failed:", ex.message);
+    return res.status(401).send("Token not valid");
+  }
+};
+
+module.exports = auth;
+module.exports.IsAdmin = IsAdmin;

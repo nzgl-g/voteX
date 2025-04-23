@@ -1,4 +1,6 @@
 import {SessionProfile} from "@/components/profile/session-profile";
+import {SiteHeader} from "@/components/sidebar/site-header";
+import React from "react";
 
 // Mock data for demonstration
 const mockSession = {
@@ -81,8 +83,10 @@ const mockSession = {
 }
 export default function Home() {
     return (
-        <main className="min-h-screen bg-slate-50 dark:bg-slate-900">
-            <SessionProfile session={mockSession} />
-        </main>
+        <><SiteHeader title="Get real-time insights into your voting session."/>
+            <main className="min-h-screen bg-slate-50 dark:bg-slate-900">
+                <SessionProfile session={mockSession}/>
+            </main>
+        </>
     )
 }

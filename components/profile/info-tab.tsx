@@ -21,7 +21,7 @@ interface InfoTabProps {
 export function InfoTab({ session, onUpdate }: InfoTabProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState({
-    title: session.title,
+    title: session.name,
     description: session.description || "",
     organizationName: session.organizationName || "",
     type: session.type,
@@ -41,7 +41,7 @@ export function InfoTab({ session, onUpdate }: InfoTabProps) {
     const scheduledAt = `${format(formData.scheduledStart, "yyyy-MM-dd HH:mm:ss")} - ${format(formData.scheduledEnd, "yyyy-MM-dd HH:mm:ss")}`
 
     onUpdate({
-      title: formData.title,
+      name: formData.title,
       description: formData.description,
       organizationName: formData.organizationName,
       type: formData.type as "poll" | "election" | "tournament",
@@ -58,7 +58,7 @@ export function InfoTab({ session, onUpdate }: InfoTabProps) {
 
   const handleCancel = () => {
     setFormData({
-      title: session.title,
+      name: session.name,
       description: session.description || "",
       organizationName: session.organizationName || "",
       type: session.type,
@@ -108,7 +108,7 @@ export function InfoTab({ session, onUpdate }: InfoTabProps) {
                 className="w-full"
               />
             ) : (
-              <p className="text-slate-900 dark:text-white py-2">{session.title}</p>
+              <p className="text-slate-900 dark:text-white py-2">{session.name}</p>
             )}
           </div>
 

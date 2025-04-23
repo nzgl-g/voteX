@@ -18,7 +18,9 @@ export const authApi = {
       // Store the token from header
       const token = response.headers.authorization;
       if (token) {
-        localStorage.setItem('auth_token', token);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('auth_token', token);
+        }
         // Set token for future requests
         apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       }
@@ -44,7 +46,9 @@ export const authApi = {
       // Store the token from header
       const token = response.headers.authorization;
       if (token) {
-        localStorage.setItem('auth_token', token);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('auth_token', token);
+        }
         // Set token for future requests
         apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       }
@@ -68,22 +72,35 @@ export const authApi = {
 
   // Logout - clear token
   logout: () => {
-    localStorage.removeItem('auth_token');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('auth_token');
+    }
     delete apiClient.defaults.headers.common['Authorization'];
   },
 
   // Check if user is authenticated
   isAuthenticated: () => {
-    return !!localStorage.getItem('auth_token');
+    if (typeof window !== 'undefined') {
+      return !!localStorage.getItem('auth_token');
+    }
+    return false;
   },
 
   // Get current user's token
   getToken: () => {
-    return localStorage.getItem('auth_token');
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('auth_token');
+    }
+    return null;
   },
 
   // Initialize auth state from localStorage on app load
   initAuth: () => {
+    // Check if code is running in browser environment
+    if (typeof window === 'undefined') {
+      return false; // Skip localStorage in server environment
+    }
+    
     const token = localStorage.getItem('auth_token');
     if (token) {
       apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -93,21 +110,40 @@ export const authApi = {
   }
 };
 
-// Set up interceptor to handle token expiration
+// Set up request interceptor to always include the latest token
+apiClient.interceptors.request.use(
+  (config) => {
+    // Check if we're in a browser environment
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Set up response interceptor to handle token expiration
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
       // Token expired or invalid
       authApi.logout();
-      // Redirect to login page if needed
-      window.location.href = '/login';
+      // Redirect to login page if needed - only in browser environment
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
 );
 
-// Initialize auth on import
-authApi.initAuth();
+// Initialize auth on import - only if in browser environment
+if (typeof window !== 'undefined') {
+  authApi.initAuth();
+}
 
 export default apiClient;

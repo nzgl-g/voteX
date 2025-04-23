@@ -5,7 +5,6 @@ import {ThemeProvider} from "next-themes"
 import {Toaster} from "@/components/shadcn-ui/sonner"
 
 import {SidebarLeft} from "@/components/sidebar/sidebar-left"
-import {SidebarRight} from "@/components/sidebar/sidebar-right"
 import ChatBubble from "@/components/chat-bubble"
 import {SidebarInset, SidebarProvider,} from "@/components/shadcn-ui/sidebar"
 
@@ -58,7 +57,6 @@ export default function Layout({children}: { children: ReactNode }) {
                 <SidebarInset>
                     {children}
                 </SidebarInset>
-                <SidebarRight />
             </SidebarProvider>
             <ChatBubble/>
             <Toaster position="bottom-center"/>

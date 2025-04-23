@@ -1,8 +1,8 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const auth = require("../middleware/auth");
 const Team = require("../models/Team");
 const User = require("../models/User");
-const auth = require("../middleware/auth");
 const isTeamLeader = require("../middleware/isTeamLeader");
 const router = express.Router();
 
@@ -16,6 +16,28 @@ router.get("/", auth, async (req, res) => {
     res.status(200).send(teams);
   } catch (err) {
     res.status(500).send(err.message);
+  }
+});
+
+/** 🔹 Get teams for the current user (Used for session creation) */
+router.get("/user", auth, async (req, res) => {
+  try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).send("Unauthorized: User not found");
+    }
+    
+    // Find teams where the user is either the leader or a member
+    const teams = await Team.find({
+      $or: [
+        { leader: req.user._id },
+        { members: { $in: [req.user._id] } }
+      ]
+    });
+    
+    res.status(200).send(teams);
+  } catch (err) {
+    console.error("Error fetching user teams:", err);
+    res.status(500).send("Server error");
   }
 });
 /** 🔹 Get all members of a team (Only if user is in the team) */

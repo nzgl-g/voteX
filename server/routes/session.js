@@ -1,84 +1,145 @@
 const mongoose = require("mongoose");
-const sessionSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  type: {
-    type: String,
-    enum: ["election", "poll", "tournament"],
-    required: true,
-  },
-  voteMode: {
-    type: String,
-    enum: [
-      "single",
-      "multiple",
-      "ranked",
-      "single elimination",
-      "double elimination",
-    ],
-    required: true,
-  },
-  blockchainAddress: String, // Stores blockchain contract reference (i am not sure if u need this but i guess u do . this is the only blockchain data in the models)
+const express = require("express");
+const router = express.Router();
+const Session = require("../models/Sessions");
+const Team = require("../models/Team");
+const auth = require("../middleware/auth");
 
-  details: { type: mongoose.Schema.Types.ObjectId, ref: "SessionDetails" }, // Single reference now
-  sessionRequest: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "SessionRequest",
-  }, // Tracks the request it came from
+router.get("/", async (req, res) => {
+  try {
+    const sessions = await Session.find({})
+      .populate("team") // Populates the team object
+      .populate("createdBy") // Optional: Populate creator details
+      .exec();
 
-  description: { type: String, default: null },
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  team: { type: mongoose.Schema.Types.ObjectId, ref: "Team", required: true },
-  results: { type: mongoose.Schema.Types.Mixed, default: null },
-  voterList: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-  isApproved: { type: Boolean, default: false },
-
-  status: {
-    type: String,
-    enum: ["InProgress", "Complete", "Rejected", "Approved", "Pending"],
-    default: "Approved",
-  },
-  sessionLifecycle: {
-    createdAt: { type: Date, default: Date.now }, // optional if you use timestamps
-    scheduledAt: { type: Date, default: null }, // if scheduling is ever used
-    startedAt: { type: Date, required: true },
-    endedAt: { type: Date, required: true },
-  },
-  visibility: {
-    type: String,
-    enum: ["Public", "Private"],
-    default: "Public",
-  },
-  secretPhrase: { type: String, default: "" },
-  locationRestriction: { type: String, default: "" },
-  resultVisibility: {
-    type: String,
-    enum: ["Visible", "Hidden"],
-    default: "Visible",
-  },
-
-  organizationName: { type: String, default: null },
-  banner: { type: String, default: null }, // Background image URL
-  verificationMethod: {
-    type: String,
-    enum: ["KYC", "CVC", null],
-    default: null,
-  },
-  candidateStep: {
-    type: String,
-    enum: ["Nomination", "Invitation"],
-    default: "Nomination",
-  },
-  subscription: {
-    id: { type: String }, // Optional, mostly for frontend matching
-    name: {
-      type: String,
-      enum: ["free", "pro", "enterprise"],
-      required: true,
-    },
-    price: { type: Number, required: true },
-    voterLimit: { type: Number, default: null },
-    features: [{ type: String }],
-    isRecommended: { type: Boolean, default: false },
-  },
+    res.status(200).json(sessions);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Failed to fetch sessions");
+  }
 });
-module.exports = mongoose.model("Session", sessionSchema);
+
+router.get("/my-sessions", auth, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    console.log(userId);
+    const sessions = await Session.find({ createdBy: userId })
+      .populate("team")
+      .populate("createdBy")
+      .exec();
+
+    res.status(200).json(sessions);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Failed to fetch user sessions");
+  }
+});
+router.get("/:id", async (req, res) => {
+  try {
+    const session = await Session.findById(req.params.id)
+      .populate("team")
+      .populate("createdBy")
+      .exec();
+
+    if (!session) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    res.status(200).json(session);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Failed to fetch session");
+  }
+});
+// router.delete("/:id", auth, async (req, res) => {
+//   try {
+//     console.log("Deleting session:", req.params.id);
+
+//     const session = await Session.findById(req.params.id);
+//     if (!session) {
+//       console.log("Session not found:", req.params.id);
+//       return res.status(404).send("Session not found");
+//     }
+
+//     // Delete session details
+//     const detailsDeleted = await SessionDetails.deleteMany({
+//       session: session._id,
+//     });
+//     console.log("Deleted session details:", detailsDeleted);
+
+//     // Delete session
+//     await session.deleteOne();
+//     console.log("Deleted session:", session);
+
+//     res.send({ message: "Session deleted successfully" });
+//   } catch (err) {
+//     console.error("Error deleting session:", err);
+//     res.status(500).json({ message: "Server error", error: err.message });
+//   }
+// });
+
+router.post("/", auth, async (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      organizationName,
+      banner,
+      type,
+      subtype,
+      subscription,
+      sessionLifecycle,
+      securityMethod,
+      verificationMethod,
+      candidates,
+      options,
+      tournamentType,
+      bracket,
+      maxRounds,
+    } = req.body;
+    const creator = req.user._id;
+    let SessionModel = Session;
+    if (type === "election") SessionModel = Session.discriminators.Election;
+    else if (type === "poll") SessionModel = Session.discriminators.Poll;
+    else if (type === "tournament")
+      SessionModel = Session.discriminators.Tournament;
+
+    const session = new SessionModel({
+      name,
+      description,
+      organizationName,
+      banner,
+      type,
+      subtype,
+      subscription,
+      sessionLifecycle,
+      securityMethod,
+      verificationMethod,
+      createdBy: creator,
+      candidateRequests: [],
+      ...(type === "election" && { candidates }),
+      ...(type === "poll" && { options }),
+      ...(type === "tournament" && { tournamentType, bracket, maxRounds }),
+    });
+
+    await session.save();
+    const team = new Team({
+      session: session._id,
+      sessionName: session.name,
+      leader: creator,
+      members: [creator],
+    });
+    const savedTeam = await team.save();
+    session.team = savedTeam._id;
+    await session.save();
+
+    res.status(201).json(session);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error creating session");
+  }
+});
+
+module.exports = router;
+// currently using simple middleware to make testing the logic easy
+// after everything is done we can add moed detailed middleware .

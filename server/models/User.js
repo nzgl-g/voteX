@@ -27,8 +27,14 @@ const userSchema = new mongoose.Schema({
   },
 });
 userSchema.pre("save", function (next) {
-  if (this.role !== "team_leader" && this.teamMembers.length > 0) {
-    return next(new Error("Only team leaders can have team members."));
+  if (this.isModified("teamMembers") || this.isModified("role")) {
+    if (
+      this.teamMembers &&
+      this.teamMembers.length > 0 &&
+      this.role !== "team_leader"
+    ) {
+      return next(new Error("Only team leaders can have team members."));
+    }
   }
   next();
 });

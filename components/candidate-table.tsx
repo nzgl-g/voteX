@@ -191,7 +191,6 @@ export default function CandidatesTable({ candidates, teamMembers }: CandidatesT
                                         {candidate.assignedReviewer ? (
                                             <div className="flex flex-col">
                                                 <span>{candidate.assignedReviewer.fullName}</span>
-                                                <span className="text-xs text-muted-foreground">{candidate.assignedReviewer.role}</span>
                                             </div>
                                         ) : (
                                             <div className="flex items-center">

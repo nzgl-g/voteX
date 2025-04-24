@@ -1,17 +1,16 @@
-"use client"
-import { SiteHeader } from "@/components/sidebar/site-header"
+import { Suspense } from "react"
+import VotingDashboard from "@/components/monitors/voting-dashboard"
+import { DashboardSkeleton } from "@/components/monitors/dashboard-skeleton"
+import {SiteHeader} from "@/components/sidebar/site-header";
 
-// Mock Data Without API
-import CandidateAreaChart from "@/components/stats/candidates-area-chart"
-import CandidatesBarGraph from "@/components/stats/candidates-bar-chart"
-import { CandidatesPieGraph } from "@/components/stats/pie-graph"
-import { CandidateVoteResults } from "@/components/stats/candidates-votes"
-import CountdownCard from "@/components/stats/countdown-card"
-import TotalVotesCard from "@/components/stats/total-vote-card"
-import React from "react"
-
-export default function Page() {
+export default function DashboardPage() {
     return (
-            <SiteHeader title="Get real-time insights into your voting session." />
+        <><SiteHeader title="Get real-time insights into your voting session."/>
+            <div className="min-h-screen bg-background">
+                <Suspense fallback={<DashboardSkeleton/>}>
+                    <VotingDashboard/>
+                </Suspense>
+            </div>
+        </>
     )
 }

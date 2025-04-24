@@ -1,11 +1,10 @@
 "use client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn-ui/card"
 import TeamMembersList from "@/components/team-manager/team-members-list"
-import RolesPermissions from "@/components/team-manager/roles-permissions"
 import InviteMember from "@/components/team-manager/invite-member"
 import ActivityLog from "@/components/team-manager/activity-log"
 import Announcements from "@/components/team-manager/announcements"
-import { Users, ShieldCheck, UserPlus, Activity, MessageSquare } from "lucide-react"
+import { Users,UserPlus, Activity, MessageSquare } from "lucide-react"
 
 export default function TeamManagementDashboard() {
   return (
@@ -17,10 +16,10 @@ export default function TeamManagementDashboard() {
 
       <div className="grid grid-cols-1 gap-8">
         <section id="team-members" className="scroll-mt-16">
-          <Card className="overflow-hidden border-t-4 border-t-primary shadow-md">
-            <CardHeader className="bg-muted/50">
+          <Card className="overflow-hidden  shadow-md">
+            <CardHeader >
               <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
+                <Users className="h-5 w-5 " />
                 <CardTitle>Team Members</CardTitle>
               </div>
               <CardDescription>Manage and organize your team members</CardDescription>
@@ -31,26 +30,13 @@ export default function TeamManagementDashboard() {
           </Card>
         </section>
 
-        <section id="roles-permissions" className="scroll-mt-16">
-          <Card className="overflow-hidden border-t-4 border-t-cyan-500 shadow-md">
-            <CardHeader className="bg-muted/50">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-cyan-500" />
-                <CardTitle>Roles & Permissions</CardTitle>
-              </div>
-              <CardDescription>Manage roles and assign permissions</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <RolesPermissions />
-            </CardContent>
-          </Card>
-        </section>
+
 
         <section id="invite-member" className="scroll-mt-16">
-          <Card className="overflow-hidden border-t-4 border-t-violet-500 shadow-md">
-            <CardHeader className="bg-muted/50">
+          <Card className="overflow-hidden  shadow-md">
+            <CardHeader >
               <div className="flex items-center gap-2">
-                <UserPlus className="h-5 w-5 text-violet-500" />
+                <UserPlus className="h-5 w-5 " />
                 <CardTitle>Invite New Team Member</CardTitle>
               </div>
               <CardDescription>Send an invitation to add a new member to your team</CardDescription>
@@ -62,10 +48,10 @@ export default function TeamManagementDashboard() {
         </section>
 
         <section id="activity-log" className="scroll-mt-16">
-          <Card className="overflow-hidden border-t-4 border-t-amber-500 shadow-md">
-            <CardHeader className="bg-muted/50">
+          <Card className="overflow-hidden  shadow-md">
+            <CardHeader >
               <div className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-amber-500" />
+                <Activity className="h-5 w-5 " />
                 <CardTitle>Activity Log</CardTitle>
               </div>
               <CardDescription>Track all actions performed by team members</CardDescription>
@@ -77,10 +63,10 @@ export default function TeamManagementDashboard() {
         </section>
 
         <section id="announcements" className="scroll-mt-16">
-          <Card className="overflow-hidden border-t-4 border-t-emerald-500 shadow-md">
-            <CardHeader className="bg-muted/50">
+          <Card className="overflow-hidden  shadow-md">
+            <CardHeader >
               <div className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-emerald-500" />
+                <MessageSquare className="h-5 w-5 " />
                 <CardTitle>Announcements & Tasks</CardTitle>
               </div>
               <CardDescription>Post announcements and assign tasks to team members</CardDescription>

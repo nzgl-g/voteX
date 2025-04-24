@@ -1,20 +1,22 @@
 "use client"
 
-import { useState } from "react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn-ui/tabs"
-import { InfoTab } from "@/components/profile/info-tab"
-import { SettingsTab } from "@/components/profile/settings-tab"
-import { CandidatesList } from "@/components/profile/candidates-list"
-import { SessionActions } from "@/components/profile/session-actions"
-import { ImageIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
-import type { Session } from "@/lib/types"
+import {useState} from "react"
+import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/shadcn-ui/tabs"
+import {InfoTab} from "@/components/profile/info-tab"
+import {SettingsTab} from "@/components/profile/settings-tab"
+import {SessionActions} from "@/components/profile/session-actions"
+import {ImageIcon} from "lucide-react"
+import {cn} from "@/lib/utils"
+import type {Candidate, Session, TeamMember} from "@/lib/types"
+import CandidatesTable from "@/components/candidate-table"
 
 interface SessionProfileProps {
   session: Session
+  candidates: Candidate[]
+  teamMembers: TeamMember[]
 }
 
-export function SessionProfile({ session }: SessionProfileProps) {
+export function SessionProfile({session, candidates, teamMembers}: SessionProfileProps) {
   const [currentSession, setCurrentSession] = useState<Session>(session)
   const [activeTab, setActiveTab] = useState<string>("info")
 
@@ -117,7 +119,7 @@ export function SessionProfile({ session }: SessionProfileProps) {
 
       {/* Main content with tabs */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm mb-8 overflow-hidden">
-        <Tabs defaultValue="info" value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs defaultValue="info" value={activeTab} onValueChange={setActiveTab} className="w-full rounded-xl">
           <TabsList className="grid w-full grid-cols-2 h-auto p-0 bg-slate-100 dark:bg-slate-800/50">
             <TabsTrigger
               value="info"
@@ -153,10 +155,13 @@ export function SessionProfile({ session }: SessionProfileProps) {
 
       {/* Candidates/Options Section */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6">
-        <h2 className="text-xl font-semibold mb-6 text-slate-900 dark:text-white">
+        {/*        <h2 className="text-xl font-semibold mb-6 text-slate-900 dark:text-white">
           {currentSession.type === "poll" ? "Options" : "Candidates"}
         </h2>
         <CandidatesList candidates={currentSession.candidates || []} sessionType={currentSession.type} />
+      */}
+        <CandidatesTable candidates={candidates} teamMembers={teamMembers}/>
+
       </div>
     </div>
   )

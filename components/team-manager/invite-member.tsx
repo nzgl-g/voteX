@@ -16,7 +16,6 @@ export default function InviteMember() {
   const [email, setEmail] = useState("")
   const [role, setRole] = useState("")
   const [message, setMessage] = useState("")
-  const [sendCopy, setSendCopy] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
 
@@ -26,7 +25,7 @@ export default function InviteMember() {
 
     // Simulate API call
     setTimeout(() => {
-      console.log("Inviting member:", { email, role, message, sendCopy })
+      console.log("Inviting member:", { email, role, message })
       setIsSubmitting(false)
       setIsSuccess(true)
 
@@ -35,7 +34,6 @@ export default function InviteMember() {
         setEmail("")
         setRole("")
         setMessage("")
-        setSendCopy(false)
         setIsSuccess(false)
       }, 2000)
     }, 1000)
@@ -105,12 +103,6 @@ export default function InviteMember() {
           </div>
         </div>
 
-        <div className="flex items-center space-x-2 pt-2">
-          <Switch id="send-copy" checked={sendCopy} onCheckedChange={setSendCopy} />
-          <Label htmlFor="send-copy" className="text-sm">
-            Send me a copy of the invitation
-          </Label>
-        </div>
       </div>
 
       <Button type="submit" className="w-full" disabled={isSubmitting || isSuccess}>

@@ -1,7 +1,7 @@
 "use client"
 
 import {ReactNode} from "react"
-import {ThemeProvider} from "next-themes"
+import {ThemeProvider} from "@/components/theme-provider"
 import {Toaster} from "@/components/shadcn-ui/sonner"
 
 import {SidebarLeft} from "@/components/sidebar/sidebar-left"
@@ -42,13 +42,12 @@ const data = {
 
 export default function Layout({children}: { children: ReactNode }) {
     return (
-        <html lang="en">
-        <body suppressHydrationWarning>
-        <ThemeProvider  attribute="class" defaultTheme="system" enableSystem >
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             <SidebarProvider style={{
+                // Using string type assertion to avoid TypeScript errors with custom CSS properties
                 "--sidebar-width": "16rem",
                 "--sidebar-width-mobile": "15rem",
-            }}>
+            } as React.CSSProperties}>
                 <SidebarLeft variant={"inset"}
                     teams={data.teams}
                     navMain={data.navMain}
@@ -61,7 +60,5 @@ export default function Layout({children}: { children: ReactNode }) {
             <ChatBubble/>
             <Toaster position="bottom-center"/>
         </ThemeProvider>
-        </body>
-        </html>
     )
 }

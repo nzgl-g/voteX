@@ -189,8 +189,9 @@ export function VoteSessionForm({ plan }: VoteSessionFormProps) {
   async function handleSubmit() {
     setIsSubmitting(true);
     try {
-      // Convert values to match the server's expected enum values
-      const mapVoteMode = (subtype: string) => {
+      // Convert form state values to match the backend's expected structure
+      // The backend expects subtype as 'subtype' field
+      const prepareSubtype = (subtype: string) => {
         const subtypeLower = subtype.toLowerCase();
         if (subtypeLower === 'single') return 'single';
         if (subtypeLower === 'multiple') return 'multiple';
@@ -200,7 +201,7 @@ export function VoteSessionForm({ plan }: VoteSessionFormProps) {
         return 'single'; // Default
       };
 
-      const mapTournamentType = (type: string | null) => {
+      const prepareTournamentType = (type: string | null) => {
         if (!type) return null;
         const typeLower = type.toLowerCase();
         if (typeLower === 'round robin') return 'Round Robin';
@@ -209,51 +210,90 @@ export function VoteSessionForm({ plan }: VoteSessionFormProps) {
         return null;
       };
 
-      const mapVisibility = (accessLevel: string) => {
+      // Convert accessLevel to match the backend's 'accessLevel' field
+      const prepareAccessLevel = (accessLevel: string) => {
         return accessLevel.charAt(0).toUpperCase() + accessLevel.slice(1).toLowerCase(); // 'public' -> 'Public'
       };
 
-      const mapSecurityMethod = (method: string | null) => {
+      // Convert securityMethod to match the backend's enum
+      const prepareSecurityMethod = (method: string | null) => {
         if (!method) return null;
         if (method.toLowerCase() === 'secret phrase') return 'Secret Phrase';
-        if (method.toLowerCase() === 'csv') return 'CSV';
+        if (method.toLowerCase() === 'area restriction') return 'Area Restriction';
         return null;
       };
 
-      const mapResultVisibility = (display: string) => {
-        return display === 'real-time' ? 'Visible' : 'Hidden';
+      // Convert verificationMethod to match the backend's enum
+      const prepareVerificationMethod = (method: string | null) => {
+        if (!method) return null;
+        if (method.toLowerCase() === 'standard') return null; // Standard is not in the backend enum
+        if (method.toLowerCase() === 'kyc') return 'KYC';
+        if (method.toLowerCase() === 'cvc') return 'CVC';
+        return null;
       };
 
-      const mapCandidateStep = (step: string) => {
-        return step.charAt(0).toUpperCase() + step.slice(1).toLowerCase(); // 'manual' -> 'Manual'
+      // Prepare candidates data if present
+      const prepareCandidates = () => {
+        if (!formState.candidates || formState.candidates.length === 0) return [];
+        
+        return formState.candidates.map(candidate => ({
+          user: candidate.id, // Assuming id is the user ID
+          partyName: candidate.partyName,
+          status: "Pending", // Default status
+          requiresReview: false
+        }));
+      };
+
+      // Prepare options data if present
+      const prepareOptions = () => {
+        if (!formState.options || formState.options.length === 0) return [];
+        
+        return formState.options.map(option => ({
+          name: option.name,
+          description: option.description
+        }));
+      };
+
+      // Prepare subscription data
+      const prepareSubscription = () => {
+        const subscriptionName = formState.subscription?.name || 'free';
+        const subscriptionPrice = formState.subscription?.price || 0;
+        
+        return {
+          name: subscriptionName,
+          price: subscriptionPrice,
+          voterLimit: subscriptionName === 'free' ? 100 : (subscriptionName === 'pro' ? 500 : null),
+          features: [],
+          isRecommended: subscriptionName === 'pro'
+        };
       };
 
       // Map the form state to match the server's expected structure
-      const sessionRequestData = {
+      const sessionData = {
         name: formState.name,
         description: formState.description,
         organizationName: formState.organizationName,
         banner: formState.banner,
         type: formState.type,
-        voteMode: mapVoteMode(formState.subtype), // Map subtype to voteMode for server
-        tournamentType: mapTournamentType(formState.tournamentType),
-        visibility: mapVisibility(formState.accessLevel), // Map accessLevel to visibility for server
-        securityMethod: mapSecurityMethod(formState.securityMethod),
-        secretPhrase: formState.secretPhrase,
-        verificationMethod: formState.verificationMethod?.toLowerCase() || null,
-        resultVisibility: mapResultVisibility(formState.resultsDisplay), // Map resultsDisplay to resultVisibility for server
-        candidateStep: mapCandidateStep(formState.candidateStep),
-        candidates: formState.candidates,
-        options: formState.options,
+        subtype: prepareSubtype(formState.subtype),
+        accessLevel: prepareAccessLevel(formState.accessLevel),
+        securityMethod: prepareSecurityMethod(formState.securityMethod),
+        verificationMethod: prepareVerificationMethod(formState.verificationMethod),
         sessionLifecycle: formState.sessionLifecycle,
-        subscription: {
-          ...formState.subscription,
-          price: formState.subscription?.price || 0 // Add required price field
-        }
+        subscription: prepareSubscription(),
+        // Add type-specific fields
+        ...(formState.type === 'election' && { candidates: prepareCandidates() }),
+        ...(formState.type === 'poll' && { options: prepareOptions() }),
+        ...(formState.type === 'tournament' && { 
+          tournamentType: prepareTournamentType(formState.tournamentType),
+          bracket: {},
+          maxRounds: 1
+        })
       };
 
-      // Send the data to the server without authentication
-      const response = await apiClient.post('/sessionRequests', sessionRequestData);
+      // Send the data to the server using authenticated API
+      // Use the correct endpoint from the backend (/sessions)
+      const response = await apiClient.post('/sessions', sessionData);
       
       // Handle successful submission
       toast({
@@ -279,7 +319,7 @@ export function VoteSessionForm({ plan }: VoteSessionFormProps) {
       // Handle submission error
       toast({
         title: "Error",
-        description: error.message || "Failed to create session. Please try again.",
+        description: error.response?.data?.message || error.message || "Failed to create session. Please try again.",
         variant: "destructive",
       });
     } finally {

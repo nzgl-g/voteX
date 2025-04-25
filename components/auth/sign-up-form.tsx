@@ -45,7 +45,8 @@ export function SignupForm() {
 
         try {
             const { authApi } = await import('@/lib/api')
-            await authApi.signup(data.username, data.email, data.password)
+            const result = await authApi.signup(data.username, data.email, data.password)
+            console.log('Signup successful:', result)
             router.push('/team-leader/real-time-analytics')
         } catch (err: any) {
             setError(err.message || 'Failed to sign up. Please check your connection and try again.')

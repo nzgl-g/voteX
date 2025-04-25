@@ -33,8 +33,9 @@ export function LoginForm() {
         
         try {
             const { authApi } = await import('@/lib/api')
-            await authApi.login(data.email, data.password)
-            router.push('/team-leader/real-time-analytics') // Redirect to home or dashboard
+            const result = await authApi.login(data.email, data.password)
+            console.log('Login successful:', result)
+            router.push('/team-leader/real-time-analytics') // Redirect to dashboard after successful login
         } catch (err: any) {
             setError(err.message || 'Failed to login. Please check your credentials and try again.')
             console.error('Login error:', err)

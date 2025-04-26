@@ -71,11 +71,33 @@ const activityData = [
   },
 ]
 
-export default function ActivityLog() {
+interface ActivityLogProps {
+  sessionId?: string;
+}
+
+export default function ActivityLog({ sessionId }: ActivityLogProps) {
   const [searchTerm, setSearchTerm] = useState("")
+  const [activityType, setActivityType] = useState("all")
+  const [date, setDate] = useState<Date | undefined>(undefined)
   const [userFilter, setUserFilter] = useState("")
   const [actionFilter, setActionFilter] = useState("")
   const [dateFilter, setDateFilter] = useState(null)
+
+  // In a real implementation, you would use sessionId to fetch activity logs for this specific session
+  // useEffect(() => {
+  //   const fetchActivityLogs = async () => {
+  //     try {
+  //       const response = await apiClient.get(`/sessions/${sessionId}/activity-logs`)
+  //       // Process and set activity logs
+  //     } catch (error) {
+  //       console.error("Error fetching activity logs:", error)
+  //     }
+  //   }
+  //   
+  //   if (sessionId) {
+  //     fetchActivityLogs()
+  //   }
+  // }, [sessionId])
 
   // Get unique users for filter
   const users = [...new Set(activityData.map((item) => item.user))]

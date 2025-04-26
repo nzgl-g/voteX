@@ -61,8 +61,20 @@ const daysUntilNextSunday = getDaysUntilNextSunday(currentDate);
 const votingSystemEvents: CalendarEvent[] = [];
 
 
-export default function Component() {
+interface BigCalendarProps {
+  sessionId?: string;
+}
+
+export default function Component({ sessionId }: BigCalendarProps) {
   const [events, setEvents] = useState<CalendarEvent[]>(votingSystemEvents);
+  
+  // In a real implementation, you would use sessionId to fetch session-specific events
+  // useEffect(() => {
+  //   if (sessionId) {
+  //     // Fetch calendar events for this session
+  //     // Example: apiClient.get(`/sessions/${sessionId}/events`).then(response => setEvents(response.data))
+  //   }
+  // }, [sessionId]);
   const { isColorVisible } = useCalendarContext();
 
   // Filter events based on visible colors

@@ -12,12 +12,26 @@ import { Check, Mail, User, FileText } from "lucide-react"
 // Available roles
 const roles = ["Team Leader", "Validator", "Support", "Auditor"]
 
-export default function InviteMember() {
+interface InviteMemberProps {
+  sessionId?: string;
+}
+
+export default function InviteMember({ sessionId }: InviteMemberProps) {
   const [email, setEmail] = useState("")
   const [role, setRole] = useState("")
   const [message, setMessage] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
+  
+  // In a real implementation, you would use sessionId when inviting a member to this specific session
+  // const inviteMember = async () => {
+  //   try {
+  //     await apiClient.post(`/sessions/${sessionId}/invite`, { email, role, message })
+  //     setIsSuccess(true)
+  //   } catch (error) {
+  //     console.error("Error inviting member:", error)
+  //   }
+  // }
 
   const handleSubmit = (e) => {
     e.preventDefault()

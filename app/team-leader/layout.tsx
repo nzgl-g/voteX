@@ -9,27 +9,17 @@ import ChatBubble from "@/components/chat-bubble"
 import {SidebarInset, SidebarProvider,} from "@/components/shadcn-ui/sidebar"
 
 import {
-    BarChart3,
     BriefcaseBusiness,
     Building2,
-    CheckCircle,
-    ClipboardList,
     Landmark,
     LifeBuoy,
-    MessageCircleQuestion,
-    Settings2,
-    Users2,
+    CalendarClock,
+    LayoutDashboard,
+    CheckSquare,
+    HelpCircle,
+    Settings,
+    Users
 } from "lucide-react"
-
-import {
-    IconCalendarCog,
-    IconDashboard,
-    IconChecklist,
-    IconHelp,
-    IconSteam,
-    IconSettings,
-    IconLifebuoyFilled,
-} from "@tabler/icons-react"
 
 const data = {
     teams: [
@@ -38,15 +28,15 @@ const data = {
         {name: "CEO Election", logo: BriefcaseBusiness, plan: "Free"},
     ],
     navMain: [
-        {title: "Monitoring", url: "./monitoring", icon: IconDashboard },
-        {title: "Session", url: "./session", icon: IconCalendarCog ,},
-        {title: "Team", url: "./team", icon: IconSteam},
-        {title: "Scheduler", url: "./scheduler", icon: IconChecklist},
-        {title: "Support", url: "./support", icon: IconLifebuoyFilled},
+        {title: "Monitoring", url: "./monitoring/default", icon: LayoutDashboard },
+        {title: "Session", url: "./session/default", icon: CalendarClock },
+        {title: "Team", url: "./team/default", icon: Users},
+        {title: "Scheduler", url: "./scheduler/default", icon: CheckSquare},
+        {title: "Support", url: "./support", icon: LifeBuoy},
     ],
     navSecondary: [
-        {title: "Settings", url: "#", icon: IconSettings },
-        {title: "Help", url: "#", icon: IconHelp},
+        {title: "Settings", url: "#", icon: Settings },
+        {title: "Help", url: "#", icon: HelpCircle},
     ]
 }
 

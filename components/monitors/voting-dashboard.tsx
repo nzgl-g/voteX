@@ -15,11 +15,32 @@ import { TotalVotesCard } from "./total-votes-card"
 // Mock data - in a real app, this would come from an API
 import { mockSession, mockVotesData, generateMockVotesOverTime } from "@/lib/mock"
 
-export default function VotingDashboard() {
+interface VotingDashboardProps {
+  sessionId: string
+}
+
+export default function VotingDashboard({ sessionId }: VotingDashboardProps) {
   const timeRange = "day"
   const [session, setSession] = useState(mockSession)
   const [votesData, setVotesData] = useState(mockVotesData)
   const [votesOverTime, setVotesOverTime] = useState(generateMockVotesOverTime("day"))
+  
+  // In a real implementation, you would fetch the session data using the sessionId
+  // useEffect(() => {
+  //   const fetchSessionData = async () => {
+  //     try {
+  //       const response = await apiClient.get(`/sessions/${sessionId}`)
+  //       setSession(response.data)
+  //       // Also fetch votes data, candidates, etc. based on the sessionId
+  //     } catch (error) {
+  //       console.error("Error fetching session data:", error)
+  //     }
+  //   }
+  //   
+  //   if (sessionId) {
+  //     fetchSessionData()
+  //   }
+  // }, [sessionId])
 
   // Calculate total votes
   const totalVotes = session.candidates?.reduce((sum, candidate) => sum + candidate.totalVotes, 0) || 0

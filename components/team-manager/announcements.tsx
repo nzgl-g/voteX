@@ -67,11 +67,34 @@ const tasksData = [
   },
 ]
 
-export default function Announcements() {
+interface AnnouncementsProps {
+  sessionId?: string;
+}
+
+export default function Announcements({ sessionId }: AnnouncementsProps) {
   const [activeTab, setActiveTab] = useState("announcements")
+  const [activeTab, setActiveTab] = useState("all")
+  const [newAnnouncementTitle, setNewAnnouncementTitle] = useState("")
+  const [newAnnouncementContent, setNewAnnouncementContent] = useState("")
   const [showNewForm, setShowNewForm] = useState(false)
   const [formTitle, setFormTitle] = useState("")
   const [formContent, setFormContent] = useState("")
+
+  // In a real implementation, you would use sessionId to fetch announcements for this specific session
+  // useEffect(() => {
+  //   const fetchAnnouncements = async () => {
+  //     try {
+  //       const response = await apiClient.get(`/sessions/${sessionId}/announcements`)
+  //       // Process and set announcements
+  //     } catch (error) {
+  //       console.error("Error fetching announcements:", error)
+  //     }
+  //   }
+  //   
+  //   if (sessionId) {
+  //     fetchAnnouncements()
+  //   }
+  // }, [sessionId])
 
   const handleSubmit = (e) => {
     e.preventDefault()

@@ -31,10 +31,19 @@ export function useCalendarContext() {
 
 interface CalendarProviderProps {
   children: ReactNode;
+  sessionId?: string;
 }
 
-export function CalendarProvider({ children }: CalendarProviderProps) {
+export function CalendarProvider({ children, sessionId }: CalendarProviderProps) {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  
+  // In a real implementation, you would use sessionId to fetch session-specific calendar data
+  // useEffect(() => {
+  //   if (sessionId) {
+  //     // Fetch calendar events for this session
+  //     // Example: apiClient.get(`/sessions/${sessionId}/events`)
+  //   }
+  // }, [sessionId]);
 
   // Initialize visibleColors based on the isActive property in etiquettes
   const [visibleColors, setVisibleColors] = useState<string[]>(() => {

@@ -6,7 +6,11 @@ import ActivityLog from "@/components/team-manager/activity-log"
 import Announcements from "@/components/team-manager/announcements"
 import { Users,UserPlus, Activity, MessageSquare } from "lucide-react"
 
-export default function TeamManagementDashboard() {
+interface TeamManagementDashboardProps {
+  sessionId: string
+}
+
+export default function TeamManagementDashboard({ sessionId }: TeamManagementDashboardProps) {
   return (
     <div className="container mx-auto py-8 px-4 space-y-8">
       <div className="flex flex-col space-y-2">
@@ -25,7 +29,7 @@ export default function TeamManagementDashboard() {
               <CardDescription>Manage and organize your team members</CardDescription>
             </CardHeader>
             <CardContent className="p-6">
-              <TeamMembersList />
+              <TeamMembersList sessionId={sessionId} />
             </CardContent>
           </Card>
         </section>
@@ -42,7 +46,7 @@ export default function TeamManagementDashboard() {
               <CardDescription>Send an invitation to add a new member to your team</CardDescription>
             </CardHeader>
             <CardContent className="p-6">
-              <InviteMember />
+              <InviteMember sessionId={sessionId} />
             </CardContent>
           </Card>
         </section>
@@ -57,7 +61,7 @@ export default function TeamManagementDashboard() {
               <CardDescription>Track all actions performed by team members</CardDescription>
             </CardHeader>
             <CardContent className="p-6">
-              <ActivityLog />
+              <ActivityLog sessionId={sessionId} />
             </CardContent>
           </Card>
         </section>
@@ -72,7 +76,7 @@ export default function TeamManagementDashboard() {
               <CardDescription>Post announcements and assign tasks to team members</CardDescription>
             </CardHeader>
             <CardContent className="p-6">
-              <Announcements />
+              <Announcements sessionId={sessionId} />
             </CardContent>
           </Card>
         </section>

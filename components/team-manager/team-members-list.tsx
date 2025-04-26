@@ -60,7 +60,11 @@ const teamMembers = [
   },
 ]
 
-export default function TeamMembersList() {
+interface TeamMembersListProps {
+  sessionId?: string;
+}
+
+export default function TeamMembersList({ sessionId }: TeamMembersListProps) {
   const [selectedMembers, setSelectedMembers] = useState<string[]>([])
   const [editMember, setEditMember] = useState<any | null>(null)
   const [showEditDialog, setShowEditDialog] = useState(false)
@@ -69,6 +73,14 @@ export default function TeamMembersList() {
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState("all")
+
+  // In a real implementation, you would use sessionId to fetch team members for this session
+  // useEffect(() => {
+  //   if (sessionId) {
+  //     // Fetch team members for this session
+  //     // Example: apiClient.get(`/sessions/${sessionId}/team-members`).then(response => setTeamMembers(response.data))
+  //   }
+  // }, [sessionId])
 
   const toggleSelectAll = () => {
     if (selectedMembers.length === teamMembers.length) {

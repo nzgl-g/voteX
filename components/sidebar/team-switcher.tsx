@@ -65,11 +65,21 @@ export function TeamSwitcher() {
         
         setSessions(sessionData)
         
-        // Set active session from URL or first session
-        const sessionIdFromUrl = pathname.includes("/") 
-          ? pathname.split("/session/")[1]?.split("/")[0]
-          : null
-          
+        // Extract session ID from URL for any team leader section
+        const pathParts = pathname.split('/')
+        const sectionIndex = pathParts.findIndex(part => 
+          ['session', 'monitoring', 'team', 'scheduler'].includes(part)
+        )
+        
+        let sessionIdFromUrl = null
+        if (sectionIndex !== -1 && pathParts.length > sectionIndex + 1) {
+          sessionIdFromUrl = pathParts[sectionIndex + 1]
+          // If it's 'default', don't use it as a real session ID
+          if (sessionIdFromUrl === 'default') {
+            sessionIdFromUrl = null
+          }
+        }
+        
         if (sessionIdFromUrl && sessionData.some((s: SessionItem) => s.id === sessionIdFromUrl)) {
           setActiveSession(sessionData.find((s: SessionItem) => s.id === sessionIdFromUrl) || null)
         } else if (sessionData.length > 0) {
@@ -83,12 +93,20 @@ export function TeamSwitcher() {
     }
 
     fetchSessions()
-  }, [])
+  }, [pathname])
 
   // Handle session selection
   const handleSessionSelect = (session: SessionItem) => {
     setActiveSession(session)
-    router.push(`/team-leader/session/${session.id}`)
+    
+    // Get the current section from the URL
+    const pathParts = pathname.split('/')
+    const currentSection = pathParts.find(part => 
+      ['session', 'monitoring', 'team', 'scheduler'].includes(part)
+    ) || 'session'
+    
+    // Navigate to the same section but with the new session ID
+    router.push(`/team-leader/${currentSection}/${session.id}`)
   }
 
   // Handle creating a new session

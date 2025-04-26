@@ -78,7 +78,6 @@ const sessionSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   team: { type: mongoose.Schema.Types.ObjectId, ref: "Team" },
   results: { type: mongoose.Schema.Types.Mixed, default: null },
-  // voterList: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], not sure about this
 
   securityMethod: {
     type: String,
@@ -93,12 +92,18 @@ const sessionSchema = new mongoose.Schema({
   candidateRequests: [
     { type: mongoose.Schema.Types.ObjectId, ref: "CandidateRequest" },
   ],
+
+  participants: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SessionParticipant",
+    },
+  ],
 });
 sessionSchema.discriminator(
   "Election",
   new mongoose.Schema({
-    // Election specific fields
-    candidates: [candidateSchema], // For election type
+    // For election type
   })
 );
 

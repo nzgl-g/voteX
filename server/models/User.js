@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
+
 const userSchema = new mongoose.Schema({
-  //add profile pic later
   username: {
     type: String,
     required: true,
@@ -16,33 +16,15 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
-  role: {
-    type: String,
-    enum: ["admin", "team_leader", "team_member", "candidate", "voter"],
-    default: "voter",
-  },
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
-userSchema.pre("save", function (next) {
-  if (this.isModified("teamMembers") || this.isModified("role")) {
-    if (
-      this.teamMembers &&
-      this.teamMembers.length > 0 &&
-      this.role !== "team_leader"
-    ) {
-      return next(new Error("Only team leaders can have team members."));
-    }
-  }
-  next();
-});
+
 userSchema.methods.generateAuthToken = function () {
-  const token = jwt.sign({ _id: this._id, role: this.role }, "hello");
+  const token = jwt.sign({ _id: this._id }, "hello");
   return token;
 };
-module.exports = mongoose.model("User", userSchema);
 
-// on top of the current properties we need to add the ones u shoed me in the candidate page . we can handle this after all the logic is done
-//or when u handle the front for it . ill make the changes when u tell me
+module.exports = mongoose.model("User", userSchema);

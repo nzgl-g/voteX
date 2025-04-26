@@ -1,21 +1,63 @@
-import Header from "@/components/landing-page/header"
-import Hero from "@/components/landing-page/hero"
-import Features from "@/components/landing-page/features"
-import Testimonials from "@/components/landing-page/testimonials"
-import TrustBar from "@/components/landing-page/trust-bar"
-import Footer from "@/components/landing-page/footer"
+"use client";
 
-export default function LandingPage() {
-    return (
-        <div className="flex min-h-screen flex-col container mx-auto px-4 py-8">
-            <Header />
-            <main className="flex-1">
-                <Hero />
-                <Features />
-                <Testimonials />
-                <TrustBar />
-            </main>
-            <Footer />
+import { HeroSection } from "@/components/landing-page/sections/hero";
+import { FeaturesSection } from "@/components/landing-page/sections/features";
+import { ProblemSection } from "@/components/landing-page/sections/problems";
+import { TestimonialSection } from "@/components/landing-page/sections/testimonial";
+import { PricingSection } from "@/components/landing-page/sections/pricing";
+import { FAQSection } from "@/components/landing-page/sections/faq";
+import { ContactSection } from "@/components/landing-page/sections/contact";
+import { FooterSection } from "@/components/landing-page/sections/footer";
+import { PricingDialog } from "@/components/pricing-dialog";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import {Navbar} from "@/components/landing-page/navbar";
+
+
+export default function Home() {
+  const searchParams = useSearchParams();
+  const [showPricingDialog, setShowPricingDialog] = useState(false);
+  
+  useEffect(() => {
+    // Check if we should show the pricing dialog based on URL parameter
+    if (searchParams.get("showPricing") === "true") {
+      setShowPricingDialog(true);
+    }
+  }, [searchParams]);
+  
+  return (
+    <>
+      <header >
+          <Navbar/>
+      </header>
+      <main className="flex-1 flex flex-col items-center w-full landing-page">
+        <div className="w-full max-w-screen-xl mx-auto">
+          <HeroSection/>
+          <FeaturesSection/>
+          <ProblemSection/>
+          <div id="testimonials" className="flex-1 flex flex-col items-center w-full" >
+            <TestimonialSection/>
+          </div>
+          <div id="pricing" className="flex-1 flex flex-col items-center w-full">
+            <PricingSection/>
+          </div>
+          <div id="faq" className="flex-1 flex flex-col items-center w-full">
+            <FAQSection/>
+          </div>
+          <div id="contact" className="flex-1 flex flex-col items-center w-full">
+            <ContactSection/>
+          </div>
         </div>
-    )
+      </main>
+      <div className="flex-1 flex flex-col items-center w-full">
+        <FooterSection />
+      </div>
+      
+      {/* Pricing dialog that can be triggered from URL parameter */}
+      <PricingDialog 
+        open={showPricingDialog} 
+        onOpenChange={setShowPricingDialog} 
+      />
+    </>
+  );
 }

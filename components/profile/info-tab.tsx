@@ -20,6 +20,32 @@ interface InfoTabProps {
 
 export function InfoTab({ session, onUpdate }: InfoTabProps) {
   const [isEditing, setIsEditing] = useState(false)
+  // Safely parse date strings to Date objects
+  const parseDate = (dateString: string | null | undefined): Date => {
+    if (!dateString) return new Date()
+    try {
+      return new Date(dateString)
+    } catch (e) {
+      console.error("Error parsing date:", e)
+      return new Date()
+    }
+  }
+
+  // Get scheduled start and end dates
+  const getScheduledStart = (): Date => {
+    if (session.sessionLifecycle?.scheduledAt?.start) {
+      return parseDate(session.sessionLifecycle.scheduledAt.start)
+    }
+    return parseDate(session.sessionLifecycle.startedAt)
+  }
+
+  const getScheduledEnd = (): Date => {
+    if (session.sessionLifecycle?.scheduledAt?.end) {
+      return parseDate(session.sessionLifecycle.scheduledAt.end)
+    }
+    return parseDate(session.sessionLifecycle.endedAt)
+  }
+
   const [formData, setFormData] = useState({
     title: session.name,
     description: session.description || "",
@@ -27,10 +53,8 @@ export function InfoTab({ session, onUpdate }: InfoTabProps) {
     type: session.type,
     subtype: session.subtype,
     tournamentType: session.tournamentType || null,
-    scheduledStart: new Date(
-      session.sessionLifecycle.scheduledAt?.split(" - ")[0] || session.sessionLifecycle.startedAt,
-    ),
-    scheduledEnd: new Date(session.sessionLifecycle.scheduledAt?.split(" - ")[1] || session.sessionLifecycle.endedAt),
+    scheduledStart: getScheduledStart(),
+    scheduledEnd: getScheduledEnd(),
   })
 
   const handleChange = (field: string, value: any) => {
@@ -38,7 +62,14 @@ export function InfoTab({ session, onUpdate }: InfoTabProps) {
   }
 
   const handleSave = () => {
-    const scheduledAt = `${format(formData.scheduledStart, "yyyy-MM-dd HH:mm:ss")} - ${format(formData.scheduledEnd, "yyyy-MM-dd HH:mm:ss")}`
+    // Format scheduledAt as an object with start and end properties
+    const updatedSessionLifecycle = {
+      ...session.sessionLifecycle,
+      scheduledAt: {
+        start: format(formData.scheduledStart, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"),
+        end: format(formData.scheduledEnd, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+      }
+    }
 
     onUpdate({
       name: formData.title,
@@ -47,10 +78,7 @@ export function InfoTab({ session, onUpdate }: InfoTabProps) {
       type: formData.type as "poll" | "election" | "tournament",
       subtype: formData.subtype as any,
       tournamentType: formData.tournamentType as any,
-      sessionLifecycle: {
-        ...session.sessionLifecycle,
-        scheduledAt,
-      },
+      sessionLifecycle: updatedSessionLifecycle,
     })
 
     setIsEditing(false)
@@ -58,16 +86,14 @@ export function InfoTab({ session, onUpdate }: InfoTabProps) {
 
   const handleCancel = () => {
     setFormData({
-      name: session.name,
+      title: session.name,
       description: session.description || "",
       organizationName: session.organizationName || "",
       type: session.type,
       subtype: session.subtype,
       tournamentType: session.tournamentType || null,
-      scheduledStart: new Date(
-        session.sessionLifecycle.scheduledAt?.split(" - ")[0] || session.sessionLifecycle.startedAt,
-      ),
-      scheduledEnd: new Date(session.sessionLifecycle.scheduledAt?.split(" - ")[1] || session.sessionLifecycle.endedAt),
+      scheduledStart: getScheduledStart(),
+      scheduledEnd: getScheduledEnd(),
     })
     setIsEditing(false)
   }
@@ -311,7 +337,9 @@ export function InfoTab({ session, onUpdate }: InfoTabProps) {
               </div>
             ) : (
               <p className="text-slate-900 dark:text-white py-2">
-                {session.sessionLifecycle.scheduledAt || "Not scheduled"}
+                {session.sessionLifecycle.scheduledAt ? 
+                  `${format(parseDate(session.sessionLifecycle.scheduledAt.start), "PPP HH:mm")} - ${format(parseDate(session.sessionLifecycle.scheduledAt.end), "PPP HH:mm")}` : 
+                  "Not scheduled"}
               </p>
             )}
           </div>

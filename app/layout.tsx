@@ -1,16 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter} from "next/font/google";
 import "./globals.css";
+import {ThemeProvider} from "@/components/theme-provider";
+import {Navbar} from "@/components/landing-page/navbar";
+import {cn} from "@/lib/utils";
+const inter = Inter({ subsets: ["latin"] });
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Votex - Voting System",
@@ -18,18 +13,23 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
+                                       children,
+                                   }: Readonly<{
+    children: React.ReactNode;
 }>) {
-  return (
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        suppressHydrationWarning
-      >
-        {children}
-      </body>
-    </html>
-  );
+    return (
+        <html lang="pt-br" suppressHydrationWarning>
+        <body className={cn("min-h-screen bg-background", inter.className)}>
+        <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+        >
+
+            {children}
+        </ThemeProvider>
+        </body>
+        </html>
+    );
 }

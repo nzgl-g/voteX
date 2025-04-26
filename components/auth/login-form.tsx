@@ -46,7 +46,7 @@ export function LoginForm() {
                 if (redirectAfterLogin === 'pricing') {
                     // Redirect to home page with pricing dialog
                     router.push('/?showPricing=true')
-                } else if (redirectAfterLogin.startsWith('session-creation')) {
+                } else if (redirectAfterLogin.startsWith('session-setup')) {
                     // Redirect to session creation with the plan parameter preserved
                     router.push(`/${redirectAfterLogin}`)
                 } else {
@@ -55,7 +55,7 @@ export function LoginForm() {
                 }
             } else {
                 // Default redirect to dashboard
-                router.push('/team-leader/real-time-analytics')
+                router.push('/team-leader/monitoring')
             }
         } catch (err: any) {
             setError(err.message || 'Failed to login. Please check your credentials and try again.')

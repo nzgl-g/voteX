@@ -55,7 +55,7 @@ export function TeamSwitcher() {
     const fetchSessions = async () => {
       try {
         setLoading(true)
-        const response = await apiClient.get("/my-sessions")
+        const response = await apiClient.get("/sessions/my-sessions")
         const sessionData = response.data.map((session: any) => ({
           id: session._id,
           name: session.name,

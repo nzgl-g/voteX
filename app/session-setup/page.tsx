@@ -24,7 +24,7 @@ export default function Home() {
         // Store the current URL with plan parameter to redirect back after login
         const planParam = searchParams.get("plan");
         if (planParam) {
-          localStorage.setItem('redirectAfterLogin', `session-creation?plan=${planParam}`);
+          localStorage.setItem('redirectAfterLogin', `session-setup?plan=${planParam}`);
         }
         
         // Redirect to login page

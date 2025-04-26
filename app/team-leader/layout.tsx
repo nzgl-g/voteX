@@ -21,6 +21,16 @@ import {
     Users2,
 } from "lucide-react"
 
+import {
+    IconCalendarCog,
+    IconDashboard,
+    IconChecklist,
+    IconHelp,
+    IconSteam,
+    IconSettings,
+    IconLifebuoyFilled,
+} from "@tabler/icons-react"
+
 const data = {
     teams: [
         {name: "Presidential Election", logo: Landmark, plan: "Enterprise"},
@@ -28,21 +38,22 @@ const data = {
         {name: "CEO Election", logo: BriefcaseBusiness, plan: "Free"},
     ],
     navMain: [
-        {title: "Real Time Analytics", url: "./real-time-analytics", icon: BarChart3 },
-        {title: "Session Management", url: "./session-management", icon: ClipboardList ,},
-        {title: "Team Management", url: "./team-management", icon: Users2},
-        {title: "Task Assignment", url: "./task-assignment", icon: CheckCircle},
-        {title: "Support", url: "./support", icon: LifeBuoy},
+        {title: "Monitoring", url: "./monitoring", icon: IconDashboard },
+        {title: "Session", url: "./session", icon: IconCalendarCog ,},
+        {title: "Team", url: "./team", icon: IconSteam},
+        {title: "Scheduler", url: "./scheduler", icon: IconChecklist},
+        {title: "Support", url: "./support", icon: IconLifebuoyFilled},
     ],
     navSecondary: [
-        {title: "Settings", url: "#", icon: Settings2},
-        {title: "Help", url: "#", icon: MessageCircleQuestion},
+        {title: "Settings", url: "#", icon: IconSettings },
+        {title: "Help", url: "#", icon: IconHelp},
     ]
 }
 
 export default function Layout({children}: { children: ReactNode }) {
     return (
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             <SidebarProvider style={{
                 // Using string type assertion to avoid TypeScript errors with custom CSS properties
                 "--sidebar-width": "16rem",

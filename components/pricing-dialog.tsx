@@ -125,7 +125,7 @@ export function PricingDialog({ open: externalOpen, onOpenChange }: PricingDialo
         setOpen(false)
         
         // Redirect to session creation with the selected plan
-        router.push(`/session-creation?plan=${plan.id}`)
+        router.push(`/session-setup?plan=${plan.id}`)
     }
 
     const pricingPlans = [

@@ -24,7 +24,6 @@ interface NavItem {
 
 interface Team {
     name: string
-    logo: LucideIcon
     plan: string
 }
 

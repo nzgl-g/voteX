@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Progress } from "@/components/shadcn-ui/progress"
 import { Button } from "@/components/shadcn-ui/button"
 import { BasicInformationStep } from "@/components/setup-form/steps/basic-information-step"
@@ -74,6 +75,7 @@ export interface VoteSessionFormProps {
 }
 
 export function VoteSessionForm({ plan }: VoteSessionFormProps) {
+  const router = useRouter()
   const [currentStep, setCurrentStep] = useState(0)
   const [formState, setFormState] = useState<SessionFormState>({
     name: "",
@@ -302,16 +304,20 @@ export function VoteSessionForm({ plan }: VoteSessionFormProps) {
         variant: "default",
       });
       
-      // Redirect or perform other actions based on the response
       console.log('Session created:', response.data);
       
-      // If subscription is not free, redirect to payment
+      // If subscription is not free, redirect to payment page
       if (formState.subscription.name !== "free") {
-        // Redirect to payment page
-        window.location.href = `/payment?sessionId=${response.data._id}`;
+        // Redirect to payment page with session ID and plan
+        router.push(`/payment?sessionId=${response.data._id}&plan=${formState.subscription.name}`);
       } else {
-        // Redirect to dashboard or sessions page
-        window.location.href = "/team-leader/real-time-analytics";
+        // Free plan - redirect directly to dashboard
+        toast({
+          title: "Session Published!",
+          description: "Your free session has been published successfully.",
+          variant: "default",
+        });
+        router.push("/team-leader/session/" + response.data._id);
       }
     } catch (error: any) {
       console.error('Error creating session:', error);

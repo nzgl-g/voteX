@@ -47,7 +47,28 @@ export function SignupForm() {
             const { authApi } = await import('@/lib/api')
             const result = await authApi.signup(data.username, data.email, data.password)
             console.log('Signup successful:', result)
-            router.push('/team-leader/real-time-analytics')
+            
+            // Check if there's a redirect destination stored in localStorage
+            const redirectAfterLogin = localStorage.getItem('redirectAfterLogin')
+            
+            if (redirectAfterLogin) {
+                // Clear the redirect info
+                localStorage.removeItem('redirectAfterLogin')
+                
+                if (redirectAfterLogin === 'pricing') {
+                    // Redirect to home page with pricing dialog
+                    router.push('/?showPricing=true')
+                } else if (redirectAfterLogin.startsWith('session-creation')) {
+                    // Redirect to session creation with the plan parameter preserved
+                    router.push(`/${redirectAfterLogin}`)
+                } else {
+                    // Handle any other redirects
+                    router.push(`/${redirectAfterLogin}`)
+                }
+            } else {
+                // Default redirect to dashboard
+                router.push('/team-leader/real-time-analytics')
+            }
         } catch (err: any) {
             setError(err.message || 'Failed to sign up. Please check your connection and try again.')
             console.error('Signup error:', err)

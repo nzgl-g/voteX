@@ -176,9 +176,12 @@ export function PricingDialog({ open: externalOpen, onOpenChange }: PricingDialo
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button size="lg">View Pricing Plans</Button>
-            </DialogTrigger>
+            {/* Only render the DialogTrigger when not controlled externally */}
+            {externalOpen === undefined && (
+                <DialogTrigger asChild>
+                    <Button size="lg">View Pricing Plans</Button>
+                </DialogTrigger>
+            )}
             <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-auto">
                 <DialogHeader>
                     <DialogTitle className="text-2xl">Choose Your Plan</DialogTitle>

@@ -23,6 +23,24 @@ export default function Home() {
     if (searchParams.get("showPricing") === "true") {
       setShowPricingDialog(true);
     }
+    
+    // Add event listener for custom event from Hero component
+    const handleShowPricingDialog = () => {
+      console.log('Custom event received, showing pricing dialog');
+      setShowPricingDialog(true);
+    };
+    
+    // Add event listener
+    if (typeof window !== 'undefined') {
+      window.addEventListener('showPricingDialog', handleShowPricingDialog);
+    }
+    
+    // Clean up event listener
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('showPricingDialog', handleShowPricingDialog);
+      }
+    };
   }, [searchParams]);
   
   return (

@@ -68,8 +68,9 @@ export const HeroSection = () => {
                   
                   if (isAuth) {
                     console.log('User is authenticated, showing pricing dialog');
-                    // Use the parent page's pricing dialog by redirecting with a query parameter
-                    router.push('/?showPricing=true');
+                    // Directly show the pricing dialog from the parent page
+                    window.dispatchEvent(new CustomEvent('showPricingDialog'));
+                    // Stay on the same page
                   } else {
                     console.log('User is not authenticated, redirecting to login');
                     // Store intended destination in localStorage to resume flow after login

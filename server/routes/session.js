@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { isValidObjectId } = require("mongoose");
 const express = require("express");
 const router = express.Router();
 const Session = require("../models/Sessions");
@@ -6,7 +7,6 @@ const CandidateRequest = require("../models/CandidateRequest");
 const SessionParticipant = require("../models/SessionParticipants");
 const Team = require("../models/Team");
 const auth = require("../middleware/auth");
-
 router.get("/", async (req, res) => {
   try {
     const sessions = await Session.find({})
@@ -44,8 +44,33 @@ router.get("/my-sessions", auth, async (req, res) => {
     res.status(500).send("Failed to fetch user sessions");
   }
 });
+
+router.get("/my-sessions-as-member", auth, async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const participantIn = await SessionParticipant.find({
+      userId: userId,
+      role: "team_member",
+    });
+
+    const sessionIds = participantIn.map((par) => par.sessionId);
+
+    const sessions = await Session.find({
+      _id: { $in: sessionIds },
+    }).populate("createdBy team");
+
+    res.status(200).json({ sessions });
+  } catch (error) {
+    console.error("Error fetching team sessions:", error);
+    res.status(500).json({ error: "Failed to fetch team sessions" });
+  }
+});
 router.get("/:id", async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ error: "Invalid session ID" });
+    }
     const session = await Session.findById(req.params.id)
       .populate("team")
       .populate("createdBy", "username email")

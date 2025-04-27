@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useEffect, useState } from "react"
-import { ChevronDown, Plus, Vote, BarChart, Trophy, Loader2, AlertCircle } from "lucide-react"
+import { ChevronDown, Plus, Vote, BarChart, Trophy, Loader2, AlertCircle, User, Users, Home } from "lucide-react"
 import { useRouter, usePathname } from "next/navigation"
 import apiClient from "@/lib/api"
 
@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
+  DropdownMenuGroup,
 } from "@/components/shadcn-ui/dropdown-menu"
 import {
   SidebarMenu,
@@ -29,6 +30,7 @@ import {
   DialogTitle,
 } from "@/components/shadcn-ui/dialog"
 import { Button } from "@/components/shadcn-ui/button"
+import { Badge } from "@/components/shadcn-ui/badge"
 
 // Define session type for the team switcher
 interface SessionItem {
@@ -36,6 +38,7 @@ interface SessionItem {
   name: string
   type: "poll" | "election" | "tournament"
   plan: string
+  role?: "leader" | "member"
 }
 
 // No Sessions Dialog Component
@@ -70,7 +73,8 @@ function NoSessionsDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
 }
 
 export function SessionSelector() {
-  const [sessions, setSessions] = useState<SessionItem[]>([])
+  const [mySessions, setMySessions] = useState<SessionItem[]>([])
+  const [memberSessions, setMemberSessions] = useState<SessionItem[]>([])
   const [activeSession, setActiveSession] = useState<SessionItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [showNoSessionsDialog, setShowNoSessionsDialog] = useState(false)
@@ -83,42 +87,58 @@ export function SessionSelector() {
       setLoading(true)
       
       try {
-        // Use the API client which already handles authentication
-        const response = await apiClient.get('/sessions/my-sessions')
-        
-        console.log('Fetched sessions:', response.data)
+        // Fetch sessions where user is a leader
+        const leaderResponse = await apiClient.get('/sessions/my-sessions')
         
         // Transform the response data to match the SessionItem interface
-        const sessionItems: SessionItem[] = response.data.map((session: any) => ({
+        const leaderSessionItems: SessionItem[] = leaderResponse.data.map((session: any) => ({
           id: session._id,
           name: session.name,
           type: session.type as "poll" | "election" | "tournament",
-          plan: session.subscription?.name || "free"
+          plan: session.subscription?.name || "free",
+          role: "leader"
         }))
         
-        setSessions(sessionItems)
+        setMySessions(leaderSessionItems)
+        
+        // Fetch sessions where user is a member
+        const memberResponse = await apiClient.get('/sessions/my-sessions-as-member')
+        
+        // Transform the response data to match the SessionItem interface
+        const memberSessionItems: SessionItem[] = memberResponse.data.sessions.map((session: any) => ({
+          id: session._id,
+          name: session.name,
+          type: session.type as "poll" | "election" | "tournament",
+          plan: session.subscription?.name || "free",
+          role: "member"
+        }))
+        
+        setMemberSessions(memberSessionItems)
+        
+        // Combine all sessions for active session detection
+        const allSessions = [...leaderSessionItems, ...memberSessionItems]
         
         // If no sessions found, show the dialog
-        if (sessionItems.length === 0) {
+        if (allSessions.length === 0) {
           setShowNoSessionsDialog(true)
         } else {
           setShowNoSessionsDialog(false)
           
           // Find the current session from the pathname
-          const currentSessionId = getSessionIdFromPath()
+          const currentSessionId = getSessionIdFromPath(allSessions)
           
           // Set the active session based on the current URL
           if (currentSessionId) {
-            const currentSession = sessionItems.find(session => session.id === currentSessionId)
+            const currentSession = allSessions.find(session => session.id === currentSessionId)
             if (currentSession) {
               setActiveSession(currentSession)
-            } else if (sessionItems.length > 0) {
+            } else if (allSessions.length > 0) {
               // If current session not found in the list, set the first one as active
-              setActiveSession(sessionItems[0])
+              setActiveSession(allSessions[0])
             }
-          } else if (sessionItems.length > 0) {
+          } else if (allSessions.length > 0) {
             // If no session ID in the URL, set the first one as active
-            setActiveSession(sessionItems[0])
+            setActiveSession(allSessions[0])
           }
         }
       } catch (error: any) {
@@ -139,7 +159,7 @@ export function SessionSelector() {
   }, [pathname])
 
   // Get the session ID from the current path
-  const getSessionIdFromPath = () => {
+  const getSessionIdFromPath = (sessions: SessionItem[]) => {
     const pathSegments = pathname.split('/')
     return pathSegments.find(segment => sessions.some(session => session.id === segment))
   }
@@ -151,36 +171,32 @@ export function SessionSelector() {
     // Extract the path segments
     const pathSegments = pathname.split('/')
     
-    // Determine if we're in team-leader or team-member route
-    const isTeamLeader = pathname.includes('team-leader')
-    const isTeamMember = pathname.includes('team-member')
+    // Determine the role based on the session
+    const roleSegment = session.role === "member" ? 'team-member' : 'team-leader'
     
-    if (isTeamLeader || isTeamMember) {
-      // Get the role segment (team-leader or team-member)
-      const roleSegment = isTeamLeader ? 'team-leader' : 'team-member'
-      
-      // Get the section segment (monitoring, team, scheduler, etc.)
-      // Default to monitoring if not found
-      let sectionSegment = 'monitoring'
-      if (pathSegments.length > 2) {
-        // Check if the third segment is a valid section (not a session ID)
-        const thirdSegment = pathSegments[2]
-        if (thirdSegment && !thirdSegment.match(/^[0-9a-fA-F]{24}$/)) {
-          sectionSegment = thirdSegment
-        }
+    // Get the section segment (monitoring, team, scheduler, etc.)
+    // Default to monitoring if not found
+    let sectionSegment = 'monitoring'
+    if (pathSegments.length > 2) {
+      // Check if the third segment is a valid section (not a session ID)
+      const thirdSegment = pathSegments[2]
+      if (thirdSegment && !thirdSegment.match(/^[0-9a-fA-F]{24}$/)) {
+        sectionSegment = thirdSegment
       }
-      
-      // Navigate to the selected session with the correct path structure
-      router.push(`/${roleSegment}/${sectionSegment}/${session.id}`)
-    } else {
-      // For other routes, just use the session ID
-      router.push(`/team-leader/monitoring/${session.id}`)
     }
+    
+    // Navigate to the selected session with the correct path structure
+    router.push(`/${roleSegment}/${sectionSegment}/${session.id}`)
   }
 
   // Handle creating a new session
   const handleCreateSession = () => {
-    router.push('/pricing')
+    router.push('/subscription')
+  }
+
+  // Handle navigating to voter page
+  const handleGoToVoterPage = () => {
+    router.push('/voter')
   }
 
   // Get the appropriate icon based on session type
@@ -215,7 +231,9 @@ export function SessionSelector() {
     )
   }
 
-  if (!activeSession && sessions.length === 0) {
+  const allSessions = [...mySessions, ...memberSessions]
+
+  if (!activeSession && allSessions.length === 0) {
     return (
       <>
         <NoSessionsDialog open={showNoSessionsDialog} onOpenChange={setShowNoSessionsDialog} />
@@ -229,6 +247,17 @@ export function SessionSelector() {
                 <Plus className="size-3" />
               </div>
               <span className="truncate font-medium">Create your first session</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton 
+              className="w-fit px-1.5"
+              onClick={handleGoToVoterPage}
+            >
+              <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-5 items-center justify-center rounded-md">
+                <Home className="size-3" />
+              </div>
+              <span className="truncate font-medium">Go to Voter Page</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -250,37 +279,86 @@ export function SessionSelector() {
                       {React.createElement(getSessionIcon(activeSession.type), { className: "size-3" })}
                     </div>
                     <span className="truncate font-medium">{activeSession.name}</span>
+                    {activeSession.role && (
+                      <Badge variant={activeSession.role === "leader" ? "default" : "secondary"} className="ml-1 text-xs">
+                        {activeSession.role === "leader" ? "Leader" : "Member"}
+                      </Badge>
+                    )}
                     <ChevronDown className="opacity-50" />
                   </>
                 )}
               </SidebarMenuButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-64 rounded-lg"
+              className="w-72 rounded-lg"
               align="start"
               side="bottom"
               sideOffset={4}
             >
-              <DropdownMenuLabel className="text-muted-foreground text-xs">
-                Your Sessions
-              </DropdownMenuLabel>
-              {sessions.map((session, index) => {
-                const SessionIcon = getSessionIcon(session.type)
-                return (
-                  <DropdownMenuItem
-                    key={session.id}
-                    onClick={() => handleSessionSelect(session)}
-                    className="gap-2 p-2"
-                  >
-                    <div className="flex size-6 items-center justify-center rounded-xs border">
-                      <SessionIcon className="size-4 shrink-0" />
-                    </div>
-                    <div className="flex-1 truncate">{session.name}</div>
-                    <div className="text-xs text-muted-foreground capitalize">{session.plan}</div>
-                  </DropdownMenuItem>
-                )
-              })}
+              {mySessions.length > 0 && (
+                <>
+                  <DropdownMenuLabel className="text-muted-foreground flex items-center gap-2 text-xs">
+                    <User className="size-3" />
+                    My Sessions
+                  </DropdownMenuLabel>
+                  <DropdownMenuGroup>
+                    {mySessions.map((session) => {
+                      const SessionIcon = getSessionIcon(session.type)
+                      return (
+                        <DropdownMenuItem
+                          key={session.id}
+                          onClick={() => handleSessionSelect(session)}
+                          className="gap-2 p-2"
+                        >
+                          <div className="flex size-6 items-center justify-center rounded-xs border">
+                            <SessionIcon className="size-4 shrink-0" />
+                          </div>
+                          <div className="flex-1 truncate">{session.name}</div>
+                          <Badge variant="default" className="text-xs">Leader</Badge>
+                        </DropdownMenuItem>
+                      )
+                    })}
+                  </DropdownMenuGroup>
+                  {memberSessions.length > 0 && <DropdownMenuSeparator />}
+                </>
+              )}
+              
+              {memberSessions.length > 0 && (
+                <>
+                  <DropdownMenuLabel className="text-muted-foreground flex items-center gap-2 text-xs">
+                    <Users className="size-3" />
+                    My Sessions as Member
+                  </DropdownMenuLabel>
+                  <DropdownMenuGroup>
+                    {memberSessions.map((session) => {
+                      const SessionIcon = getSessionIcon(session.type)
+                      return (
+                        <DropdownMenuItem
+                          key={session.id}
+                          onClick={() => handleSessionSelect(session)}
+                          className="gap-2 p-2"
+                        >
+                          <div className="flex size-6 items-center justify-center rounded-xs border">
+                            <SessionIcon className="size-4 shrink-0" />
+                          </div>
+                          <div className="flex-1 truncate">{session.name}</div>
+                          <Badge variant="secondary" className="text-xs">Member</Badge>
+                        </DropdownMenuItem>
+                      )
+                    })}
+                  </DropdownMenuGroup>
+                </>
+              )}
+              
               <DropdownMenuSeparator />
+              
+              <DropdownMenuItem className="gap-2 p-2" onClick={handleGoToVoterPage}>
+                <div className="bg-background flex size-6 items-center justify-center rounded-md border">
+                  <Home className="size-4" />
+                </div>
+                <div className="text-muted-foreground font-medium">Go to Voter Page</div>
+              </DropdownMenuItem>
+              
               <DropdownMenuItem className="gap-2 p-2" onClick={handleCreateSession}>
                 <div className="bg-background flex size-6 items-center justify-center rounded-md border">
                   <Plus className="size-4" />

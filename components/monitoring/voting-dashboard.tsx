@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { CalendarDays, ChevronDown, FileText } from "lucide-react"
+import { CalendarDays, ChevronDown, FileText, AlertTriangle } from "lucide-react"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn-ui/card"
 import { Button } from "@/components/shadcn-ui/button"
@@ -14,6 +14,7 @@ import { TotalVotesCard } from "./total-votes-card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/shadcn-ui/alert"
 import { Loader2 } from "lucide-react"
 import apiClient from "@/lib/api"
+import { Badge } from "@/components/shadcn-ui/badge"
 
 // Mock data - in a real app, this would come from an API
 import { mockSession, mockVotesData, generateMockVotesOverTime } from "@/lib/mock"
@@ -36,6 +37,7 @@ export default function VotingDashboard({ sessionId }: VotingDashboardProps) {
   const [votesOverTime, setVotesOverTime] = useState(generateMockVotesOverTime("day"))
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [sessionStatus, setSessionStatus] = useState<'not_started' | 'active' | 'ended'>('active')
   
   // Update mock data when time range changes
   useEffect(() => {
@@ -104,6 +106,10 @@ export default function VotingDashboard({ sessionId }: VotingDashboardProps) {
         }
         
         setSession(formattedSession)
+        
+        // Determine session status based on lifecycle dates
+        determineSessionStatus(formattedSession.sessionLifecycle);
+        
       } catch (err) {
         console.error('Error fetching session data:', err)
         setError('Failed to load session data. Please try again later.')
@@ -122,6 +128,9 @@ export default function VotingDashboard({ sessionId }: VotingDashboardProps) {
           totalVoters: 1000
         }
         setSession(modifiedSession)
+        
+        // Determine session status based on lifecycle dates
+        determineSessionStatus(modifiedSession.sessionLifecycle);
       } finally {
         setLoading(false)
       }
@@ -129,6 +138,23 @@ export default function VotingDashboard({ sessionId }: VotingDashboardProps) {
     
     fetchSessionData()
   }, [sessionId])
+  
+  // Determine session status based on lifecycle dates
+  const determineSessionStatus = (lifecycle: Session['sessionLifecycle']) => {
+    const now = new Date()
+    const startDate = lifecycle.scheduledAt?.start 
+      ? new Date(lifecycle.scheduledAt.start) 
+      : new Date(lifecycle.startedAt)
+    const endDate = new Date(lifecycle.endedAt)
+    
+    if (now < startDate) {
+      setSessionStatus('not_started')
+    } else if (now < endDate) {
+      setSessionStatus('active')
+    } else {
+      setSessionStatus('ended')
+    }
+  }
 
   // Handle time range change
   const handleTimeRangeChange = (range: "day" | "week" | "month") => {
@@ -163,9 +189,6 @@ export default function VotingDashboard({ sessionId }: VotingDashboardProps) {
 
   // Calculate total votes
   const totalVotes = session.candidates?.reduce((sum, candidate) => sum + (candidate.totalVotes || 0), 0) || 0
-
-  // Format session end date for countdown
-  const sessionEndDate = new Date(session.sessionLifecycle.endedAt)
 
   return (
     <div className="container mx-auto py-6 space-y-8">
@@ -212,18 +235,32 @@ export default function VotingDashboard({ sessionId }: VotingDashboardProps) {
         </div>
       </div>
 
+      {sessionStatus === 'not_started' && (
+        <Alert className="bg-yellow-50 border-yellow-200">
+          <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          <AlertTitle className="text-yellow-800">Session Not Started</AlertTitle>
+          <AlertDescription className="text-yellow-700">
+            This session is scheduled but has not started yet. The data shown below is preliminary and will be updated once the session begins.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <TotalVotesCard totalVotes={totalVotes} />
+        <TotalVotesCard totalVotes={sessionStatus === 'not_started' ? 0 : totalVotes} />
         
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-medium">Participation Rate</CardTitle>
             <CardDescription>
-              {Math.round((totalVotes / (session.totalVoters || 1000)) * 100)}% of eligible voters
+              {sessionStatus === 'not_started' 
+                ? "0% of eligible voters" 
+                : `${Math.round((totalVotes / (session.totalVoters || 1000)) * 100)}% of eligible voters`}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalVotes} / {session.totalVoters || 1000}</div>
+            <div className="text-2xl font-bold">
+              {sessionStatus === 'not_started' ? "0" : totalVotes} / {session.totalVoters || 1000}
+            </div>
           </CardContent>
         </Card>
         
@@ -233,19 +270,32 @@ export default function VotingDashboard({ sessionId }: VotingDashboardProps) {
             <CardDescription>Current state of voting</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold capitalize">{session.status || 'Active'}</div>
+            <div className="flex flex-col gap-2">
+              <div className="text-2xl font-bold capitalize">
+                {sessionStatus === 'not_started' ? 'Scheduled' : sessionStatus}
+              </div>
+              <div>
+                {sessionStatus === 'not_started' && (
+                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
+                    Not Started
+                  </Badge>
+                )}
+                {sessionStatus === 'active' && (
+                  <Badge variant="outline" className="bg-green-100 text-green-800">
+                    Active
+                  </Badge>
+                )}
+                {sessionStatus === 'ended' && (
+                  <Badge variant="outline" className="bg-gray-100 text-gray-800">
+                    Ended
+                  </Badge>
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
         
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium">Time Remaining</CardTitle>
-            <CardDescription>Until session closes</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <CountdownTimer endDate={sessionEndDate} />
-          </CardContent>
-        </Card>
+        <CountdownTimer sessionLifecycle={session.sessionLifecycle} status={session.status} />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
@@ -259,7 +309,17 @@ export default function VotingDashboard({ sessionId }: VotingDashboardProps) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <VotesOverTimeChart data={votesOverTime} timeRange={timeRange} />
+            {sessionStatus === 'not_started' ? (
+              <div className="flex flex-col items-center justify-center h-[300px] text-center">
+                <AlertTriangle className="h-8 w-8 text-yellow-500 mb-2" />
+                <p className="text-lg font-medium">No voting data available yet</p>
+                <p className="text-sm text-muted-foreground">
+                  Voting data will be displayed once the session begins
+                </p>
+              </div>
+            ) : (
+              <VotesOverTimeChart data={votesOverTime} timeRange={timeRange} />
+            )}
           </CardContent>
         </Card>
         
@@ -271,7 +331,17 @@ export default function VotingDashboard({ sessionId }: VotingDashboardProps) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <VoteDistributionChart candidates={session.candidates || []} />
+            {sessionStatus === 'not_started' ? (
+              <div className="flex flex-col items-center justify-center h-[300px] text-center">
+                <AlertTriangle className="h-8 w-8 text-yellow-500 mb-2" />
+                <p className="text-lg font-medium">No voting data available yet</p>
+                <p className="text-sm text-muted-foreground">
+                  Vote distribution will be displayed once the session begins
+                </p>
+              </div>
+            ) : (
+              <VoteDistributionChart candidates={session.candidates || []} />
+            )}
           </CardContent>
         </Card>
       </div>
@@ -284,7 +354,17 @@ export default function VotingDashboard({ sessionId }: VotingDashboardProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <CandidatesList candidates={session.candidates || []} timeRange={timeRange} />
+          {sessionStatus === 'not_started' ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <AlertTriangle className="h-8 w-8 text-yellow-500 mb-2" />
+              <p className="text-lg font-medium">No voting data available yet</p>
+              <p className="text-sm text-muted-foreground">
+                Candidate voting data will be displayed once the session begins
+              </p>
+            </div>
+          ) : (
+            <CandidatesList candidates={session.candidates || []} timeRange={timeRange} />
+          )}
         </CardContent>
       </Card>
     </div>

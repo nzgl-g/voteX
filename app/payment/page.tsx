@@ -33,7 +33,7 @@ export default function PaymentPage() {
         description: "No session ID provided. Please try again.",
         variant: "destructive",
       })
-      router.push('/team-leader/real-time-analytics')
+      router.push('/team-leader/monitoring')
       return
     }
     
@@ -54,8 +54,8 @@ export default function PaymentPage() {
     // In a real application, you would update the session's payment status on the server
     console.log('Payment successful for session:', sessionId)
     
-    // Redirect to dashboard
-    router.push('/team-leader/real-time-analytics')
+    // Redirect to monitoring dashboard with session ID
+    router.push(`/team-leader/monitoring/${sessionId}`)
   }
   
   if (isLoading) {

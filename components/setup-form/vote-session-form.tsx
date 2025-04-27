@@ -311,13 +311,13 @@ export function VoteSessionForm({ plan }: VoteSessionFormProps) {
         // Redirect to payment page with session ID and plan
         router.push(`/payment?sessionId=${response.data._id}&plan=${formState.subscription.name}`);
       } else {
-        // Free plan - redirect directly to dashboard
+        // Free plan - redirect directly to monitoring dashboard
         toast({
           title: "Session Published!",
           description: "Your free session has been published successfully.",
           variant: "default",
         });
-        router.push("/team-leader/session/" + response.data._id);
+        router.push(`/team-leader/monitoring/${response.data._id}`);
       }
     } catch (error: any) {
       console.error('Error creating session:', error);

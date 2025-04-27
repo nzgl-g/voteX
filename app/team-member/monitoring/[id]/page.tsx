@@ -6,7 +6,7 @@ import VotingDashboard from "@/components/monitoring/voting-dashboard"
 import { DashboardSkeleton } from "@/components/monitoring/dashboard-skeleton"
 import { SiteHeader } from "@/components/sidebar/site-header"
 
-export default function MonitoringPage() {
+export default function TeamMemberMonitoringPage() {
   const params = useParams()
   const sessionId = params.id as string
   

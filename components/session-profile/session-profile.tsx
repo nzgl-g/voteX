@@ -2,9 +2,9 @@
 
 import {useState} from "react"
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/shadcn-ui/tabs"
-import {InfoTab} from "@/components/profile/info-tab"
-import {SettingsTab} from "@/components/profile/settings-tab"
-import {SessionActions} from "@/components/profile/session-actions"
+import {InfoTab} from "@/components/session-profile/info-tab"
+import {SettingsTab} from "@/components/session-profile/settings-tab"
+import {SessionActions} from "@/components/session-profile/session-actions"
 import {ImageIcon} from "lucide-react"
 import {cn} from "@/lib/utils"
 import type {Candidate, Session, TeamMember} from "@/lib/types"

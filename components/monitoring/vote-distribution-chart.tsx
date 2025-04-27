@@ -39,6 +39,15 @@ export function VoteDistributionChart({ candidates }: VoteDistributionChartProps
     return null
   }
 
+  // Define chart colors using global CSS variables
+  const chartColors = [
+    "hsl(var(--chart-1))",
+    "hsl(var(--chart-2))",
+    "hsl(var(--chart-3))",
+    "hsl(var(--chart-4))",
+    "hsl(var(--chart-5))"
+  ]
+
   return (
     <div className="w-full h-[300px] flex items-center justify-center relative">
       <ResponsiveContainer width="100%" height="100%">
@@ -52,19 +61,15 @@ export function VoteDistributionChart({ candidates }: VoteDistributionChartProps
             outerRadius={100}
             innerRadius={60}
             paddingAngle={2}
-            // Remove the label prop to hide direct labels
           >
-            {data.map((entry, index) => {
-              // Generate colors based on index
-              const colors = [
-                "hsl(var(--chart-1))",
-                "hsl(var(--chart-2))",
-                "hsl(var(--chart-3))",
-                "hsl(var(--chart-4))",
-                "hsl(var(--chart-5))",
-              ]
-              return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-            })}
+            {data.map((entry, index) => (
+              <Cell 
+                key={`cell-${index}`} 
+                fill={chartColors[index % chartColors.length]} 
+                stroke="hsl(var(--background))"
+                strokeWidth={2}
+              />
+            ))}
           </Pie>
           <Tooltip content={<CustomTooltip />} />
         </PieChart>

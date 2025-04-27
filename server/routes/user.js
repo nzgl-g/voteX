@@ -40,106 +40,106 @@ router.delete("/me", auth, async (req, res) => {
   }
 });
 
-/**  Add Team Member (Only Team Leaders) */
-router.post("/:userId/team-members", auth, isTeamLeader, async (req, res) => {
-  try {
-    const { memberId } = req.body;
-    const userId = req.user._id;
+// /**  Add Team Member (Only Team Leaders) */
+// router.post("/:userId/team-members", auth, isTeamLeader, async (req, res) => {
+//   try {
+//     const { memberId } = req.body;
+//     const userId = req.user._id;
 
-    if (
-      !mongoose.Types.ObjectId.isValid(memberId) ||
-      !mongoose.Types.ObjectId.isValid(userId)
-    ) {
-      return res.status(400).send("Invalid user ID.");
-    }
+//     if (
+//       !mongoose.Types.ObjectId.isValid(memberId) ||
+//       !mongoose.Types.ObjectId.isValid(userId)
+//     ) {
+//       return res.status(400).send("Invalid user ID.");
+//     }
 
-    const leader = await User.findById(userId);
-    if (!leader || leader.role !== "team_leader") {
-      return res.status(403).send("Only team leaders can add members.");
-    }
+//     const leader = await User.findById(userId);
+//     if (!leader || leader.role !== "team_leader") {
+//       return res.status(403).send("Only team leaders can add members.");
+//     }
 
-    if (leader.teamMembers.includes(memberId)) {
-      return res.status(400).send("User is already a team member.");
-    }
+//     if (leader.teamMembers.includes(memberId)) {
+//       return res.status(400).send("User is already a team member.");
+//     }
 
-    leader.teamMembers.push(memberId);
-    await leader.save();
+//     leader.teamMembers.push(memberId);
+//     await leader.save();
 
-    res.status(200).send({ message: "Member added successfully.", leader });
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
-});
+//     res.status(200).send({ message: "Member added successfully.", leader });
+//   } catch (err) {
+//     res.status(500).send(err.message);
+//   }
+// });
 
-/**  Remove Team Member (Only Team Leaders) */
-router.delete(
-  "/:userId/team-members/:memberId",
-  auth,
-  isTeamLeader,
-  async (req, res) => {
-    try {
-      const { memberId } = req.params;
-      const userId = req.user.id;
-      if (
-        !mongoose.Types.ObjectId.isValid(memberId) ||
-        !mongoose.Types.ObjectId.isValid(userId)
-      ) {
-        return res.status(400).send("Invalid user ID.");
-      }
+// /**  Remove Team Member (Only Team Leaders) */
+// router.delete(
+//   "/:userId/team-members/:memberId",
+//   auth,
+//   isTeamLeader,
+//   async (req, res) => {
+//     try {
+//       const { memberId } = req.params;
+//       const userId = req.user.id;
+//       if (
+//         !mongoose.Types.ObjectId.isValid(memberId) ||
+//         !mongoose.Types.ObjectId.isValid(userId)
+//       ) {
+//         return res.status(400).send("Invalid user ID.");
+//       }
 
-      const leader = await User.findById(userId);
-      if (!leader || leader.role !== "team_leader") {
-        return res.status(403).send("Only team leaders can remove members.");
-      }
+//       const leader = await User.findById(userId);
+//       if (!leader || leader.role !== "team_leader") {
+//         return res.status(403).send("Only team leaders can remove members.");
+//       }
 
-      if (!leader.teamMembers.includes(memberId)) {
-        return res.status(400).send("User is not a team member.");
-      }
+//       if (!leader.teamMembers.includes(memberId)) {
+//         return res.status(400).send("User is not a team member.");
+//       }
 
-      leader.teamMembers = leader.teamMembers.filter(
-        (id) => id.toString() !== memberId
-      );
-      await leader.save();
+//       leader.teamMembers = leader.teamMembers.filter(
+//         (id) => id.toString() !== memberId
+//       );
+//       await leader.save();
 
-      res.status(200).send({ message: "Member removed successfully.", leader });
-    } catch (err) {
-      res.status(500).send(err.message);
-    }
-  }
-);
+//       res.status(200).send({ message: "Member removed successfully.", leader });
+//     } catch (err) {
+//       res.status(500).send(err.message);
+//     }
+//   }
+// );
 
 //admin below . add middleware later.
 
-/**  Get All Users (Admin Only) */
-router.get("/", auth, async (req, res) => {
-  try {
-    const users = await User.find().select("-password"); // Exclude password
-    res.status(200).send(users);
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
-});
+// /**  Get All Users (Admin Only) */
+// router.get("/", auth, async (req, res) => {
+//   try {
+//     const users = await User.find().select("-password"); // Exclude password
+//     res.status(200).send(users);
+//   } catch (err) {
+//     res.status(500).send(err.message);
+//   }
+// });
 
-/**  Get Specific User (Admin Only) */
-router.get("/:id", auth, async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id).select("-password");
-    if (!user) return res.status(404).send("User not found.");
-    res.status(200).send(user);
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
-});
+// /**  Get Specific User (Admin Only) */
+// router.get("/:id", auth, async (req, res) => {
+//   try {
+//     const user = await User.findById(req.params.id).select("-password");
+//     if (!user) return res.status(404).send("User not found.");
+//     res.status(200).send(user);
+//   } catch (err) {
+//     res.status(500).send(err.message);
+//   }
+// });
 
-/**  Delete User (Admin Only) */
-router.delete("/:id", auth, async (req, res) => {
-  try {
-    await User.findByIdAndDelete(req.params.id);
-    res.status(200).send({ message: "User deleted successfully." });
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
-});
+// /**  Delete User (Admin Only) */
+// router.delete("/:id", auth, async (req, res) => {
+//   try {
+//     await User.findByIdAndDelete(req.params.id);
+//     res.status(200).send({ message: "User deleted successfully." });
+//   } catch (err) {
+//     res.status(500).send(err.message);
+//   }
+// });
 
 module.exports = router;
 

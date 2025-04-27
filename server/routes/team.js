@@ -1,12 +1,13 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const Team = require("../models/Team");
+const Invitation = require("../models/Invitation");
 const User = require("../models/User");
 const auth = require("../middleware/auth");
 const isTeamLeader = require("../middleware/isTeamLeader");
 const router = express.Router();
 
-/** 🔹 Get all teams (Only those the user is part of) */
+/**  Get all teams (Only those the user is part of) */
 router.get("/", auth, async (req, res) => {
   try {
     const teams = await Team.find({
@@ -18,20 +19,20 @@ router.get("/", auth, async (req, res) => {
     res.status(500).send(err.message);
   }
 });
-/** 🔹 Get all members of a team (Only if user is in the team) */
+/** Get all members of a team (Only if user is in the team) */
 router.get("/:teamId/members", auth, async (req, res) => {
   try {
     const team = await Team.findById(req.params.teamId).populate(
-        "members",
-        "username email"
+      "members",
+      "username email"
     );
 
     if (!team) return res.status(404).send("Team not found.");
 
     // Check if user is in the team
     if (
-        team.leader.toString() !== req.user._id.toString() &&
-        !team.members.some((m) => m._id.toString() === req.user._id.toString())
+      team.leader.toString() !== req.user._id.toString() &&
+      !team.members.some((m) => m._id.toString() === req.user._id.toString())
     ) {
       return res.status(403).send("Access denied.");
     }
@@ -41,19 +42,20 @@ router.get("/:teamId/members", auth, async (req, res) => {
     res.status(500).send(err.message);
   }
 });
-/** 🔹 Get a specific team by ID (Only if user is in the team) */
+/**  Get a specific team by ID (Only if user is in the team) */
 router.get("/:teamId", auth, async (req, res) => {
   try {
     const team = await Team.findById(req.params.teamId).populate(
-        "leader members",
-        "username email"
+      "leader members",
+      "username email"
     );
 
     if (!team) return res.status(404).send("Team not found.");
-    if (
-        team.leader.toString() !== req.user._id.toString() &&
-        !team.members.some((m) => m.toString() === req.user._id.toString())
-    ) {
+
+    const isLeader = team.leader._id.equals(req.user._id);
+    const isMember = team.members.some((u) => u._id.equals(req.user._id));
+
+    if (!isLeader && !isMember) {
       return res.status(403).send("Access denied.");
     }
 
@@ -61,69 +63,106 @@ router.get("/:teamId", auth, async (req, res) => {
   } catch (err) {
     res.status(500).send(err.message);
   }
-});
-
-// Send an invitation to a user to join a team
+}); // Send an invitation to a user to join a team
 router.post("/:teamId/invite", auth, isTeamLeader, async (req, res) => {
   try {
-    const { email } = req.body; // Email of the user to invite
-    const team = await Team.findById(req.params.teamId);
+    const { email } = req.body;
+    const { teamId } = req.params;
 
-    if (!team) return res.status(404).send("Team not found.");
+    // Validate email
+    if (!email) return res.status(400).send("Email is required");
 
-    // Find the user by email
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).send("User not found.");
+    // Find team and user in parallel for better performance
+    const [team, user] = await Promise.all([
+      Team.findById(teamId),
+      User.findOne({ email }),
+    ]);
 
-    // Check if the user is already a member of the team
-    if (team.members.includes(user._id)) {
-      return res.status(400).send("User is already in the team.");
+    if (!team) return res.status(404).send("Team not found");
+    if (!user) return res.status(404).send("User not found");
+
+    // Check if user is already a member or the leader
+    const isMember = team.members.some((member) => member.equals(user._id));
+    const isLeader = team.leader.equals(user._id);
+
+    if (isMember || isLeader) {
+      return res.status(400).send("User is already part of the team");
     }
 
-    // Create an invitation
-    const invitation = new Invitation({
-      teamId: team._id,
+    // Check for existing pending invitation
+    const existingInvite = await Invitation.findOne({
+      teamId,
       userId: user._id,
-      invitedBy: req.user._id, // ID of the team leader who sent the invitation
+      status: "pending",
     });
 
-    // Save the invitation
-    await invitation.save();
+    if (existingInvite) {
+      return res.status(400).send("Pending invitation already exists");
+    }
 
-    res.status(200).send({ message: "Invitation sent successfully." });
+    // Create and save invitation
+    const invitation = new Invitation({
+      teamId,
+      userId: user._id,
+      invitedBy: req.user._id,
+      status: "pending",
+    });
+
+    await invitation.save();
+    res.status(201).json({
+      message: "Invitation sent successfully",
+      invitationId: invitation._id,
+    });
   } catch (err) {
-    res.status(500).send(err.message);
+    console.error("Invitation error:", err);
+    res.status(500).send("Failed to send invitation");
   }
 });
 
 /** 🔹 Remove a team member (Only Team Leaders) */
 router.delete(
-    "/:teamId/members/:memberId",
-    auth,
-    isTeamLeader,
-    async (req, res) => {
-      try {
-        const { teamId, memberId } = req.params;
-        const team = await Team.findById(teamId);
-        if (!team) return res.status(404).send("Team not found.");
+  "/:teamId/members/:memberId",
+  auth,
+  isTeamLeader,
+  async (req, res) => {
+    try {
+      const { teamId, memberId } = req.params;
 
-        if (!team.members.includes(memberId)) {
-          return res.status(400).send("User is not in the team.");
-        }
+      const memberObjectId = new mongoose.Types.ObjectId(memberId);
 
-        // Prevent the leader from removing themselves
-        if (team.leader.toString() === memberId) {
-          return res.status(400).send("Leader cannot remove themselves.");
-        }
+      const team = await Team.findById(teamId);
+      if (!team) return res.status(404).json({ error: "Team not found" });
 
-        team.members = team.members.filter((id) => id.toString() !== memberId);
-        await team.save();
-
-        res.status(200).send({ message: "Member removed successfully.", team });
-      } catch (err) {
-        res.status(500).send(err.message);
+      // Check if member exists in team (using ObjectId comparison)
+      const isMember = team.members.some((id) => id.equals(memberObjectId));
+      if (!isMember) {
+        return res.status(400).json({ error: "User is not in the team" });
       }
+
+      // Prevent leader self-removal (using ObjectId comparison)
+      if (team.leader.equals(memberObjectId)) {
+        return res
+          .status(400)
+          .json({ error: "Leader cannot remove themselves" });
+      }
+
+      // Filter using ObjectId comparison
+      team.members = team.members.filter((id) => !id.equals(memberObjectId));
+      await team.save();
+
+      res.status(200).json({
+        success: true,
+        message: "Member removed successfully",
+        team: await Team.findById(teamId).populate("members"), // Return fresh data
+      });
+    } catch (err) {
+      console.error("Remove member error:", err);
+      res.status(500).json({
+        error: "Server error",
+        details: err.message,
+      });
     }
+  }
 );
 
 module.exports = router;

@@ -1,20 +1,23 @@
-const jwt = require("jsonwebtoken");
+const Team = require("../models/Team");
 
-module.exports = function isTeamLeader(req, res, next) {
-  const token = req.header("authorization");
-  if (!token) {
-    return res.status(401).send("No token provided");
-  }
+module.exports = async function isTeamLeader(req, res, next) {
   try {
-    const decoded = jwt.verify(token, "hello");
-    if (decoded.role !== "team_leader") {
+    const team = await Team.findById(req.params.teamId);
+
+    if (!team) {
+      return res.status(404).send("Team not found");
+    }
+
+    // Compare ObjectIds properly
+    if (!team.leader.equals(req.user._id)) {
       return res
         .status(403)
         .send("Access denied. Not authorized as team leader");
     }
-    req.user = decoded;
+
+    req.team = team; // Attach team to request for later use
     next();
-  } catch (ex) {
-    return res.status(400).send("Invalid token");
+  } catch (err) {
+    res.status(500).send("Server error");
   }
 };

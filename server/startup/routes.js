@@ -2,7 +2,6 @@ const express = require("express");
 const signupRouter = require("../routes/signUp");
 const loginRouter = require("../routes/login");
 const sessionRouter = require("../routes/session");
-
 const userRouter = require("../routes/user");
 const candidateRouter = require("../routes/candidate");
 const voteRouter = require("../routes/vote");
@@ -14,6 +13,7 @@ module.exports = function (app) {
   app.use("/votex/api/sessions", sessionRouter);
   app.use("/votex/api/users", userRouter);
   app.use("/votex/api/teams", teamRouter);
+  app.use("/votex/api/invitations", invitationRouter);
   app.use("/votex/api/sessions/:sessionId/vote", voteRouter);
   app.use("/votex/api/sessions/:sessionId/candidate", candidateRouter);
 };

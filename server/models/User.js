@@ -20,6 +20,27 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  fullName: {
+    type: String,
+    required: false, // Optional field
+  },
+  gender: {
+    type: String,
+    enum: ["Male", "Female", "Prefer not to say"],
+    required: true,
+  },
+  walletAddress: {
+    type: String,
+    required: false, // Optional for non-crypto users
+    validate: {
+      validator: (v) => /^0x[a-fA-F0-9]{40}$/.test(v),
+      message: "Invalid Ethereum wallet address",
+    },
+  },
+  profilePic: {
+    type: String,
+    default: "",
+  },
 });
 
 userSchema.methods.generateAuthToken = function () {

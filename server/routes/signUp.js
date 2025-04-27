@@ -5,13 +5,12 @@ const Joi = require("joi");
 const userSchema = require("../validation/user");
 const router = express.Router();
 router.post("/", async (req, res) => {
-  const { username, email, password } = req.body;
-
   const { value, error } = userSchema.validate(req.body);
   if (error) {
     return res.status(400).json({ message: error.details[0].message });
   }
 
+  const { username, email, password, fullName, gender } = req.body;
   const exists = await User.findOne({ email });
   if (exists) {
     return res.status(400).json({ message: "User already exists." });
@@ -23,6 +22,8 @@ router.post("/", async (req, res) => {
     username,
     email,
     password: hashedPassword,
+    fullName: fullName || "",
+    gender,
   });
   await user.save();
 

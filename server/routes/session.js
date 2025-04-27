@@ -206,6 +206,62 @@ router.post("/", auth, async (req, res) => {
   }
 });
 
+//not ready
+// router.patch("/:id", auth, async (req, res) => {
+//   try {
+//     const sessionId = req.params.id;
+//     const updates = req.body;
+//     const userId = req.user._id;
+
+//     const session = await Session.findById(sessionId);
+//     if (!session) {
+//       return res.status(404).json({ error: "Session not found" });
+//     }
+
+//     // 2. Verify leadership through team
+//     const team = await Team.findOne({ session: sessionId });
+//     if (!team || !team.leader.equals(userId)) {
+//       return res
+//         .status(403)
+//         .json({ error: "Only the team leader can update this session" });
+//     }
+
+//     // 3. Define allowed fields for update
+//     const allowedUpdates = {
+//       name: 1,
+//       description: 1,
+//       organizationName: 1,
+//       banner: 1,
+//       "sessionLifecycle.scheduledAt.start": 1,
+//       "sessionLifecycle.scheduledAt.end": 1,
+//       securityMethod: 1,
+//       verificationMethod: 1,
+//     };
+
+//     // 4. Filter unauthorized updates
+//     const filteredUpdates = Object.keys(updates).reduce((acc, key) => {
+//       if (allowedUpdates[key] || key.startsWith("sessionLifecycle.")) {
+//         acc[key] = updates[key];
+//       }
+//       return acc;
+//     }, {});
+
+//     // 5. Apply updates
+//     const updatedSession = await Session.findByIdAndUpdate(
+//       sessionId,
+//       { $set: filteredUpdates },
+//       { new: true, runValidators: true }
+//     ).populate("team createdBy");
+
+//     res.status(200).json(updatedSession);
+//   } catch (err) {
+//     console.error("Update error:", err);
+//     res.status(500).json({
+//       error: "Failed to update session",
+//       details: err.message,
+//     });
+//   }
+// });
 module.exports = router;
 // currently using simple middleware to make testing the logic easy
 // after everything is done we can add moed detailed middleware .

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { SessionProfile } from "@/components/profile/session-profile"
+import { SessionProfile } from "@/components/session-profile/session-profile"
 import { SiteHeader } from "@/components/sidebar/site-header"
 import apiClient from "@/lib/api"
 import type { Session, Candidate, TeamMember } from "@/lib/types"

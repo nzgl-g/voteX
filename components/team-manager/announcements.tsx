@@ -73,7 +73,7 @@ interface AnnouncementsProps {
 
 export default function Announcements({ sessionId }: AnnouncementsProps) {
   const [activeTab, setActiveTab] = useState("announcements")
-  const [activeTab, setActiveTab] = useState("all")
+  const [activeAnnouncementFilter, setActiveAnnouncementFilter] = useState("all")
   const [newAnnouncementTitle, setNewAnnouncementTitle] = useState("")
   const [newAnnouncementContent, setNewAnnouncementContent] = useState("")
   const [showNewForm, setShowNewForm] = useState(false)
@@ -96,7 +96,7 @@ export default function Announcements({ sessionId }: AnnouncementsProps) {
   //   }
   // }, [sessionId])
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     console.log("Creating new item:", { title: formTitle, content: formContent })
     setFormTitle("")
@@ -104,7 +104,7 @@ export default function Announcements({ sessionId }: AnnouncementsProps) {
     setShowNewForm(false)
   }
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case "completed":
         return (
@@ -129,7 +129,7 @@ export default function Announcements({ sessionId }: AnnouncementsProps) {
     }
   }
 
-  const getPriorityBadge = (priority) => {
+  const getPriorityBadge = (priority: string) => {
     switch (priority) {
       case "high":
         return <Badge variant="destructive">High</Badge>

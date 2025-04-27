@@ -8,10 +8,28 @@ interface VotesOverTimeChartProps {
 }
 
 export function VotesOverTimeChart({ data, timeRange }: VotesOverTimeChartProps) {
-  // Format tooltip time
+  // Format tooltip time based on time range
   const formatTooltipTime = (time: string) => {
     const date = new Date(time)
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    if (timeRange === "day") {
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    } else {
+      return date.toLocaleDateString([], { month: "short", day: "numeric" })
+    }
+  }
+
+  // Get appropriate x-axis label based on time range
+  const getXAxisLabel = () => {
+    switch (timeRange) {
+      case "day":
+        return "24-hour period"
+      case "week":
+        return "Last 7 days"
+      case "month":
+        return "Last 30 days"
+      default:
+        return "Time period"
+    }
   }
 
   return (
@@ -28,19 +46,31 @@ export function VotesOverTimeChart({ data, timeRange }: VotesOverTimeChartProps)
         >
           <defs>
             <linearGradient id="colorVotes" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8} />
-              <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
+              <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.8} />
+              <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.2} />
             </linearGradient>
           </defs>
-          <CartesianGrid vertical={false} strokeDasharray="3 3" />
+          <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
           <XAxis
             dataKey="time"
             tickLine={false}
             axisLine={false}
             tick={false} // Hide the ticks
-            label={{ value: "24-hour period", position: "insideBottom", offset: -5 }}
+            label={{ 
+              value: getXAxisLabel(), 
+              position: "insideBottom", 
+              offset: -5,
+              className: "fill-muted-foreground text-xs"
+            }}
+            className="text-muted-foreground"
           />
-          <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} dx={-10} />
+          <YAxis 
+            tickLine={false} 
+            axisLine={false} 
+            tickFormatter={(value) => `${value}`} 
+            dx={-10}
+            className="text-muted-foreground text-xs" 
+          />
           <Tooltip
             formatter={(value) => [`${value} votes`, "Votes"]}
             labelFormatter={formatTooltipTime}
@@ -54,7 +84,7 @@ export function VotesOverTimeChart({ data, timeRange }: VotesOverTimeChartProps)
           <Area
             type="monotone"
             dataKey="votes"
-            stroke="hsl(var(--primary))"
+            stroke="hsl(var(--chart-1))"
             fill="url(#colorVotes)"
             strokeWidth={2}
             activeDot={{ r: 6, strokeWidth: 2, stroke: "hsl(var(--background))" }}

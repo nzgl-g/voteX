@@ -23,6 +23,7 @@ import { Button } from "@/components/shadcn-ui/button";
 import Link from "next/link";
 import Image from "next/image";
 import { ThemeToggle } from "@/components/shadcn-ui/theme-toggle";
+import { AuthButton } from "@/components/auth";
 
 interface RouteProps {
   href: string;
@@ -128,7 +129,10 @@ export const Navbar = React.forwardRef<HTMLDivElement>((props, ref) => {
             <SheetFooter className="flex-col sm:flex-col justify-start items-start">
               <Separator className="mb-2" />
 
-              <ThemeToggle />
+              <div className="flex items-center gap-2 w-full">
+                <ThemeToggle />
+                <AuthButton className="w-full" />
+              </div>
             </SheetFooter>
           </SheetContent>
         </Sheet>
@@ -176,7 +180,7 @@ export const Navbar = React.forwardRef<HTMLDivElement>((props, ref) => {
 
       <div className="hidden lg:flex items-center space-x-2">
         <ThemeToggle />
-        
+        <AuthButton />
       </div>
     </header>
   );

@@ -11,6 +11,15 @@ interface CandidatesListProps {
 }
 
 export function CandidatesList({ candidates, timeRange }: CandidatesListProps) {
+  // Define chart colors using global CSS variables
+  const chartColors = [
+    "hsl(var(--chart-1))",
+    "hsl(var(--chart-2))",
+    "hsl(var(--chart-3))",
+    "hsl(var(--chart-4))",
+    "hsl(var(--chart-5))"
+  ]
+
   return (
     <Table>
       <TableHeader>
@@ -22,9 +31,11 @@ export function CandidatesList({ candidates, timeRange }: CandidatesListProps) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {candidates.map((candidate) => {
+        {candidates.map((candidate, index) => {
           // Generate mock data for the mini chart
           const chartData = generateCandidateVotesOverTime(candidate.id, timeRange)
+          // Get color for this candidate
+          const chartColor = chartColors[index % chartColors.length]
 
           return (
             <TableRow key={candidate.id}>
@@ -36,11 +47,17 @@ export function CandidatesList({ candidates, timeRange }: CandidatesListProps) {
                     <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                       <XAxis dataKey="time" hide />
                       <YAxis hide />
+                      <defs>
+                        <linearGradient id={`colorGradient-${candidate.id}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={chartColor} stopOpacity={0.8} />
+                          <stop offset="95%" stopColor={chartColor} stopOpacity={0.2} />
+                        </linearGradient>
+                      </defs>
                       <Area
                         type="monotone"
                         dataKey="votes"
-                        stroke="hsl(var(--primary))"
-                        fill="hsl(var(--primary))"
+                        stroke={chartColor}
+                        fill={`url(#colorGradient-${candidate.id})`}
                         fillOpacity={0.2}
                         strokeWidth={1.5}
                       />

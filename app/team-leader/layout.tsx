@@ -28,11 +28,11 @@ const data = {
         {name: "CEO Election", logo: BriefcaseBusiness, plan: "Free"},
     ],
     navMain: [
-        {title: "Monitoring", url: "./monitoring/default", icon: LayoutDashboard },
-        {title: "Session", url: "./session/default", icon: CalendarClock },
-        {title: "Team", url: "./team/default", icon: Users},
-        {title: "Scheduler", url: "./scheduler/default", icon: CheckSquare},
-        {title: "Support", url: "./support", icon: LifeBuoy},
+        {title: "Monitoring", url: "/team-leader/monitoring/default", icon: LayoutDashboard },
+        {title: "Session", url: "/team-leader/session/default", icon: CalendarClock },
+        {title: "Team", url: "/team-leader/team/default", icon: Users},
+        {title: "Scheduler", url: "/team-leader/scheduler/default", icon: CheckSquare},
+        {title: "Support", url: "/team-leader/support", icon: LifeBuoy},
     ],
     navSecondary: [
         {title: "Settings", url: "#", icon: Settings },
@@ -50,7 +50,7 @@ export default function Layout({children}: { children: ReactNode }) {
                 "--sidebar-width-mobile": "15rem",
             } as React.CSSProperties}>
                 <SidebarLeft variant={"inset"}
-                    teams={data.teams}
+                    sessions={data.teams}
                     navMain={data.navMain}
                     navSecondary={data.navSecondary}
                 />

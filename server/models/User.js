@@ -31,9 +31,10 @@ const userSchema = new mongoose.Schema({
   },
   walletAddress: {
     type: String,
-    required: false, // Optional for non-crypto users
+    required: false,
+    default: "",
     validate: {
-      validator: (v) => /^0x[a-fA-F0-9]{40}$/.test(v),
+      validator: (v) => v === "" || /^0x[a-fA-F0-9]{40}$/.test(v),
       message: "Invalid Ethereum wallet address",
     },
   },

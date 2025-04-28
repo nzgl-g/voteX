@@ -11,13 +11,13 @@ router.post("/", async (req, res) => {
   }
 
   const { username, email, password, fullName, gender } = req.body;
-  
+
   // Check if email already exists
   const emailExists = await User.findOne({ email });
   if (emailExists) {
     return res.status(400).json({ message: "Email already in use." });
   }
-  
+
   // Check if username already exists
   const usernameExists = await User.findOne({ username });
   if (usernameExists) {
@@ -32,6 +32,7 @@ router.post("/", async (req, res) => {
     password: hashedPassword,
     fullName: fullName || "",
     gender,
+    walletAddress: "",
   });
   await user.save();
 

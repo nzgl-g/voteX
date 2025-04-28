@@ -98,9 +98,16 @@ export const authApi = {
     try {
       const response = await api.get('/users/me');
       if (response.data) {
-        // Update local storage with the latest user data
-        localStorage.setItem('user', JSON.stringify(response.data));
-        return response.data;
+        // Map backend fields to frontend expectations
+        const user = response.data;
+        const mappedUser = {
+          name: user.fullName || user.name || user.username || "User",
+          email: user.email,
+          avatar: user.profilePic || user.avatar || undefined,
+          ...user // keep all other fields for settings, etc.
+        };
+        localStorage.setItem('user', JSON.stringify(mappedUser));
+        return mappedUser;
       }
       throw new Error('Failed to fetch user profile');
     } catch (error: any) {
@@ -115,7 +122,7 @@ export const authApi = {
   async checkUsernameAvailability(username: string) {
     try {
       const response = await api.get(`/users/check-username/${username}`);
-      return response.data;
+      return response.data.available;
     } catch (error: any) {
       if (error.response) {
         throw new Error(error.response.data.message || 'Failed to check username availability');

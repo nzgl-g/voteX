@@ -14,8 +14,6 @@ interface ProfileSettingsProps {
 
 export function ProfileSettings({ onSave, userData }: ProfileSettingsProps) {
     const [username, setUsername] = useState("");
-    const [usernameAvailable, setUsernameAvailable] = useState(true);
-    const [isCheckingUsername, setIsCheckingUsername] = useState(false);
     const [fullName, setFullName] = useState("");
     const [email, setEmail] = useState("");
     const [gender, setGender] = useState("");
@@ -34,54 +32,6 @@ export function ProfileSettings({ onSave, userData }: ProfileSettingsProps) {
             setAvatarUrl(userData.profilePic || "");
         }
     }, [userData]);
-
-    const checkUsernameAvailability = async (value: string) => {
-        if (value.length < 3) {
-            setUsernameAvailable(false);
-            return;
-        }
-
-        // Skip check if username hasn't changed from current user's username
-        if (userData && userData.username === value) {
-            setUsernameAvailable(true);
-            return;
-        }
-
-        setIsCheckingUsername(true);
-        try {
-            // Make a temporary API call to check username availability
-            // We'll try to update the username and catch the error if it's taken
-            await authApi.updateProfile({ username: value });
-            
-            // If we get here, the username is available
-            setUsernameAvailable(true);
-            
-            // Revert to the original username since we don't want to actually update it yet
-            if (userData) {
-                setUsername(userData.username || "");
-            }
-        } catch (error: any) {
-            // Check if the error message indicates the username is already taken
-            if (error.message && error.message.includes("Username already taken")) {
-                setUsernameAvailable(false);
-            } else {
-                // For other errors, assume the username is available
-                setUsernameAvailable(true);
-            }
-        } finally {
-            setIsCheckingUsername(false);
-        }
-    };
-
-    const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value.replace(/[^a-zA-Z0-9_]/g, "");
-        setUsername(value);
-        if (value.length >= 3) {
-            checkUsernameAvailability(value);
-        } else {
-            setUsernameAvailable(false);
-        }
-    };
 
     const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -176,18 +126,35 @@ export function ProfileSettings({ onSave, userData }: ProfileSettingsProps) {
         }
     };
 
+    const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value.replace(/[^a-zA-Z0-9_]/g, "");
+        setUsername(value);
+    };
+
     const handleUsernameBlur = async () => {
-        if (!usernameAvailable || username.length < 3) {
+        if (username.length < 3) {
+            toast({
+                title: "Username too short",
+                description: "Username must be at least 3 characters.",
+                variant: "destructive"
+            });
             return;
         }
-
         // Skip update if username hasn't changed
         if (userData && userData.username === username) {
             return;
         }
-
         try {
             setLoading(true);
+            const available = await authApi.checkUsernameAvailability(username);
+            if (!available) {
+                toast({
+                    title: "Username unavailable",
+                    description: "This username is already taken. Please choose another.",
+                    variant: "destructive"
+                });
+                return;
+            }
             await authApi.updateProfile({ username });
             toast({ title: "Username updated successfully!", duration: 2000 });
             onSave();
@@ -197,10 +164,6 @@ export function ProfileSettings({ onSave, userData }: ProfileSettingsProps) {
                 description: error.message,
                 variant: "destructive" 
             });
-            // Reset to the original username if update failed
-            if (userData) {
-                setUsername(userData.username || "");
-            }
         } finally {
             setLoading(false);
         }
@@ -309,22 +272,7 @@ export function ProfileSettings({ onSave, userData }: ProfileSettingsProps) {
 
                 <div className="space-y-4 flex-1 w-full">
                     <div className="space-y-2">
-                        <Label htmlFor="username" className="flex items-center gap-2">
-                            Username
-                            {username.length >= 3 && !isCheckingUsername && usernameAvailable && (
-                                <span className="text-green-500 text-xs flex items-center gap-1">
-                                    <Check className="h-3 w-3" /> Available!
-                                </span>
-                            )}
-                            {username.length >= 3 && !isCheckingUsername && !usernameAvailable && (
-                                <span className="text-red-500 text-xs">Already taken</span>
-                            )}
-                            {isCheckingUsername && (
-                                <span className="text-muted-foreground text-xs flex items-center gap-1">
-                                    <Loader2 className="h-3 w-3 animate-spin" /> Checking...
-                                </span>
-                            )}
-                        </Label>
+                        <Label htmlFor="username">Username</Label>
                         <div className="relative">
                             <Input
                                 id="username"

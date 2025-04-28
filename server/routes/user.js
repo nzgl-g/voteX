@@ -27,17 +27,73 @@ router.get("/me", auth, async (req, res) => {
   }
 });
 
+/**  Check username availability */
+router.get("/check-username/:username", async (req, res) => {
+  try {
+    const { username } = req.params;
+    const existingUser = await User.findOne({ username });
+
+    return res.status(200).send({
+      available: !existingUser,
+      message: existingUser ? "Username already taken" : "Username available",
+    });
+  } catch (err) {
+    res.status(500).send({ message: err.message });
+  }
+});
+
 /**  Update user profile */
 router.put("/me", auth, async (req, res) => {
   try {
-    const updates = req.body;
+    // Only allow specific fields to be updated
+    const allowedUpdates = [
+      "username",
+      "fullName",
+      "email",
+      "gender",
+      "profilePic",
+    ];
+    const updates = {};
+
+    // Filter only allowed fields
+    Object.keys(req.body).forEach((key) => {
+      if (allowedUpdates.includes(key)) {
+        updates[key] = req.body[key];
+      }
+    });
+
+    // Check if username is being updated and if it's unique
+    if (updates.username && updates.username !== req.user.username) {
+      const existingUser = await User.findOne({ username: updates.username });
+      if (existingUser) {
+        return res
+          .status(400)
+          .send({
+            message: "Username already taken. Please choose another one.",
+          });
+      }
+    }
+
+    // Check if email is being updated and if it's unique
+    if (updates.email && updates.email !== req.user.email) {
+      const existingUser = await User.findOne({ email: updates.email });
+      if (existingUser) {
+        return res
+          .status(400)
+          .send({
+            message: "Email already in use. Please use another email address.",
+          });
+      }
+    }
+
     const user = await User.findByIdAndUpdate(req.user._id, updates, {
       new: true,
       runValidators: true,
     });
+
     res.status(200).send(user);
   } catch (err) {
-    res.status(500).send(err.message);
+    res.status(500).send({ message: err.message });
   }
 });
 

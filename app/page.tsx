@@ -10,11 +10,12 @@ import { ContactSection } from "@/components/landing-page/sections/contact";
 import { FooterSection } from "@/components/landing-page/sections/footer";
 import { PricingDialog } from "@/components/pricing-dialog";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import {Navbar} from "@/components/landing-page/navbar";
+import { useEffect, useState, Suspense } from "react";
+import { Navbar } from "@/components/landing-page/navbar";
+import { LandingSkeleton } from "@/components/landing-page/landing-skeleton";
 
-
-export default function Home() {
+// Create a separate component for the main content
+const LandingPageContent = () => {
   const searchParams = useSearchParams();
   const [showPricingDialog, setShowPricingDialog] = useState(false);
   
@@ -45,15 +46,15 @@ export default function Home() {
   
   return (
     <>
-      <header >
-          <Navbar/>
+      <header>
+        <Navbar/>
       </header>
       <main className="flex-1 flex flex-col items-center w-full landing-page">
         <div className="w-full max-w-screen-xl mx-auto">
           <HeroSection/>
           <FeaturesSection/>
           <ProblemSection/>
-          <div id="testimonials" className="flex-1 flex flex-col items-center w-full" >
+          <div id="testimonials" className="flex-1 flex flex-col items-center w-full">
             <TestimonialSection/>
           </div>
           <div id="pricing" className="flex-1 flex flex-col items-center w-full">
@@ -77,5 +78,14 @@ export default function Home() {
         onOpenChange={setShowPricingDialog} 
       />
     </>
+  );
+};
+
+// Main component with Suspense
+export default function Home() {
+  return (
+    <Suspense fallback={<LandingSkeleton />}>
+      <LandingPageContent />
+    </Suspense>
   );
 }

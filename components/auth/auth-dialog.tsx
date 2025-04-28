@@ -36,6 +36,8 @@ type SignupFormData = {
   email: string
   password: string
   confirmPassword: string
+  gender: string
+  fullName?: string
 }
 
 interface AuthDialogProps {
@@ -177,7 +179,13 @@ export function AuthDialog({
 
     try {
       const { authApi } = await import('@/lib/api')
-      const result = await authApi.signup(data.username, data.email, data.password)
+      const result = await authApi.signup(
+        data.username, 
+        data.email, 
+        data.password, 
+        data.gender,
+        data.fullName
+      )
       console.log('Signup successful:', result)
       
       // Check if there's a redirect destination stored in localStorage
@@ -315,6 +323,33 @@ export function AuthDialog({
                 />
                 {signupErrors.email && (
                   <p className="text-sm text-destructive">{signupErrors.email.message}</p>
+                )}
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="signup-fullname">Full Name (Optional)</Label>
+                <Input
+                  id="signup-fullname"
+                  type="text"
+                  placeholder="John Doe"
+                  {...registerSignup('fullName')}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="signup-gender">Gender</Label>
+                <select
+                  id="signup-gender"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  {...registerSignup('gender', { required: 'Gender is required' })}
+                >
+                  <option value="">Select gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Prefer not to say">Prefer not to say</option>
+                </select>
+                {signupErrors.gender && (
+                  <p className="text-sm text-destructive">{signupErrors.gender.message}</p>
                 )}
               </div>
 

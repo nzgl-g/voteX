@@ -1,4 +1,3 @@
-
 import { Badge } from "@/components/shadcn-ui/badge";
 import { Button } from "@/components/shadcn-ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/shadcn-ui/card";
@@ -16,6 +15,7 @@ interface SessionCardProps {
     onJoinAsCandidate?: () => void;
     onVote?: () => void;
     onShowResults?: () => void;
+    onSecretPhraseConfirmed?: (phrase: string) => void;
 }
 
 export function SessionCard({
@@ -27,6 +27,7 @@ export function SessionCard({
                                 onJoinAsCandidate,
                                 onVote,
                                 onShowResults,
+                                onSecretPhraseConfirmed,
                             }: SessionCardProps) {
     const statusColors: Record<SessionStatus, string> = {
         nomination: "bg-amber-500 hover:bg-amber-600",

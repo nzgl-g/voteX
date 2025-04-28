@@ -1,13 +1,19 @@
 "use client";
-import { useState } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { ThemeToggle } from "@/components/shadcn-ui/theme-toggle";
-import { UserMenu } from "@/components/voter-portal/user-menu";
+import { UserProfile } from "@/components/shared/user-profile";
 import { SessionCard } from "@/components/voter-portal/session-card";
 import { SecretPhraseDialog } from "@/components/voter-portal/secret-phrase-dialog";
 import { Button } from "@/components/shadcn-ui/button";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { Calendar } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { PricingDialog } from "@/components/pricing-dialog";
+import { VoterSkeleton } from "@/components/voter-portal/voter-skeleton";
+import { authApi } from "@/lib/api";
 
 const MOCK_SESSIONS = [
     {
@@ -61,8 +67,31 @@ const MOCK_SESSIONS = [
     },
 ];
 
-const Index = () => {
+const VoterPortalContent = () => {
     const [sessions] = useState(MOCK_SESSIONS);
+    const [showPricingDialog, setShowPricingDialog] = useState(false);
+    const [userData, setUserData] = useState<{ name: string; email: string; avatar?: string }>({ 
+        name: "User", 
+        email: "" 
+    });
+    const router = useRouter();
+
+    useEffect(() => {
+        const fetchUserData = async () => {
+            try {
+                const userProfile = await authApi.fetchUserProfile();
+                setUserData({
+                    name: userProfile.name || "User",
+                    email: userProfile.email || "",
+                    avatar: userProfile.avatar || undefined
+                });
+            } catch (error) {
+                console.error("Failed to fetch user profile:", error);
+            }
+        };
+        
+        fetchUserData();
+    }, []);
 
     const handleViewSession = (sessionId: string) => {
         toast.info(`Viewing session: ${sessionId}`);
@@ -86,52 +115,54 @@ const Index = () => {
 
     const handleCreateSession = () => {
         toast.info("Creating new session");
+        setShowPricingDialog(true);
     };
 
     const activeAndPastSessions = sessions.filter(s => s.status !== 'upcoming');
     const upcomingSessions = sessions.filter(s => s.status === 'upcoming');
 
     return (
-        <div className="min-h-screen bg-background">
+        <>
             <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="container flex h-16 items-center justify-between">
+                <div className="container flex h-16 items-center justify-between max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-2">
-                            <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center text-primary-foreground font-bold">
-                                VV
+                        <Link href="/" className="flex items-center">
+                            <div className="hidden dark:block">
+                                <Image src="/logo/expended-dark.png" alt="Vote System Logo" width={120} height={40} className="mr-2" />
                             </div>
-                            <span className="font-semibold hidden md:inline-block">Vote Vista</span>
-                        </div>
-
-                        <ThemeToggle className="md:hidden" />
+                            <div className="block dark:hidden">
+                                <Image src="/logo/expended.png" alt="Vote System Logo" width={120} height={40} className="mr-2" />
+                            </div>
+                        </Link>
                     </div>
-
-                    <div className="flex items-center gap-4">
-                        <ThemeToggle className="hidden md:flex" />
-
-                        <UserMenu userName="John Doe" />
+                    <div className="flex items-center gap-2">
+                        <ThemeToggle />
+                        <UserProfile 
+                            userName={userData.name}
+                            userEmail={userData.email}
+                            userAvatar={userData.avatar}
+                            variant="dropdown"
+                        />
                     </div>
                 </div>
             </header>
 
-            <main className="container py-6 md:py-10">
-                <div className="flex flex-col gap-8">
-                    <div>
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                            <div>
-                                <h1 className="text-3xl font-bold">Vote Sessions</h1>
-                                <p className="text-muted-foreground">Available voting sessions for you</p>
-                            </div>
+            <main className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div className="flex justify-between items-center mb-8">
+                    <h1 className="text-3xl font-bold">Your Sessions</h1>
+                    <div className="flex gap-2">
+                        <SecretPhraseDialog onPhraseConfirmed={handleSecretPhraseConfirmed} />
+                        <Button onClick={handleCreateSession} className="gap-2">
+                            <Plus className="h-4 w-4" />
+                            Create Session
+                        </Button>
+                    </div>
+                </div>
 
-                            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                                <SecretPhraseDialog onPhraseConfirmed={handleSecretPhraseConfirmed} />
-                                <Button onClick={handleCreateSession} className="sm:w-auto">
-                                    <Plus className="mr-2 h-4 w-4" /> Create Session
-                                </Button>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {activeAndPastSessions.length > 0 && (
+                    <div className="mb-12">
+                        <h2 className="text-xl font-semibold mb-4">Active & Past Sessions</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {activeAndPastSessions.map((session) => (
                                 <SessionCard
                                     key={session.id}
@@ -140,48 +171,50 @@ const Index = () => {
                                     bannerUrl={session.bannerUrl}
                                     status={session.status}
                                     onViewSession={() => handleViewSession(session.id)}
-                                    onJoinAsCandidate={
-                                        session.status === "nomination"
-                                            ? () => handleJoinAsCandidate(session.id)
-                                            : undefined
-                                    }
-                                    onVote={
-                                        session.status === "started"
-                                            ? () => handleVote(session.id)
-                                            : undefined
-                                    }
-                                    onShowResults={
-                                        session.status === "ended"
-                                            ? () => handleShowResults(session.id)
-                                            : undefined
-                                    }
+                                    onJoinAsCandidate={() => handleJoinAsCandidate(session.id)}
+                                    onVote={() => handleVote(session.id)}
+                                    onShowResults={() => handleShowResults(session.id)}
                                 />
                             ))}
                         </div>
                     </div>
+                )}
 
-                    {upcomingSessions.length > 0 && (
-                        <div>
-                            <div className="flex items-center gap-2 mb-6">
-                                <Calendar className="h-5 w-5" />
-                                <h2 className="text-2xl font-semibold">Upcoming Sessions</h2>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {upcomingSessions.map((session) => (
-                                    <SessionCard
-                                        key={session.id}
-                                        title={session.title}
-                                        description={session.description}
-                                        bannerUrl={session.bannerUrl}
-                                        status={session.status}
-                                        onViewSession={() => handleViewSession(session.id)}
-                                    />
-                                ))}
-                            </div>
+                {upcomingSessions.length > 0 && (
+                    <div>
+                        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                            <Calendar className="h-5 w-5" />
+                            Upcoming Sessions
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {upcomingSessions.map((session) => (
+                                <SessionCard
+                                    key={session.id}
+                                    title={session.title}
+                                    description={session.description}
+                                    bannerUrl={session.bannerUrl}
+                                    status={session.status}
+                                    onViewSession={() => handleViewSession(session.id)}
+                                />
+                            ))}
                         </div>
-                    )}
-                </div>
+                    </div>
+                )}
             </main>
+            <PricingDialog 
+                open={showPricingDialog} 
+                onOpenChange={setShowPricingDialog} 
+            />
+        </>
+    );
+};
+
+const Index = () => {
+    return (
+        <div className="min-h-screen bg-background flex flex-col">
+            <Suspense fallback={<VoterSkeleton />}>
+                <VoterPortalContent />
+            </Suspense>
         </div>
     );
 };

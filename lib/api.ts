@@ -44,9 +44,21 @@ export const authApi = {
   },
 
   // Signup method
-  async signup(username: string, email: string, password: string) {
+  async signup(
+    username: string, 
+    email: string, 
+    password: string, 
+    gender: string,
+    fullName?: string
+  ) {
     try {
-      const response = await api.post('/signup', { username, email, password });
+      const response = await api.post('/signup', { 
+        username, 
+        email, 
+        password, 
+        gender,
+        fullName
+      });
       
       if (response.data.token) {
         // Store token and user data in localStorage
@@ -79,6 +91,63 @@ export const authApi = {
   getCurrentUser() {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
+  },
+
+  // Fetch user profile from server
+  async fetchUserProfile() {
+    try {
+      const response = await api.get('/users/me');
+      if (response.data) {
+        // Update local storage with the latest user data
+        localStorage.setItem('user', JSON.stringify(response.data));
+        return response.data;
+      }
+      throw new Error('Failed to fetch user profile');
+    } catch (error: any) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Failed to fetch user profile');
+      }
+      throw error;
+    }
+  },
+
+  // Check username availability
+  async checkUsernameAvailability(username: string) {
+    try {
+      const response = await api.get(`/users/check-username/${username}`);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Failed to check username availability');
+      }
+      throw error;
+    }
+  },
+
+  // Update user profile
+  async updateProfile(userData: {
+    username?: string;
+    fullName?: string;
+    email?: string;
+    gender?: string;
+    profilePic?: string;
+  }) {
+    try {
+      const response = await api.put('/users/me', userData);
+      
+      if (response.data) {
+        // Update the user data in localStorage with the response from server
+        localStorage.setItem('user', JSON.stringify(response.data));
+        return response.data;
+      } else {
+        throw new Error('Failed to update profile');
+      }
+    } catch (error: any) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Failed to update profile');
+      }
+      throw error;
+    }
   }
 };
 

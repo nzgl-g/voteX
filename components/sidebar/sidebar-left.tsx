@@ -11,8 +11,11 @@ import {
 import { NavMain } from "@/components/sidebar/nav-main"
 import { NavSecondary } from "@/components/sidebar/nav-secondary"
 import { SessionSelector } from "@/components/sidebar/session-selector"
+import { UserProfile } from "@/components/shared/user-profile"
 import { LucideIcon } from "lucide-react"
 import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
+import { authApi } from "@/lib/api"
 
 interface NavItem {
     title: string
@@ -40,6 +43,31 @@ export function SidebarLeft({
                                 ...props
                             }: SidebarLeftProps) {
     const pathname = usePathname()
+    const [userData, setUserData] = useState<{ name: string; email: string; avatar?: string }>({ 
+        name: "User", 
+        email: "" 
+    });
+    const [loading, setLoading] = useState(true);
+    
+    useEffect(() => {
+        const fetchUserData = async () => {
+            try {
+                setLoading(true);
+                const userProfile = await authApi.fetchUserProfile();
+                setUserData({
+                    name: userProfile.name || "User",
+                    email: userProfile.email || "",
+                    avatar: userProfile.avatar || undefined
+                });
+            } catch (error) {
+                console.error("Failed to fetch user profile:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        fetchUserData();
+    }, []);
     
     // Extract session ID from the current path if it exists
     const getSessionIdFromPath = () => {
@@ -76,6 +104,14 @@ export function SidebarLeft({
                     <NavMain items={getActiveItems(navMain)} />
                 </div>
                 <NavSecondary items={getActiveItems(navSecondary)} className="mt-auto" />
+                <div className="mt-4 px-2 pb-4">
+                    <UserProfile 
+                        userName={userData.name}
+                        userEmail={userData.email}
+                        userAvatar={userData.avatar}
+                        variant="sidebar"
+                    />
+                </div>
             </SidebarContent>
             <SidebarRail />
         </Sidebar>

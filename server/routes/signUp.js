@@ -11,9 +11,17 @@ router.post("/", async (req, res) => {
   }
 
   const { username, email, password, fullName, gender } = req.body;
-  const exists = await User.findOne({ email });
-  if (exists) {
-    return res.status(400).json({ message: "User already exists." });
+  
+  // Check if email already exists
+  const emailExists = await User.findOne({ email });
+  if (emailExists) {
+    return res.status(400).json({ message: "Email already in use." });
+  }
+  
+  // Check if username already exists
+  const usernameExists = await User.findOne({ username });
+  if (usernameExists) {
+    return res.status(400).json({ message: "Username already taken." });
   }
 
   const salt = await bcrypt.genSalt(10);

@@ -32,7 +32,6 @@ router.post("/", async (req, res) => {
     password: hashedPassword,
     fullName: fullName || "",
     gender,
-    walletAddress: "",
   });
   await user.save();
 

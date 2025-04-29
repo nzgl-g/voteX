@@ -12,17 +12,19 @@ router.post("/logout", auth, (req, res) => {
 });
 
 router.get("/search", auth, async (req, res) => {
-  const { email } = req.query;
-  if (!email) return res.status(400).json({ message: "Email is needed" });
+  const { query } = req.query;
+  if (!query) return res.status(400).json({ message: "Query is required" });
 
   try {
-    const user = await User.findOne({ email: email.toLowerCase() }).select(
-      "-password"
-    );
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const regex = new RegExp("^" + query, "i");
 
-    res.status(200).send(user);
+    const users = await User.find({
+      $or: [{ email: regex }, { username: regex }],
+    }).select("username email fullName profilePic _id");
+
+    res.status(200).json(users);
   } catch (err) {
+    console.error("User search error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });

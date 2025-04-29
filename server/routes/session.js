@@ -68,6 +68,7 @@ router.get("/my-sessions-as-member", auth, async (req, res) => {
 });
 router.get("/:id", async (req, res) => {
   try {
+    const { fields } = req.query;
     if (!isValidObjectId(req.params.id)) {
       return res.status(400).json({ error: "Invalid session ID" });
     }
@@ -83,7 +84,18 @@ router.get("/:id", async (req, res) => {
     if (!session) {
       return res.status(404).json({ message: "Session not found" });
     }
+    if (fields) {
+      const selectedFields = fields.split(",");
+      const filteredSession = {};
 
+      selectedFields.forEach((field) => {
+        if (session[field] !== undefined) {
+          filteredSession[field] = session[field];
+        }
+      });
+
+      return res.status(200).json(filteredSession);
+    }
     res.status(200).json(session);
   } catch (err) {
     console.error(err);

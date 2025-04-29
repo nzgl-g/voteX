@@ -63,7 +63,8 @@ router.get("/:teamId", auth, async (req, res) => {
   } catch (err) {
     res.status(500).send(err.message);
   }
-}); // Send an invitation to a user to join a team
+});
+// Send an invitation to a user to join a team
 router.post("/:teamId/invite", auth, isTeamLeader, async (req, res) => {
   try {
     const { email } = req.body;

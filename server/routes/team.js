@@ -29,10 +29,10 @@ router.get("/:teamId/members", auth, async (req, res) => {
     if (!team) return res.status(404).send("Team not found.");
 
     // Check if user is in the team
-    if (
-      team.leader.toString() !== req.user._id.toString() &&
-      !team.members.some((m) => m._id.toString() === req.user._id.toString())
-    ) {
+    const isLeader = team.leader._id.equals(req.user._id);
+    const isMember = team.members.some((u) => u._id.equals(req.user._id));
+
+    if (!isLeader && !isMember) {
       return res.status(403).send("Access denied.");
     }
 

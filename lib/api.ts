@@ -122,7 +122,7 @@ export const authApi = {
   async checkUsernameAvailability(username: string) {
     try {
       const response = await api.get(`/users/check-username/${username}`);
-      return response.data.available;
+      return response.data;
     } catch (error: any) {
       if (error.response) {
         throw new Error(error.response.data.message || 'Failed to check username availability');

@@ -22,10 +22,9 @@ router.get("/", auth, async (req, res) => {
 /** Get all members of a team (Only if user is in the team) */
 router.get("/:teamId/members", auth, async (req, res) => {
   try {
-    const team = await Team.findById(req.params.teamId).populate(
-      "members",
-      "username email"
-    );
+    const team = await Team.findById(req.params.teamId)
+      .populate("leader", "username email fullName")
+      .populate("members", "username email fullName");
 
     if (!team) return res.status(404).send("Team not found.");
 
@@ -37,7 +36,10 @@ router.get("/:teamId/members", auth, async (req, res) => {
       return res.status(403).send("Access denied.");
     }
 
-    res.status(200).send(team.members);
+    res.status(200).send({
+      leader: team.leader,
+      members: team.members,
+    });
   } catch (err) {
     res.status(500).send(err.message);
   }

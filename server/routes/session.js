@@ -180,7 +180,7 @@ router.post("/", auth, async (req, res) => {
       session: session._id,
       sessionName: session.name,
       leader: creator,
-      members: [creator],
+      members: [],
     });
 
     const leaderParticipant = new SessionParticipant({

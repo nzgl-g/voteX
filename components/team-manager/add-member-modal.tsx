@@ -3,135 +3,160 @@
 import type React from "react"
 
 import { useState } from "react"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/shadcn-ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/shadcn-ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn-ui/tabs"
 import { Button } from "@/components/shadcn-ui/button"
 import { Input } from "@/components/shadcn-ui/input"
 import { Label } from "@/components/shadcn-ui/label"
 import { Textarea } from "@/components/shadcn-ui/textarea"
-import { Alert, AlertDescription } from "@/components/shadcn-ui/alert"
-import { CheckCircle2 } from "lucide-react"
+import { toast } from "@/components/shadcn-ui/use-toast"
+import { Search, Mail } from "lucide-react"
+import { inviteTeamMember } from "@/lib/team-service"
 
 interface AddMemberModalProps {
   isOpen: boolean
   onClose: () => void
-  onAddMember: (email: string, isInvite: boolean) => void
+  sessionId: string
 }
 
-export function AddMemberModal({ isOpen, onClose, onAddMember }: AddMemberModalProps) {
-  const [activeTab, setActiveTab] = useState("invitation")
-  const [email, setEmail] = useState("")
-  const [message, setMessage] = useState("I'd like to invite you to join our team on the platform.")
-  const [showSuccess, setShowSuccess] = useState(false)
+export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMemberModalProps) {
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [searchEmail, setSearchEmail] = useState("")
+  const [message, setMessage] = useState(
+    "Hi there! I'd like to invite you to join our team on our project management platform.",
+  )
+  const [isLoading, setIsLoading] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent, isInvite: boolean) => {
+  const handleInviteSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (email) {
-      if (isInvite) {
-        setShowSuccess(true)
-        setTimeout(() => {
-          onAddMember(email, true)
-          resetForm()
-        }, 2000)
-      } else {
-        onAddMember(email, false)
-        resetForm()
-      }
+    if (!sessionId) {
+      toast({
+        title: "Error",
+        description: "Session ID is missing. Please try again later.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      await inviteTeamMember(sessionId, inviteEmail)
+      toast({
+        title: "Invitation sent",
+        description: `An invitation has been sent to ${inviteEmail}.`,
+      })
+      setInviteEmail("")
+      setMessage("Hi there! I'd like to invite you to join our team on our project management platform.")
+      onClose()
+    } catch (error) {
+      console.error("Failed to send invitation:", error)
+      toast({
+        title: "Error",
+        description: "Failed to send invitation. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const resetForm = () => {
-    setEmail("")
-    setMessage("I'd like to invite you to join our team on the platform.")
-    setShowSuccess(false)
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    toast({
+      title: "Join request sent",
+      description: `A join request has been sent to ${searchEmail}.`,
+    })
+    setSearchEmail("")
+    onClose()
   }
 
   return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={(open) => {
-        if (!open) {
-          onClose()
-          resetForm()
-        }
-      }}
-    >
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Add Team Member</DialogTitle>
-          <DialogDescription>Add existing users or invite new members to your team.</DialogDescription>
+          <DialogDescription>Invite someone to join your team or search for existing users.</DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs defaultValue="search" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="invitation">Add Existing User</TabsTrigger>
-            <TabsTrigger value="email">Invite via Email</TabsTrigger>
+            <TabsTrigger value="search">Invitation</TabsTrigger>
+            <TabsTrigger value="invite">Invite via Email</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="invitation">
-            <form onSubmit={(e) => handleSubmit(e, false)}>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="email-search">Email</Label>
+          <TabsContent value="search">
+            <form onSubmit={handleSearchSubmit} className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="search-email">Search by email</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    id="email-search"
+                    id="search-email"
+                    placeholder="Enter email address"
+                    className="pl-8"
                     type="email"
-                    placeholder="Search by email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={searchEmail}
+                    onChange={(e) => setSearchEmail(e.target.value)}
                     required
                   />
                 </div>
-                <div className="flex justify-end space-x-2">
-                  <Button type="button" variant="outline" onClick={onClose}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">Add to Team</Button>
-                </div>
+              </div>
+
+              <div className="flex justify-between pt-4">
+                <Button variant="outline" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button type="submit">Send Join Request</Button>
               </div>
             </form>
           </TabsContent>
 
-          <TabsContent value="email">
-            <form onSubmit={(e) => handleSubmit(e, true)}>
-              <div className="grid gap-4 py-4">
-                {showSuccess ? (
-                  <Alert className="bg-green-50 border-green-200">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-green-600">Invitation sent successfully!</AlertDescription>
-                  </Alert>
-                ) : (
-                  <>
-                    <div className="grid gap-2">
-                      <Label htmlFor="invite-email">Email</Label>
-                      <Input
-                        id="invite-email"
-                        type="email"
-                        placeholder="Enter email address"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="invite-message">Invitation Message</Label>
-                      <Textarea
-                        id="invite-message"
-                        placeholder="Write a custom message..."
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        rows={4}
-                      />
-                    </div>
-                    <div className="flex justify-end space-x-2">
-                      <Button type="button" variant="outline" onClick={onClose}>
-                        Cancel
-                      </Button>
-                      <Button type="submit">Send Invitation</Button>
-                    </div>
-                  </>
-                )}
+          <TabsContent value="invite">
+            <form onSubmit={handleInviteSubmit} className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="invite-email">Email address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="invite-email"
+                    placeholder="Enter email address"
+                    className="pl-8"
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="message">Invitation message</Label>
+                <Textarea
+                  id="message"
+                  placeholder="Write a custom message..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={4}
+                  disabled={isLoading}
+                />
+              </div>
+
+              <DialogFooter className="pt-4">
+                <Button variant="outline" onClick={onClose} disabled={isLoading}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? "Sending..." : "Send Invitation"}
+                </Button>
+              </DialogFooter>
             </form>
           </TabsContent>
         </Tabs>

@@ -1,208 +1,301 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/shadcn-ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/shadcn-ui/dropdown-menu"
 import { Button } from "@/components/shadcn-ui/button"
-import { Input } from "@/components/shadcn-ui/input"
-import { Badge } from "@/components/shadcn-ui/badge"
 import { Checkbox } from "@/components/shadcn-ui/checkbox"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/shadcn-ui/dropdown-menu"
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/shadcn-ui/alert-dialog"
-import { Copy, MoreHorizontal, Search, Filter } from "lucide-react"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/shadcn-ui/dialog"
+import { Badge } from "@/components/shadcn-ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/shadcn-ui/avatar"
+import { Input } from "@/components/shadcn-ui/input"
+import { Edit, Filter, MoreHorizontal, Search, Trash2, ClipboardCopy, CheckCircle2, Loader2 } from "lucide-react"
+import { toast } from "@/components/shadcn-ui/use-toast"
+import { getSessionTeamMembers, removeTeamMember } from "@/lib/team-service"
 
 interface TeamMember {
-  id: string
+  _id: string
   username: string
-  fullName: string
   email: string
-  role: string
-  status: string
+  role?: string
 }
 
 interface TeamMembersTableProps {
-  members: TeamMember[]
+  sessionId: string
   selectedMembers: string[]
-  onSelectMembers: (selectedIds: string[]) => void
-  onRemoveMember: (id: string) => void
-  onAssignTask: (id: string) => void
+  setSelectedMembers: (members: string[]) => void
+  onAssignTask: () => void
+  onAddMember: () => void
 }
 
-export function TeamMembersTable({
-  members,
+export default function TeamMembersTable({
+  sessionId,
   selectedMembers,
-  onSelectMembers,
-  onRemoveMember,
+  setSelectedMembers,
   onAssignTask,
+  onAddMember,
 }: TeamMembersTableProps) {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [memberToRemove, setMemberToRemove] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [memberToDelete, setMemberToDelete] = useState<string | null>(null)
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const filteredMembers = members.filter(
+  useEffect(() => {
+    const fetchTeamMembers = async () => {
+      if (!sessionId) return
+      
+      setIsLoading(true)
+      try {
+        const members = await getSessionTeamMembers(sessionId)
+        setTeamMembers(members)
+        setError(null)
+      } catch (err) {
+        console.error("Failed to fetch team members:", err)
+        setError("Failed to load team members. Please try again.")
+        toast({
+          title: "Error",
+          description: "Failed to load team members. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchTeamMembers()
+  }, [sessionId])
+
+  const filteredMembers = teamMembers.filter(
     (member) =>
-      member.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.email.toLowerCase().includes(searchTerm.toLowerCase()),
+      member.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      member.email?.toLowerCase().includes(searchQuery.toLowerCase()),
   )
+
+  const handleSelectMember = (memberId: string) => {
+    if (selectedMembers.includes(memberId)) {
+      setSelectedMembers(selectedMembers.filter((id) => id !== memberId))
+    } else {
+      setSelectedMembers([...selectedMembers, memberId])
+    }
+  }
 
   const handleSelectAll = () => {
     if (selectedMembers.length === filteredMembers.length) {
-      onSelectMembers([])
+      setSelectedMembers([])
     } else {
-      onSelectMembers(filteredMembers.map((member) => member.id))
+      setSelectedMembers(filteredMembers.map((member) => member._id))
     }
   }
 
-  const handleSelectMember = (id: string) => {
-    if (selectedMembers.includes(id)) {
-      onSelectMembers(selectedMembers.filter((memberId) => memberId !== id))
-    } else {
-      onSelectMembers([...selectedMembers, id])
-    }
+  const handleCopyUsername = (username: string) => {
+    navigator.clipboard.writeText(username)
+    toast({
+      title: "Username copied",
+      description: `Username "${username}" has been copied to clipboard.`,
+    })
   }
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
+  const handleDeleteMember = (memberId: string) => {
+    setMemberToDelete(memberId)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const confirmDeleteMember = async () => {
+    if (!memberToDelete || !sessionId) return
+    
+    try {
+      await removeTeamMember(sessionId, memberToDelete)
+      
+      // Update the local state to remove the member
+      setTeamMembers(teamMembers.filter(member => member._id !== memberToDelete))
+      
+      toast({
+        title: "Member removed",
+        description: "The team member has been removed successfully.",
+      })
+      
+      // If the removed member was selected, remove it from selected members
+      if (selectedMembers.includes(memberToDelete)) {
+        setSelectedMembers(selectedMembers.filter(id => id !== memberToDelete))
+      }
+    } catch (err) {
+      console.error("Failed to remove team member:", err)
+      toast({
+        title: "Error",
+        description: "Failed to remove team member. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeleteDialogOpen(false)
+      setMemberToDelete(null)
+    }
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <div className="relative w-72">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            type="search"
             placeholder="Search members..."
             className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <Button variant="outline" size="icon">
-          <Filter className="h-4 w-4" />
-          <span className="sr-only">Filter</span>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="h-8 gap-1">
+            <Filter className="h-3.5 w-3.5" />
+            <span>Filter</span>
+          </Button>
+          <Button variant="default" size="sm" onClick={onAddMember}>
+            Add Member
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[50px]">
-                <Checkbox
-                  checked={selectedMembers.length > 0 && selectedMembers.length === filteredMembers.length}
-                  onCheckedChange={handleSelectAll}
-                  aria-label="Select all"
-                />
-              </TableHead>
-              <TableHead>Username</TableHead>
-              <TableHead>Full Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredMembers.length > 0 ? (
-              filteredMembers.map((member) => (
-                <TableRow key={member.id}>
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedMembers.includes(member.id)}
-                      onCheckedChange={() => handleSelectMember(member.id)}
-                      aria-label={`Select ${member.username}`}
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-1">
-                      {member.username}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => copyToClipboard(member.username)}
-                      >
-                        <Copy className="h-3 w-3" />
-                        <span className="sr-only">Copy username</span>
-                      </Button>
-                    </div>
-                  </TableCell>
-                  <TableCell>{member.fullName}</TableCell>
-                  <TableCell>{member.email}</TableCell>
-                  <TableCell>
-                    <Badge variant={member.role === "Leader" ? "default" : "secondary"}>{member.role}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`h-2.5 w-2.5 rounded-full ${member.status === "online" ? "bg-green-500" : "bg-gray-300"}`}
-                      ></div>
-                      <span className="capitalize">{member.status}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Open menu</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onAssignTask(member.id)}>Assign Task</DropdownMenuItem>
-                        <DropdownMenuItem>Edit Member</DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600" onClick={() => setMemberToRemove(member.id)}>
-                          Remove Member
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+        {isLoading ? (
+          <div className="flex justify-center items-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2">Loading team members...</span>
+          </div>
+        ) : error ? (
+          <div className="flex justify-center items-center p-8 text-red-500">
+            <p>{error}</p>
+            <Button variant="outline" className="ml-4" onClick={() => window.location.reload()}>
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={
+                      filteredMembers.length > 0 && selectedMembers.length === filteredMembers.length
+                    }
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
+                <TableHead>Username</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredMembers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center">
+                    {searchQuery ? "No members match your search." : "No team members found."}
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
-                  No members found.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                filteredMembers.map((member) => (
+                  <TableRow key={member._id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedMembers.includes(member._id)}
+                        onCheckedChange={() => handleSelectMember(member._id)}
+                        aria-label={`Select ${member.username}`}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback>
+                            {member.username.substring(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex items-center">
+                          {member.username}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 ml-1"
+                            onClick={() => handleCopyUsername(member.username)}
+                          >
+                            <ClipboardCopy className="h-3.5 w-3.5" />
+                            <span className="sr-only">Copy username</span>
+                          </Button>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>{member.email}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        Member
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Open menu</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              toast({
+                                title: "Edit member",
+                                description: `Editing ${member.username}'s details.`,
+                              })
+                            }}
+                          >
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit Member
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteMember(member._id)} className="text-red-600">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Remove Member
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={onAssignTask}>
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                            Assign Task
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        )}
       </div>
 
-      <AlertDialog open={!!memberToRemove} onOpenChange={() => setMemberToRemove(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently remove the team member.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              onClick={() => {
-                if (memberToRemove) {
-                  onRemoveMember(memberToRemove)
-                  setMemberToRemove(null)
-                }
-              }}
-            >
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Team Member</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove this team member? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteMember}>
               Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

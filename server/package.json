@@ -16,6 +16,7 @@
     "joi": "^17.13.3",
     "jsonwebtoken": "^8.5.1",
     "mongoose": "^8.7.1",
+    "socket.io": "^4.8.1",
     "supertest": "^7.0.0"
   },
   "devDependencies": {

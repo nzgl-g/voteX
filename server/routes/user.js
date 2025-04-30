@@ -3,8 +3,8 @@ const mongoose = require("mongoose");
 const User = require("../models/User");
 const auth = require("../middleware/auth");
 const isTeamLeader = require("../middleware/isTeamLeader");
-const router = express.Router();
 
+const router = express.Router();
 /**  Log out */
 router.post("/logout", auth, (req, res) => {
   // Invalidate token (frontend handles this mostly)

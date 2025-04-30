@@ -1,10 +1,10 @@
 const mongoose = require("mongoose");
 const express = require("express");
-const router = express.Router();
 const auth = require("../middleware/auth");
 const Invitation = require("../models/Invitation");
 const Team = require("../models/Team");
 
+const router = express.Router();
 // Accept an invitation
 router.post("/:invitationId/accept", auth, async (req, res) => {
   try {

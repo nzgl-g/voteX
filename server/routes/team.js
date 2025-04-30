@@ -1,10 +1,12 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const Notification = require("../models/Notification");
 const Team = require("../models/Team");
 const Invitation = require("../models/Invitation");
 const User = require("../models/User");
 const auth = require("../middleware/auth");
 const isTeamLeader = require("../middleware/isTeamLeader");
+
 const router = express.Router();
 
 /**  Get all teams (Only those the user is part of) */
@@ -71,7 +73,7 @@ router.post("/:teamId/invite", auth, isTeamLeader, async (req, res) => {
   try {
     const { email } = req.body;
     const { teamId } = req.params;
-
+    const io = req.app.get("io");
     // Validate email
     if (!email) return res.status(400).send("Email is required");
 
@@ -112,6 +114,17 @@ router.post("/:teamId/invite", auth, isTeamLeader, async (req, res) => {
     });
 
     await invitation.save();
+
+    const notification = new Notification({
+      recipients: [user._id],
+      type: "team-invite",
+      message: `You've been invited to join the team of "${team.sessionName}"`,
+      link: `/teams/${teamId}`, //idk kifh rak dayr f front . gotta check laater
+      targetType: "user",
+    });
+
+    await notification.save();
+    io.to(user._id.toString()).emit("new-notification", notification);
     res.status(201).json({
       message: "Invitation sent successfully",
       invitationId: invitation._id,

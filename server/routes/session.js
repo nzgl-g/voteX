@@ -1,12 +1,12 @@
 const mongoose = require("mongoose");
 const { isValidObjectId } = require("mongoose");
 const express = require("express");
-const router = express.Router();
 const Session = require("../models/Sessions");
 const CandidateRequest = require("../models/CandidateRequest");
 const SessionParticipant = require("../models/SessionParticipants");
 const Team = require("../models/Team");
 const auth = require("../middleware/auth");
+const router = express.Router();
 router.get("/", async (req, res) => {
   try {
     const sessions = await Session.find({})
@@ -66,7 +66,38 @@ router.get("/my-sessions-as-member", auth, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch team sessions" });
   }
 });
-router.get("/:id", async (req, res) => {
+router.get("/check-secret-phrase", auth, async (req, res) => {
+  const { phrase } = req.query;
+
+  if (!phrase) return res.status(400).json({ message: "Phrase is required" });
+
+  const exists = await Session.exists({ secretPhrase: phrase });
+  return res.json({ available: !exists });
+});
+router.get("/by-phrase/:phrase", auth, async (req, res) => {
+  try {
+    const phrase = req.params.phrase;
+    if (!phrase) {
+      return res.status(400).json({ message: "Secret phrase is required" });
+    }
+    const session = await Session.findOne({
+      secretPhrase: phrase,
+      accessLevel: "Private",
+      securityMethod: "Secret Phrase",
+    });
+
+    if (!session) {
+      return res
+        .status(404)
+        .json({ message: "Session not found or invalid phrase" });
+    }
+    res.json(session);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+router.get("/:id", auth, async (req, res) => {
   try {
     const { fields } = req.query;
     if (!isValidObjectId(req.params.id)) {
@@ -104,32 +135,29 @@ router.get("/:id", async (req, res) => {
       .json({ message: "Failed to fetch session", error: err.message });
   }
 });
-// router.delete("/:id", auth, async (req, res) => {
-//   try {
-//     console.log("Deleting session:", req.params.id);
+router.delete("/:id", auth, async (req, res) => {
+  try {
+    const session = await Session.findById(req.params.id).populate("team");
+    if (!session) return res.status(404).send("Session not found");
 
-//     const session = await Session.findById(req.params.id);
-//     if (!session) {
-//       console.log("Session not found:", req.params.id);
-//       return res.status(404).send("Session not found");
-//     }
+    const team = session.team;
+    if (!team) return res.status(400).send("No team assigned to this session");
 
-//     // Delete session details
-//     const detailsDeleted = await SessionDetails.deleteMany({
-//       session: session._id,
-//     });
-//     console.log("Deleted session details:", detailsDeleted);
+    if (!team.leader.equals(req.user._id)) {
+      return res
+        .status(403)
+        .send("Access denied. Not authorized as team leader");
+    }
+    await SessionParticipant.deleteMany({ _id: { $in: session.participants } });
+    await Team.findByIdAndDelete(team._id);
+    await session.deleteOne();
 
-//     // Delete session
-//     await session.deleteOne();
-//     console.log("Deleted session:", session);
-
-//     res.send({ message: "Session deleted successfully" });
-//   } catch (err) {
-//     console.error("Error deleting session:", err);
-//     res.status(500).json({ message: "Server error", error: err.message });
-//   }
-// });
+    res.send({ message: "Session deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting session:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
 
 router.post("/", auth, async (req, res) => {
   try {
@@ -143,6 +171,8 @@ router.post("/", auth, async (req, res) => {
       subscription,
       sessionLifecycle,
       securityMethod,
+      accessLevel,
+      secretPhrase,
       verificationMethod,
       candidates,
       options,
@@ -150,6 +180,14 @@ router.post("/", auth, async (req, res) => {
       bracket,
       maxRounds,
     } = req.body;
+    if (secretPhrase) {
+      const existingSession = await Session.findOne({ secretPhrase });
+      if (existingSession) {
+        return res
+          .status(400)
+          .json({ message: "This secret phrase is already in use." });
+      }
+    }
     const creator = req.user._id;
     let SessionModel = Session;
     if (type === "election") SessionModel = Session.discriminators.Election;
@@ -167,6 +205,8 @@ router.post("/", auth, async (req, res) => {
       subscription,
       sessionLifecycle,
       securityMethod,
+      accessLevel,
+      secretPhrase,
       verificationMethod,
       createdBy: creator,
       candidateRequests: [],

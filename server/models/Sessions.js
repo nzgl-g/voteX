@@ -53,7 +53,6 @@ const sessionSchema = new mongoose.Schema({
   accessLevel: {
     type: String,
     enum: ["Public", "Private"],
-    default: "Public",
   },
   subscription: {
     name: {
@@ -83,6 +82,11 @@ const sessionSchema = new mongoose.Schema({
     type: String,
     enum: ["Secret Phrase", "Area Restriction", null],
     default: null,
+  },
+  secretPhrase: {
+    type: String,
+    unique: true,
+    sparse: true,
   },
   verificationMethod: {
     type: String,

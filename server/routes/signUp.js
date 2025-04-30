@@ -3,7 +3,9 @@ const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const Joi = require("joi");
 const userSchema = require("../validation/user");
+
 const router = express.Router();
+
 router.post("/", async (req, res) => {
   const { value, error } = userSchema.validate(req.body);
   if (error) {

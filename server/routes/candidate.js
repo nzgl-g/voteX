@@ -1,8 +1,8 @@
 const express = require("express");
-const router = express.Router({ mergeParams: true });
 const Session = require("../models/Sessions");
 const auth = require("../middleware/auth");
 const isTeamMember = require("../middleware/isTeamMember");
+const router = express.Router({ mergeParams: true });
 router.get("/", async (req, res) => {
   const sessionId = req.params.sessionId;
 

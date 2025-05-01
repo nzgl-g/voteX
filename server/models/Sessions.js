@@ -103,6 +103,10 @@ const sessionSchema = new mongoose.Schema({
       ref: "SessionParticipant",
     },
   ],
+  allowDirectEdit: {
+    type: Boolean,
+    default: false,
+  },
 });
 sessionSchema.discriminator(
   "Election",

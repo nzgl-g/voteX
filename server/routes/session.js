@@ -4,8 +4,10 @@ const express = require("express");
 const Session = require("../models/Sessions");
 const CandidateRequest = require("../models/CandidateRequest");
 const SessionParticipant = require("../models/SessionParticipants");
+const SessionEditRequest = require("../models/SessionEditRequest");
 const Team = require("../models/Team");
 const auth = require("../middleware/auth");
+const isTeamLeader = require("../middleware/isTeamLeader");
 const router = express.Router();
 router.get("/", async (req, res) => {
   try {
@@ -97,7 +99,7 @@ router.get("/by-phrase/:phrase", auth, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-router.get("/:id", auth, async (req, res) => {
+router.get("/:sessionId", auth, async (req, res) => {
   try {
     const { fields } = req.query;
     if (!isValidObjectId(req.params.id)) {
@@ -135,7 +137,7 @@ router.get("/:id", auth, async (req, res) => {
       .json({ message: "Failed to fetch session", error: err.message });
   }
 });
-router.delete("/:id", auth, async (req, res) => {
+router.delete("/:sessionId", auth, async (req, res) => {
   try {
     const session = await Session.findById(req.params.id).populate("team");
     if (!session) return res.status(404).send("Session not found");
@@ -257,63 +259,109 @@ router.post("/", auth, async (req, res) => {
     res.status(500).send("Error creating session");
   }
 });
+router.patch("/:sessionId/edit-request", auth, async (req, res) => {
+  try {
+    const sessionId = req.params.sessionId;
+    const updates = req.body;
+    const userId = req.user._id;
 
-//not ready
-// router.patch("/:id", auth, async (req, res) => {
-//   try {
-//     const sessionId = req.params.id;
-//     const updates = req.body;
-//     const userId = req.user._id;
+    const session = await Session.findById(sessionId);
+    if (!session) return res.status(404).json({ error: "Session not found" });
+    await session.populate({
+      path: "team",
+      select: "leader members", // Only populate these fields
+    });
+    if (session.team.leader.equals(userId)) {
+      await session.updateOne({ $set: updates });
+      return res.status(200).json({ message: "Session updated successfully" });
+    }
+    if (session.allowDirectEdit) {
+      if (!session.team.members.some((m) => m.equals(userId))) {
+        return res
+          .status(403)
+          .json({ error: "Only team members can propose edits" });
+      }
+      await session.updateOne({ $set: updates });
+      return res.status(200).json({ message: "Session updated successfully" });
+    }
+    const editRequest = new SessionEditRequest({
+      session: sessionId,
+      proposedBy: userId,
+      updates,
+      status: "pending",
+    });
 
-//     const session = await Session.findById(sessionId);
-//     if (!session) {
-//       return res.status(404).json({ error: "Session not found" });
-//     }
+    await editRequest.save();
+    res.status(201).json({ message: "Edit request submitted.", editRequest });
+  } catch (err) {
+    console.error("Submit edit request error:", err);
+    res
+      .status(500)
+      .json({ error: "Failed to submit edit request", details: err.message });
+  }
+});
 
-//     // 2. Verify leadership through team
-//     const team = await Team.findOne({ session: sessionId });
-//     if (!team || !team.leader.equals(userId)) {
-//       return res
-//         .status(403)
-//         .json({ error: "Only the team leader can update this session" });
-//     }
+router.patch("/edit-requests/:requestId/approve", auth, async (req, res) => {
+  try {
+    const requestId = req.params.requestId;
+    const userId = req.user._id;
 
-//     // 3. Define allowed fields for update
-//     const allowedUpdates = {
-//       name: 1,
-//       description: 1,
-//       organizationName: 1,
-//       banner: 1,
-//       "sessionLifecycle.scheduledAt.start": 1,
-//       "sessionLifecycle.scheduledAt.end": 1,
-//       securityMethod: 1,
-//       verificationMethod: 1,
-//     };
+    const editRequest = await SessionEditRequest.findById(requestId).populate(
+      "session"
+    );
+    if (!editRequest || editRequest.status !== "pending") {
+      return res
+        .status(404)
+        .json({ error: "Valid edit request not found or not pending" });
+    }
 
-//     // 4. Filter unauthorized updates
-//     const filteredUpdates = Object.keys(updates).reduce((acc, key) => {
-//       if (allowedUpdates[key] || key.startsWith("sessionLifecycle.")) {
-//         acc[key] = updates[key];
-//       }
-//       return acc;
-//     }, {});
+    const team = await Team.findOne({ session: editRequest.session._id });
+    if (!team || !team.leader.equals(userId)) {
+      return res
+        .status(403)
+        .json({ error: "Only the team leader can approve edits" });
+    }
 
-//     // 5. Apply updates
-//     const updatedSession = await Session.findByIdAndUpdate(
-//       sessionId,
-//       { $set: filteredUpdates },
-//       { new: true, runValidators: true }
-//     ).populate("team createdBy");
+    const updates = editRequest.updates;
 
-//     res.status(200).json(updatedSession);
-//   } catch (err) {
-//     console.error("Update error:", err);
-//     res.status(500).json({
-//       error: "Failed to update session",
-//       details: err.message,
-//     });
-//   }
-// });
+    const allowedUpdates = {
+      name: 1,
+      description: 1,
+      organizationName: 1,
+      banner: 1,
+      "sessionLifecycle.scheduledAt.start": 1,
+      "sessionLifecycle.scheduledAt.end": 1,
+      securityMethod: 1,
+      secretPhrase: 1,
+    };
+
+    const filteredUpdates = Object.keys(updates).reduce((acc, key) => {
+      if (allowedUpdates[key] || key.startsWith("sessionLifecycle.")) {
+        acc[key] = updates[key];
+      }
+      return acc;
+    }, {});
+
+    const updatedSession = await Session.findByIdAndUpdate(
+      editRequest.session._id,
+      { $set: filteredUpdates },
+      { new: true, runValidators: true }
+    );
+
+    editRequest.status = "approved";
+    await editRequest.save();
+
+    res
+      .status(200)
+      .json({ message: "Edit approved and applied", updatedSession });
+  } catch (err) {
+    console.error("Approve edit error:", err);
+    res
+      .status(500)
+      .json({ error: "Failed to approve edit", details: err.message });
+  }
+});
+
 module.exports = router;
 // currently using simple middleware to make testing the logic easy
 // after everything is done we can add moed detailed middleware .

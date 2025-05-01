@@ -23,7 +23,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/shadcn-ui/
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { CalendarIcon, Clock, Loader2 } from "lucide-react"
-import { getSessionTeamMembers } from "@/lib/team-service"
+import { teamService, TeamMember as ApiTeamMember } from "@/api/team-service"
+import { sessionService } from "@/api/session-service"
 
 interface TeamMember {
   _id: string
@@ -66,8 +67,47 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
     
     setIsLoading(true)
     try {
-      const members = await getSessionTeamMembers(sessionId)
-      setTeamMembers(members)
+      let teamId;
+      
+      try {
+        // First, try to get the team ID associated with the session
+        teamId = await sessionService.getSessionTeam(sessionId)
+        console.log(`Found team ID: ${teamId} for session: ${sessionId}`)
+      } catch (error: any) {
+        console.warn(`Could not get team ID from session service: ${error.message}`)
+        console.log('Falling back to using sessionId as teamId')
+        teamId = sessionId // Fallback to using sessionId directly
+      }
+      
+      if (!teamId) {
+        throw new Error(`No team found for session ${sessionId}`)
+      }
+      
+      // Use the teamService to get team members
+      const teamMembersData = await teamService.getTeamMembers(teamId)
+      
+      // Process the team data to create a unified array with proper roles
+      const processedMembers: TeamMember[] = []
+      
+      // Add the leader with a Leader role
+      if (teamMembersData.leader) {
+        processedMembers.push({
+          ...teamMembersData.leader,
+          role: 'Leader'
+        })
+      }
+      
+      // Add members with a Member role
+      if (teamMembersData.members && Array.isArray(teamMembersData.members)) {
+        teamMembersData.members.forEach((member) => {
+          processedMembers.push({
+            ...member,
+            role: 'Member'
+          })
+        })
+      }
+      
+      setTeamMembers(processedMembers)
     } catch (err) {
       console.error("Failed to fetch team members:", err)
       toast({

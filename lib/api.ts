@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { AxiosError } from 'axios';
 
 // Base API configuration
 const api = axios.create({
@@ -18,6 +19,27 @@ api.interceptors.request.use(
     return config;
   },
   (error) => Promise.reject(error)
+);
+
+// Add a response interceptor for better error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    // Enhanced error logging
+    if (error.response) {
+      console.error('API Error Response:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+        url: error.config?.url
+      });
+    } else if (error.request) {
+      console.error('API Error Request:', error.request);
+    } else {
+      console.error('API Error:', error.message);
+    }
+    return Promise.reject(error);
+  }
 );
 
 // Session API methods

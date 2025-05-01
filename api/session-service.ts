@@ -228,13 +228,25 @@ export const sessionService = {
    */
   async getSessionById(sessionId: string, fields?: string): Promise<Session | Partial<Session>> {
     try {
+      if (!sessionId) {
+        throw new Error("Session ID is required");
+      }
+      
+      // Ensure we're using the correct parameter name (sessionId)
       const url = fields 
         ? `/sessions/${sessionId}?fields=${encodeURIComponent(fields)}`
         : `/sessions/${sessionId}`;
+        
+      console.log(`Fetching session with URL: ${url}`);
       const response = await api.get(url);
       return response.data;
     } catch (error: any) {
       console.error(`Failed to fetch session with ID ${sessionId}:`, error);
+      if (error.response?.status === 400) {
+        throw new Error("Invalid session ID format");
+      } else if (error.response?.status === 404) {
+        throw new Error("Session not found");
+      }
       throw new Error(error.response?.data?.message || "Failed to fetch session");
     }
   },
@@ -277,7 +289,19 @@ export const sessionService = {
   async getSessionTeam(sessionId: string): Promise<string> {
     try {
       const response = await api.get(`/sessions/${sessionId}`);
-      return response.data.team?._id;
+      console.log('Session data:', response.data);
+      
+      // Check different possible paths to the team ID
+      if (response.data.team?._id) {
+        return response.data.team._id;
+      } else if (response.data.team) {
+        // If team is directly the ID
+        return response.data.team;
+      } else {
+        // For debugging, log the structure
+        console.log('Team structure not found in:', response.data);
+        throw new Error(`Team not found in session ${sessionId}`);
+      }
     } catch (error: any) {
       console.error(`Failed to get team for session with ID ${sessionId}:`, error);
       throw new Error(error.response?.data?.message || "Failed to get session team");

@@ -18,7 +18,8 @@ import { Label } from "@/components/shadcn-ui/label"
 import { Textarea } from "@/components/shadcn-ui/textarea"
 import { toast } from "@/components/shadcn-ui/use-toast"
 import { Search, Mail, User, Check } from "lucide-react"
-import { inviteTeamMember } from "@/lib/team-service"
+import { teamService } from "@/api/team-service"
+import { sessionService } from "@/api/session-service"
 import { userService, User as UserType } from "@/api/user-service"
 
 interface AddMemberModalProps {
@@ -39,33 +40,56 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
   const [showDropdown, setShowDropdown] = useState(false)
   const [selectedUser, setSelectedUser] = useState<UserType | null>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const handleInviteSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!sessionId) {
-      toast({
-        title: "Error",
-        description: "Session ID is missing. Please try again later.",
-        variant: "destructive",
-      })
-      return
-    }
-
+    if (!inviteEmail || !sessionId) return
+    
     setIsLoading(true)
     try {
-      await inviteTeamMember(sessionId, inviteEmail)
+      let teamId;
+      
+      try {
+        // First, try to get the team ID associated with the session
+        teamId = await sessionService.getSessionTeam(sessionId)
+        console.log(`Found team ID: ${teamId} for session: ${sessionId}`)
+      } catch (error: any) {
+        console.warn(`Could not get team ID from session service: ${error.message}`)
+        console.log('Falling back to using sessionId as teamId')
+        teamId = sessionId // Fallback to using sessionId directly
+      }
+      
+      if (!teamId) {
+        throw new Error(`No team found for session ${sessionId}`)
+      }
+      
+      // Use the team service to send the invitation
+      const response = await teamService.inviteUserToTeam(teamId, inviteEmail)
+      
       toast({
-        title: "Invitation sent",
-        description: `An invitation has been sent to ${inviteEmail}.`,
+        title: "Invitation Sent",
+        description: `Invitation sent to ${inviteEmail} successfully.`,
+        variant: "default",
       })
+      
+      // Reset form and close modal
       setInviteEmail("")
       setMessage("Hi there! I'd like to invite you to join our team on our project management platform.")
       onClose()
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to send invitation:", error)
       toast({
-        title: "Error",
-        description: "Failed to send invitation. Please try again.",
+        title: "Invitation Failed",
+        description: error.message || "Failed to send invitation. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -83,9 +107,10 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
       clearTimeout(searchTimeoutRef.current)
     }
     
+    // Don't search if less than 3 characters to prevent server overload
     if (value.length < 3) {
-      setSearchResults([])
       setShowDropdown(false)
+      setSearchResults([])
       return
     }
     
@@ -115,25 +140,59 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
     setShowDropdown(false)
   }
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
+  const handleSearchSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedUser && searchEmail) {
-      // If no user is selected but there's an email, show a warning
+    if (!selectedUser || !sessionId) {
       toast({
-        title: "No user selected",
-        description: "Please select a user from the dropdown or enter a valid email address.",
+        title: "Selection Required",
+        description: "Please select a user from the search results.",
         variant: "destructive",
       })
       return
     }
     
-    toast({
-      title: "Join request sent",
-      description: `A join request has been sent to ${selectedUser ? selectedUser.fullName || selectedUser.username : searchEmail}.`,
-    })
-    setSearchEmail("")
-    setSelectedUser(null)
-    onClose()
+    setIsLoading(true)
+    try {
+      let teamId;
+      
+      try {
+        // First, try to get the team ID associated with the session
+        teamId = await sessionService.getSessionTeam(sessionId)
+        console.log(`Found team ID: ${teamId} for session: ${sessionId}`)
+      } catch (error: any) {
+        console.warn(`Could not get team ID from session service: ${error.message}`)
+        console.log('Falling back to using sessionId as teamId')
+        teamId = sessionId // Fallback to using sessionId directly
+      }
+      
+      if (!teamId) {
+        throw new Error(`No team found for session ${sessionId}`)
+      }
+      
+      // Use the team service to send the invitation
+      const response = await teamService.inviteUserToTeam(teamId, selectedUser.email)
+      
+      toast({
+        title: "Invitation Sent",
+        description: `Invitation sent to ${selectedUser.username} successfully.`,
+        variant: "default",
+      })
+      
+      // Reset form and close modal
+      setSearchEmail("")
+      setSelectedUser(null)
+      setSearchResults([])
+      onClose()
+    } catch (error: any) {
+      console.error("Failed to send invitation:", error)
+      toast({
+        title: "Invitation Failed",
+        description: error.message || "Failed to send invitation. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -207,7 +266,9 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
                 <Button variant="outline" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button type="submit">Send Join Request</Button>
+                <Button type="submit" disabled={isLoading || !selectedUser}>
+                  {isLoading ? "Sending..." : "Send Join Request"}
+                </Button>
               </div>
             </form>
           </TabsContent>

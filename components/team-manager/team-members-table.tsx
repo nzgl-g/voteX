@@ -18,13 +18,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/shadcn-ui/avat
 import { Input } from "@/components/shadcn-ui/input"
 import { Edit, Filter, MoreHorizontal, Search, Trash2, ClipboardCopy, CheckCircle2, Loader2 } from "lucide-react"
 import { toast } from "@/components/shadcn-ui/use-toast"
-import { getSessionTeamMembers, removeTeamMember } from "@/lib/team-service"
+// Import the new team service
+import { teamService } from "@/api/team-service"
+import { sessionService } from "@/api/session-service"
 
-interface TeamMember {
-  _id: string
-  username: string
-  email: string
-  role?: string
+// Use the TeamMember interface from the team service, but extend it for our UI needs
+import { TeamMember as BaseTeamMember } from "@/api/team-service"
+
+interface TeamMember extends BaseTeamMember {
+  role?: 'Leader' | 'Member'
   uniqueId?: string // Unique identifier for React keys
 }
 
@@ -57,45 +59,74 @@ export default function TeamMembersTable({
       setIsLoading(true)
       try {
         console.log(`Fetching team members for session: ${sessionId}`)
-        const members = await getSessionTeamMembers(sessionId)
-        console.log('Team members received:', members)
         
-        // Validate the data structure
-        if (Array.isArray(members)) {
-          setTeamMembers(members)
-          setError(null)
-        } else {
-          console.error('Invalid team members data format:', members)
-          setTeamMembers([])
-          setError('Received invalid team data format from server')
-          toast({
-            title: "Data Format Error",
-            description: "The team data is in an unexpected format. Please contact support.",
-            variant: "destructive",
-          })
+        let teamId;
+        
+        try {
+          // First, try to get the team ID associated with the session
+          teamId = await sessionService.getSessionTeam(sessionId);
+          console.log(`Found team ID: ${teamId} for session: ${sessionId}`);
+        } catch (error: any) {
+          console.warn(`Could not get team ID from session service: ${error.message}`);
+          console.log('Falling back to using sessionId as teamId');
+          teamId = sessionId; // Fallback to using sessionId directly
         }
+        
+        if (!teamId) {
+          throw new Error(`No team found for session ${sessionId}`);
+        }
+        
+        // Use the team service to get team members
+        const teamMembersData = await teamService.getTeamMembers(teamId);
+        console.log('Team members received:', teamMembersData);
+        
+        // Process the team data to create a unified array with proper roles
+        const processedMembers: TeamMember[] = [];
+        
+        // Add the leader with a Leader role
+        if (teamMembersData.leader) {
+          processedMembers.push({
+            ...teamMembersData.leader,
+            role: 'Leader',
+            uniqueId: `leader-${teamMembersData.leader._id}`
+          });
+        }
+        
+        // Add members with a Member role
+        if (teamMembersData.members && Array.isArray(teamMembersData.members)) {
+          teamMembersData.members.forEach((member, index) => {
+            processedMembers.push({
+              ...member,
+              role: 'Member',
+              uniqueId: `member-${member._id}-${index}`
+            });
+          });
+        }
+        
+        setTeamMembers(processedMembers);
+        setError(null);
       } catch (err: any) {
-        console.error("Failed to fetch team members:", err)
+        console.error("Failed to fetch team members:", err);
         
         // Enhanced error reporting
-        let errorMessage = "Failed to load team members. Please try again."
+        let errorMessage = "Failed to load team members. Please try again.";
         if (err.response) {
-          errorMessage += ` (Status: ${err.response.status})`
-          console.error('Response data:', err.response.data)
+          errorMessage += ` (Status: ${err.response.status})`;
+          console.error('Response data:', err.response.data);
         }
         
-        setError(errorMessage)
+        setError(errorMessage);
         toast({
           title: "Error",
           description: errorMessage,
           variant: "destructive",
-        })
+        });
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
-    }
+    };
 
-    fetchTeamMembers()
+    fetchTeamMembers();
   }, [sessionId])
 
   const filteredMembers = teamMembers.filter(
@@ -137,30 +168,57 @@ export default function TeamMembersTable({
     if (!memberToDelete || !sessionId) return
     
     try {
-      await removeTeamMember(sessionId, memberToDelete)
+      let teamId;
       
-      // Update the local state to remove the member
-      setTeamMembers(teamMembers.filter(member => member._id !== memberToDelete))
+      try {
+        // First, try to get the team ID associated with the session
+        teamId = await sessionService.getSessionTeam(sessionId);
+        console.log(`Found team ID: ${teamId} for session: ${sessionId}`);
+      } catch (error: any) {
+        console.warn(`Could not get team ID from session service: ${error.message}`);
+        console.log('Falling back to using sessionId as teamId');
+        teamId = sessionId; // Fallback to using sessionId directly
+      }
       
-      toast({
-        title: "Member removed",
-        description: "The team member has been removed successfully.",
-      })
+      if (!teamId) {
+        throw new Error(`No team found for session ${sessionId}`);
+      }
       
-      // If the removed member was selected, remove it from selected members
-      if (selectedMembers.includes(memberToDelete)) {
-        setSelectedMembers(selectedMembers.filter(id => id !== memberToDelete))
+      console.log(`Attempting to remove member ${memberToDelete} from team ${teamId}`);
+      
+      try {
+        // Use the team service to remove the member
+        const response = await teamService.removeTeamMember(teamId, memberToDelete);
+        console.log('Remove member response:', response);
+        
+        // Update the local state to remove the member
+        setTeamMembers(teamMembers.filter(member => member._id !== memberToDelete));
+        
+        toast({
+          title: "Member removed",
+          description: "The team member has been removed successfully.",
+        });
+        
+        // If the removed member was selected, remove it from selected members
+        if (selectedMembers.includes(memberToDelete)) {
+          setSelectedMembers(selectedMembers.filter(id => id !== memberToDelete));
+        }
+      } catch (removeError: any) {
+        console.error('Detailed remove error:', removeError);
+        console.error('Response data:', removeError.response?.data);
+        console.error('Status code:', removeError.response?.status);
+        throw removeError;
       }
     } catch (err) {
-      console.error("Failed to remove team member:", err)
+      console.error("Failed to remove team member:", err);
       toast({
         title: "Error",
         description: "Failed to remove team member. Please try again.",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsDeleteDialogOpen(false)
-      setMemberToDelete(null)
+      setIsDeleteDialogOpen(false);
+      setMemberToDelete(null);
     }
   }
 
@@ -263,8 +321,8 @@ export default function TeamMembersTable({
                     </TableCell>
                     <TableCell>{member.email}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">
-                        Member
+                      <Badge variant={member.role === 'Leader' ? "default" : "outline"} className={member.role === 'Leader' ? "bg-blue-500" : ""}>
+                        {member.role || 'Member'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">

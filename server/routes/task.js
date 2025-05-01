@@ -109,4 +109,36 @@ router.patch("/:taskId/assign", isTeamLeader, async (req, res) => {
   }
 });
 
+router.patch("/:taskId/complete", auth, async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.taskId);
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    const isAssigned = task.assignedMembers.some((memberId) =>
+      memberId.equals(req.user._id)
+    );
+
+    if (!isAssigned) {
+      return res
+        .status(403)
+        .json({ message: "You are not assigned to this task" });
+    }
+    if (task.status === "completed") {
+      return res
+        .status(400)
+        .json({ message: "Task is already marked as completed" });
+    }
+
+    task.status = "completed";
+    await task.save();
+
+    res.json({ message: "Task marked as completed", task });
+  } catch (err) {
+    console.error("Error updating task:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
 module.exports = router;

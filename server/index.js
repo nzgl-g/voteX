@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io"); // Socket.IO
+const blockchainController = require("./utils/blockchainController");
 
 let io;
 
@@ -51,10 +52,37 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("join-session", (sessionId) => {
+    if (sessionId) {
+      socket.join(sessionId.toString());
+      console.log(`User joined session room: ${sessionId}`);
+    }
+  });
+
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
   });
 });
+
+// Initialize blockchain controller if environment variables are set
+const initializeBlockchain = async () => {
+  const privateKey = process.env.BLOCKCHAIN_PRIVATE_KEY;
+  const contractAddress = process.env.CONTRACT_ADDRESS;
+
+  if (privateKey && contractAddress) {
+    try {
+      console.log("Initializing blockchain controller...");
+      await blockchainController.initialize(privateKey, contractAddress);
+      console.log("Blockchain controller initialized successfully");
+    } catch (error) {
+      console.error("Error initializing blockchain controller:", error);
+      console.log("Blockchain features will not be available until controller is initialized via API");
+    }
+  } else {
+    console.log("BLOCKCHAIN_PRIVATE_KEY or CONTRACT_ADDRESS not set. Blockchain controller not initialized.");
+    console.log("To enable blockchain features, please initialize the controller via API");
+  }
+};
 
 // Start server function
 const startServer = async (port) => {
@@ -79,7 +107,13 @@ const startServer = async (port) => {
   });
 };
 
-// Connect DB and start
-connectDB().then(() => {
-  startServer(2000);
-});
+// Connect DB, initialize blockchain and start server
+connectDB()
+  .then(async () => {
+    await initializeBlockchain();
+    return startServer(2000);
+  })
+  .catch((error) => {
+    console.error("Error starting application:", error);
+    process.exit(1);
+  });

@@ -6,6 +6,7 @@ const Invitation = require("../models/Invitation");
 const User = require("../models/User");
 const auth = require("../middleware/auth");
 const isTeamLeader = require("../middleware/isTeamLeader");
+const sendNotification = require("../helpers/sendNotification");
 
 const router = express.Router();
 
@@ -73,7 +74,6 @@ router.post("/:teamId/invite", auth, isTeamLeader, async (req, res) => {
   try {
     const { email } = req.body;
     const { teamId } = req.params;
-    const io = req.app.get("io");
     // Validate email
     if (!email) return res.status(400).send("Email is required");
 
@@ -114,17 +114,23 @@ router.post("/:teamId/invite", auth, isTeamLeader, async (req, res) => {
     });
 
     await invitation.save();
-
-    const notification = new Notification({
+    await sendNotification(req, {
       recipients: [user._id],
       type: "team-invite",
       message: `You've been invited to join the team of "${team.sessionName}"`,
-      link: `/teams/${teamId}`, //idk kifh rak dayr f front . gotta check laater
+      link: `/teams/${teamId}`, // update this later when front is ready
       targetType: "user",
     });
+    // const notification = new Notification({
+    //   recipients: [user._id],
+    //   type: "team-invite",
+    //   message: `You've been invited to join the team of "${team.sessionName}"`,
+    //   link: `/teams/${teamId}`, //idk kifh rak dayr f front . gotta check laater
+    //   targetType: "user",
+    // });
 
-    await notification.save();
-    io.to(user._id.toString()).emit("new-notification", notification);
+    // await notification.save();
+    // io.to(user._id.toString()).emit("new-notification", notification);
     res.status(201).json({
       message: "Invitation sent successfully",
       invitationId: invitation._id,

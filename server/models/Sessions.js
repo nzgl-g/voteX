@@ -7,11 +7,6 @@ const candidateSchema = new mongoose.Schema({
     required: true,
   },
 
-  status: {
-    type: String,
-    enum: ["Verified", "Pending", "Refused"],
-    default: "Pending",
-  },
   assignedReviewer: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -76,6 +71,7 @@ const sessionSchema = new mongoose.Schema({
   },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   team: { type: mongoose.Schema.Types.ObjectId, ref: "Team" },
+  candidates: [candidateSchema],
   results: { type: mongoose.Schema.Types.Mixed, default: null },
 
   securityMethod: {

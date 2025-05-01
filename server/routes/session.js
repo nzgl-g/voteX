@@ -102,10 +102,10 @@ router.get("/by-phrase/:phrase", auth, async (req, res) => {
 router.get("/:sessionId", auth, async (req, res) => {
   try {
     const { fields } = req.query;
-    if (!isValidObjectId(req.params.id)) {
+    if (!isValidObjectId(req.params.sessionId)) {
       return res.status(400).json({ error: "Invalid session ID" });
     }
-    const session = await Session.findById(req.params.id)
+    const session = await Session.findById(req.params.sessionId)
       .populate("team")
       .populate("createdBy", "username email")
       .populate({

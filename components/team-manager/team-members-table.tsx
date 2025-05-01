@@ -58,18 +58,14 @@ export default function TeamMembersTable({
       
       setIsLoading(true)
       try {
-        console.log(`Fetching team members for session: ${sessionId}`)
-        
         let teamId;
         
         try {
           // First, try to get the team ID associated with the session
           teamId = await sessionService.getSessionTeam(sessionId);
-          console.log(`Found team ID: ${teamId} for session: ${sessionId}`);
         } catch (error: any) {
-          console.warn(`Could not get team ID from session service: ${error.message}`);
-          console.log('Falling back to using sessionId as teamId');
-          teamId = sessionId; // Fallback to using sessionId directly
+          // Fallback to using sessionId as teamId
+          teamId = sessionId;
         }
         
         if (!teamId) {
@@ -78,7 +74,6 @@ export default function TeamMembersTable({
         
         // Use the team service to get team members
         const teamMembersData = await teamService.getTeamMembers(teamId);
-        console.log('Team members received:', teamMembersData);
         
         // Process the team data to create a unified array with proper roles
         const processedMembers: TeamMember[] = [];
@@ -92,9 +87,14 @@ export default function TeamMembersTable({
           });
         }
         
-        // Add members with a Member role
+        // Add members with a Member role, but exclude the leader if they appear in members array
         if (teamMembersData.members && Array.isArray(teamMembersData.members)) {
           teamMembersData.members.forEach((member, index) => {
+            // Skip if this member is the same as the leader (prevent duplication)
+            if (teamMembersData.leader && member._id === teamMembersData.leader._id) {
+              return;
+            }
+            
             processedMembers.push({
               ...member,
               role: 'Member',
@@ -112,7 +112,6 @@ export default function TeamMembersTable({
         let errorMessage = "Failed to load team members. Please try again.";
         if (err.response) {
           errorMessage += ` (Status: ${err.response.status})`;
-          console.error('Response data:', err.response.data);
         }
         
         setError(errorMessage);
@@ -160,8 +159,20 @@ export default function TeamMembersTable({
   }
 
   const handleDeleteMember = (memberId: string) => {
-    setMemberToDelete(memberId)
-    setIsDeleteDialogOpen(true)
+    // Check if this member is the team leader
+    const memberToRemove = teamMembers.find(member => member._id === memberId);
+    
+    if (memberToRemove?.role === 'Leader') {
+      toast({
+        title: "Cannot Remove Leader",
+        description: "The team leader cannot be removed. Transfer leadership to another member first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setMemberToDelete(memberId);
+    setIsDeleteDialogOpen(true);
   }
 
   const confirmDeleteMember = async () => {
@@ -173,47 +184,56 @@ export default function TeamMembersTable({
       try {
         // First, try to get the team ID associated with the session
         teamId = await sessionService.getSessionTeam(sessionId);
-        console.log(`Found team ID: ${teamId} for session: ${sessionId}`);
       } catch (error: any) {
-        console.warn(`Could not get team ID from session service: ${error.message}`);
-        console.log('Falling back to using sessionId as teamId');
-        teamId = sessionId; // Fallback to using sessionId directly
+        // Fallback to using sessionId directly
+        teamId = sessionId;
       }
       
       if (!teamId) {
         throw new Error(`No team found for session ${sessionId}`);
       }
       
-      console.log(`Attempting to remove member ${memberToDelete} from team ${teamId}`);
+      // Use the team service to remove the member
+      const response = await teamService.removeTeamMember(teamId, memberToDelete);
       
-      try {
-        // Use the team service to remove the member
-        const response = await teamService.removeTeamMember(teamId, memberToDelete);
-        console.log('Remove member response:', response);
-        
-        // Update the local state to remove the member
-        setTeamMembers(teamMembers.filter(member => member._id !== memberToDelete));
-        
-        toast({
-          title: "Member removed",
-          description: "The team member has been removed successfully.",
-        });
-        
-        // If the removed member was selected, remove it from selected members
-        if (selectedMembers.includes(memberToDelete)) {
-          setSelectedMembers(selectedMembers.filter(id => id !== memberToDelete));
-        }
-      } catch (removeError: any) {
-        console.error('Detailed remove error:', removeError);
-        console.error('Response data:', removeError.response?.data);
-        console.error('Status code:', removeError.response?.status);
-        throw removeError;
-      }
-    } catch (err) {
-      console.error("Failed to remove team member:", err);
+      // Update the local state to remove the member
+      setTeamMembers(teamMembers.filter(member => member._id !== memberToDelete));
+      
       toast({
-        title: "Error",
-        description: "Failed to remove team member. Please try again.",
+        title: "Member removed",
+        description: "The team member has been removed successfully.",
+      });
+      
+      // If the removed member was selected, remove it from selected members
+      if (selectedMembers.includes(memberToDelete)) {
+        setSelectedMembers(selectedMembers.filter(id => id !== memberToDelete));
+      }
+    } catch (err: any) {
+      // Check for specific error messages
+      let errorTitle = "Error";
+      let errorMessage = "Failed to remove team member. Please try again.";
+      
+      // Extract error message from the error object
+      if (typeof err.message === 'string') {
+        if (err.message.includes("Leader cannot remove themselves")) {
+          errorTitle = "Cannot Remove Team Leader";
+          errorMessage = "The team leader cannot be removed. Transfer leadership to another member first.";
+        } else if (err.message.includes("not authorized")) {
+          errorTitle = "Not Authorized";
+          errorMessage = err.message;
+        } else if (err.message.includes("not found")) {
+          errorTitle = "Not Found";
+          errorMessage = err.message;
+        } else {
+          // Use the error message directly if it exists
+          errorMessage = err.message;
+        }
+      }
+      
+      // Display the error toast
+      toast({
+        title: errorTitle,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -345,10 +365,17 @@ export default function TeamMembersTable({
                             <Edit className="mr-2 h-4 w-4" />
                             Edit Member
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteMember(member._id)} className="text-red-600">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Remove Member
-                          </DropdownMenuItem>
+                          {member.role !== 'Leader' ? (
+                            <DropdownMenuItem onClick={() => handleDeleteMember(member._id)} className="text-red-600">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Remove Member
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem disabled className="text-muted-foreground cursor-not-allowed">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Cannot Remove Leader
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem onClick={onAssignTask}>
                             <CheckCircle2 className="mr-2 h-4 w-4" />
                             Assign Task

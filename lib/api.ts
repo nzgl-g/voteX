@@ -27,12 +27,22 @@ api.interceptors.response.use(
   (error: AxiosError) => {
     // Enhanced error logging
     if (error.response) {
+      const responseData = error.response.data;
+      // Check if the response is HTML instead of JSON
+      const isHtmlResponse = typeof responseData === 'string' && responseData.includes('<!DOCTYPE');
+      
       console.error('API Error Response:', {
         status: error.response.status,
         statusText: error.response.statusText,
-        data: error.response.data,
+        isHtmlResponse,
+        data: isHtmlResponse ? 'HTML Response (not JSON)' : error.response.data,
         url: error.config?.url
       });
+      
+      // If we got HTML instead of JSON, provide a more helpful error
+      if (isHtmlResponse) {
+        return Promise.reject(new Error('Server returned HTML instead of JSON. The API endpoint might be incorrect or the server might be down.'));
+      }
     } else if (error.request) {
       console.error('API Error Request:', error.request);
     } else {

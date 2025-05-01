@@ -102,8 +102,6 @@ export const teamService = {
    */
   async removeTeamMember(teamId: string, memberId: string): Promise<RemoveMemberResponse> {
     try {
-      console.log(`Sending request to remove member ${memberId} from team ${teamId}`);
-      
       // Make sure we have a valid token before making the request
       const token = localStorage.getItem('token');
       if (!token) {
@@ -111,24 +109,23 @@ export const teamService = {
       }
       
       const response = await api.delete(`/teams/${teamId}/members/${memberId}`);
-      console.log('Remove member response:', response.data);
       return response.data;
     } catch (error: any) {
-      console.error(`Failed to remove member ${memberId} from team ${teamId}:`, error);
+      // Simplified error logging
+      console.error(`Team member removal error:`, error.message);
       
-      // Enhanced error reporting
+      // Handle specific error cases
       if (error.response) {
-        console.error('Response status:', error.response.status);
-        console.error('Response data:', error.response.data);
-        
-        // Handle specific error cases
-        if (error.response.status === 403) {
+        if (error.response.status === 400 && error.response.data?.error === "Leader cannot remove themselves") {
+          throw new Error('Leader cannot remove themselves. Please transfer leadership to another member first.');
+        } else if (error.response.status === 403) {
           throw new Error('You are not authorized to remove members from this team. Only team leaders can do this.');
         } else if (error.response.status === 404) {
           throw new Error(`Team or member not found. Please refresh and try again.`);
         }
       }
       
+      // Fallback error
       throw new Error(error.response?.data?.error || `Failed to remove member from team`);
     }
   },

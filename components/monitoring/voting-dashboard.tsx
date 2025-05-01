@@ -59,12 +59,29 @@ export default function VotingDashboard({ sessionId }: VotingDashboardProps) {
         // Get the token from localStorage
         const token = localStorage.getItem('token')
         
+        if (!token) {
+          throw new Error('Authentication token not found. Please log in again.')
+        }
+        
+        // Validate sessionId format (assuming it's a MongoDB ObjectId)
+        if (!/^[0-9a-fA-F]{24}$/.test(sessionId)) {
+          throw new Error('Invalid session ID format')
+        }
+        
+        console.log('Fetching session with ID:', sessionId)
+        
         // Fetch session data from the API with authentication
         const response = await apiClient.get(`/sessions/${sessionId}`, {
           headers: {
-            'Authorization': token || ''
+            'Authorization': token
           }
         })
+        
+        if (!response.data) {
+          throw new Error('Empty response received from server')
+        }
+        
+        console.log('Session data received:', response.data)
         
         const sessionData = response.data
         

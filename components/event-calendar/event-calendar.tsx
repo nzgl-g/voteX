@@ -44,7 +44,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/shadcn-ui/dropdown-menu";
-import Participants from "@/components/team-management/participants";
+import Participants from "@/components/event-calendar/participants";
 
 export interface EventCalendarProps {
   events?: CalendarEvent[];

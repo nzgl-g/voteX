@@ -2,7 +2,7 @@
 
 // Functionalities
 import React, { createContext, useContext, useState, ReactNode } from "react";
-import { etiquettes } from "@/components/team-management/big-calendar";
+import { etiquettes } from "@/components/event-calendar/big-calendar";
 
 interface CalendarContextType {
   // Date management

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/shadcn-ui/avatar";
 import {
     DropdownMenu,
@@ -10,10 +10,10 @@ import {
     DropdownMenuTrigger,
     DropdownMenuLabel,
 } from "@/components/shadcn-ui/dropdown-menu";
-import { Settings, LogOut, User } from "lucide-react";
+import { Settings, LogOut, User, LayoutDashboard, Vote } from "lucide-react";
 import { SettingsDialog } from "@/components/user-settngs/settings-dialog";
-import { authApi } from "@/lib/api";
-import { useRouter } from "next/navigation";
+import { authApi, sessionApi } from "@/lib/api";
+import { useRouter, usePathname } from "next/navigation";
 
 export interface UserProfileProps {
     userName?: string;
@@ -31,7 +31,31 @@ export function UserProfile({
     className = ""
 }: UserProfileProps) {
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [hasSessions, setHasSessions] = useState(false);
+    const [sessionId, setSessionId] = useState<string | null>(null);
     const router = useRouter();
+    const pathname = usePathname();
+    
+    useEffect(() => {
+        const checkUserSessions = async () => {
+            try {
+                const sessions = await sessionApi.getUserSessions();
+                if (sessions && sessions.length > 0) {
+                    setHasSessions(true);
+                    // Store the first session ID to use for dashboard navigation
+                    if (sessions[0]._id) {
+                        setSessionId(sessions[0]._id);
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching user sessions:", error);
+            }
+        };
+        
+        if (authApi.isAuthenticated()) {
+            checkUserSessions();
+        }
+    }, []);
     
     const initials = userName
         ? userName
@@ -44,6 +68,16 @@ export function UserProfile({
     const handleLogout = () => {
         authApi.logout();
         router.push('/');
+    };
+    
+    const navigateToVoterPortal = () => {
+        router.push('/voter');
+    };
+    
+    const navigateToDashboard = () => {
+        if (sessionId) {
+            router.push(`/team-leader/monitoring/${sessionId}`);
+        }
     };
 
     // Dropdown variant (used in voter portal, mobile headers, etc.)
@@ -70,6 +104,19 @@ export function UserProfile({
                                 {userEmail && <p className="text-xs text-muted-foreground">{userEmail}</p>}
                             </div>
                         </div>
+                        <DropdownMenuSeparator />
+                        {!pathname?.startsWith('/voter') && (
+                            <DropdownMenuItem onClick={navigateToVoterPortal}>
+                                <Vote className="mr-2 h-4 w-4" />
+                                <span>Go to Voter Portal</span>
+                            </DropdownMenuItem>
+                        )}
+                        {hasSessions && !pathname?.startsWith('/team-leader') && (
+                            <DropdownMenuItem onClick={navigateToDashboard}>
+                                <LayoutDashboard className="mr-2 h-4 w-4" />
+                                <span>Go to Dashboard</span>
+                            </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
                             <Settings className="mr-2 h-4 w-4" />
@@ -122,6 +169,19 @@ export function UserProfile({
                             </div>
                         </div>
                     </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {!pathname?.startsWith('/voter') && (
+                        <DropdownMenuItem onClick={navigateToVoterPortal}>
+                            <Vote className="mr-2 h-4 w-4" />
+                            <span>Go to Voter Portal</span>
+                        </DropdownMenuItem>
+                    )}
+                    {hasSessions && !pathname?.startsWith('/team-leader') && (
+                        <DropdownMenuItem onClick={navigateToDashboard}>
+                            <LayoutDashboard className="mr-2 h-4 w-4" />
+                            <span>Go to Dashboard</span>
+                        </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
                         <Settings className="mr-2 h-4 w-4" />

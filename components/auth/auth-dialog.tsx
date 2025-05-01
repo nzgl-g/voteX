@@ -131,7 +131,7 @@ export function AuthDialog({
         // Fetch user sessions to determine where to redirect
         try {
           // First check if user has team leader sessions
-          const response = await fetch('/api/session/my-sessions')
+          const response = await fetch('/api/sessions/my-sessions')
           const sessions = await response.json()
           
           if (sessions && sessions.length > 0) {
@@ -139,7 +139,7 @@ export function AuthDialog({
             router.push(`/team-leader/monitoring/${sessions[0]._id}`)
           } else {
             // Check if user has team member sessions
-            const memberResponse = await fetch('/api/session/my-sessions-as-member')
+            const memberResponse = await fetch('/api/sessions/my-sessions-as-member')
             const memberData = await memberResponse.json()
             
             if (memberData.sessions && memberData.sessions.length > 0) {
@@ -188,12 +188,17 @@ export function AuthDialog({
       )
       console.log('Signup successful:', result)
       
+      // Check if signup is triggered from navbar
+      const navbarSignup = localStorage.getItem('navbarSignup') === 'true'
       // Check if there's a redirect destination stored in localStorage
       const redirectAfterLogin = localStorage.getItem('redirectAfterLogin')
       
       handleDialogClose()
       
-      if (redirectAfterLogin) {
+      if (navbarSignup) {
+        localStorage.removeItem('navbarSignup')
+        router.push('/voter')
+      } else if (redirectAfterLogin) {
         // Clear the redirect info
         localStorage.removeItem('redirectAfterLogin')
         

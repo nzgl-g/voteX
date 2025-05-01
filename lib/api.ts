@@ -20,6 +20,22 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Session API methods
+export const sessionApi = {
+  // Get user's sessions
+  async getUserSessions() {
+    try {
+      const response = await api.get('/sessions/my-sessions');
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Failed to fetch user sessions');
+      }
+      throw error;
+    }
+  },
+};
+
 // Auth API methods
 export const authApi = {
   // Login method

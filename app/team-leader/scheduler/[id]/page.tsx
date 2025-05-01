@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import BigCalendar from "@/components/team-management/big-calendar"
+import BigCalendar from "@/components/event-calendar/big-calendar"
 import { CalendarProvider } from "@/components/event-calendar/calendar-context"
 import { SiteHeader } from "@/components/sidebar/site-header"
 import { Loader2, Plus } from "lucide-react"

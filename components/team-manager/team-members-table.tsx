@@ -25,6 +25,7 @@ interface TeamMember {
   username: string
   email: string
   role?: string
+  uniqueId?: string // Unique identifier for React keys
 }
 
 interface TeamMembersTableProps {
@@ -55,15 +56,38 @@ export default function TeamMembersTable({
       
       setIsLoading(true)
       try {
+        console.log(`Fetching team members for session: ${sessionId}`)
         const members = await getSessionTeamMembers(sessionId)
-        setTeamMembers(members)
-        setError(null)
-      } catch (err) {
+        console.log('Team members received:', members)
+        
+        // Validate the data structure
+        if (Array.isArray(members)) {
+          setTeamMembers(members)
+          setError(null)
+        } else {
+          console.error('Invalid team members data format:', members)
+          setTeamMembers([])
+          setError('Received invalid team data format from server')
+          toast({
+            title: "Data Format Error",
+            description: "The team data is in an unexpected format. Please contact support.",
+            variant: "destructive",
+          })
+        }
+      } catch (err: any) {
         console.error("Failed to fetch team members:", err)
-        setError("Failed to load team members. Please try again.")
+        
+        // Enhanced error reporting
+        let errorMessage = "Failed to load team members. Please try again."
+        if (err.response) {
+          errorMessage += ` (Status: ${err.response.status})`
+          console.error('Response data:', err.response.data)
+        }
+        
+        setError(errorMessage)
         toast({
           title: "Error",
-          description: "Failed to load team members. Please try again.",
+          description: errorMessage,
           variant: "destructive",
         })
       } finally {
@@ -203,8 +227,12 @@ export default function TeamMembersTable({
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredMembers.map((member) => (
-                  <TableRow key={member._id}>
+                filteredMembers.map((member) => {
+                  // Ensure we have a truly unique key for each row
+                  const rowKey = member.uniqueId || `member-${member._id}-${member.role}-${Math.random().toString(36).substring(2, 9)}`;
+                  
+                  return (
+                  <TableRow key={rowKey}>
                     <TableCell>
                       <Checkbox
                         checked={selectedMembers.includes(member._id)}
@@ -271,7 +299,8 @@ export default function TeamMembersTable({
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))
+                );
+              })
               )}
             </TableBody>
           </Table>

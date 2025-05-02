@@ -1,6 +1,6 @@
 const express = require("express");
 const mongoose = require("mongoose");
-const Notification = require("../models/Notification");
+
 const Team = require("../models/Team");
 const Invitation = require("../models/Invitation");
 const User = require("../models/User");

@@ -23,25 +23,31 @@ const notificationSchema = new mongoose.Schema({
       "vote-ended",
       "team-invite",
       "candidate-invite",
+      "team-member-accepted",
+      "team-member-declined",
+      "session-edit-request",
+      "session-edit-approved",
+      "task-assigned",
+      "team-member-removed",
       "support-response",
       "system",
     ],
     required: true,
   },
   message: { type: String, required: true },
-  link: { type: String, required: true }, // Link to redirect user to relevant session, team, etc.
+  link: { type: String, required: true },
   timestamp: { type: Date, default: Date.now },
 });
 
 notificationSchema.statics.getUserNotifications = function (
-    userId,
-    limit = 5,
-    skip = 0
+  userId,
+  limit = 5,
+  skip = 0
 ) {
   return this.find({ recipients: userId })
-      .sort({ timestamp: -1 })
-      .skip(skip)
-      .limit(limit);
+    .sort({ timestamp: -1 })
+    .skip(skip)
+    .limit(limit);
 };
 notificationSchema.pre("save", function (next) {
   if (this.targetType === "all") {

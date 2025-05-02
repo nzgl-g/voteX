@@ -9,14 +9,14 @@ const router = express.Router({ mergeParams: true });
 router.get("/", auth, async (req, res) => {
   try {
     const session = await Session.findById(req.params.sessionId)
-        .populate({
-          path: "candidates.user",
-          select: "name email",
-        })
-        .populate({
-          path: "candidates.assignedReviewer",
-          select: "name email",
-        });
+      .populate({
+        path: "candidates.user",
+        select: "name email",
+      })
+      .populate({
+        path: "candidates.assignedReviewer",
+        select: "name email",
+      });
 
     if (!session) {
       return res.status(404).json({ message: "Session not found" });
@@ -35,7 +35,7 @@ router.get("/", auth, async (req, res) => {
       nationalities: candidate.nationalities,
       dobPob: candidate.dobPob,
       promises: candidate.promises,
-      papers: candidate.papers,
+      paper: candidate.paper,
     }));
 
     res.status(200).json(candidates);
@@ -55,7 +55,7 @@ router.post("/apply", auth, async (req, res) => {
     dobPob,
     promises,
     partyName,
-    papers,
+    paper,
   } = req.body;
   try {
     const user = await User.findById(userId);
@@ -70,8 +70,8 @@ router.post("/apply", auth, async (req, res) => {
 
     if (session.createdBy.equals(userId)) {
       return res
-          .status(400)
-          .json({ message: "Session leaders cannot apply as candidates" });
+        .status(400)
+        .json({ message: "Session leaders cannot apply as candidates" });
     }
     const existingRequest = await CandidateRequest.findOne({
       user: userId,
@@ -81,27 +81,19 @@ router.post("/apply", auth, async (req, res) => {
     if (existingRequest) {
       if (existingRequest.status === "approved") {
         return res
-            .status(400)
-            .json({ message: "You are already a candidate for this session." });
+          .status(400)
+          .json({ message: "You are already a candidate for this session." });
       } else if (existingRequest.status === "rejected") {
         return res.status(400).json({
           message:
-              "Your previous request was rejected. You cannot apply again.",
+            "Your previous request was rejected. You cannot apply again.",
         });
       } else {
         return res
-            .status(400)
-            .json({ message: "Your application is still pending." });
+          .status(400)
+          .json({ message: "Your application is still pending." });
       }
     }
-    const candidatePapers = session.allowDirectEdit
-        ? papers
-        : session.allowsOfficialPapers
-            ? papers.map((paper) => ({
-              name: paper.name,
-              url: paper.url,
-            }))
-            : [];
 
     const candidateRequest = new CandidateRequest({
       user: userId,
@@ -113,7 +105,7 @@ router.post("/apply", auth, async (req, res) => {
       dobPob,
       promises,
       partyName,
-      papers: candidatePapers,
+      paper: session.allowPapers ? paper || null : null,
       status: "pending",
     });
     await candidateRequest.save();
@@ -135,7 +127,7 @@ router.post("/accept/:requestId", auth, async (req, res) => {
 
   try {
     const session = await Session.findById(req.params.sessionId).populate(
-        "candidateRequests"
+      "candidateRequests"
     );
     if (!session) {
       return res.status(404).json({ message: "Session not found" });
@@ -146,31 +138,18 @@ router.post("/accept/:requestId", auth, async (req, res) => {
     }
     if (candidateRequest.status === "approved") {
       return res
-          .status(400)
-          .json({ message: "This request has already been approved." });
+        .status(400)
+        .json({ message: "This request has already been approved." });
     }
     if (candidateRequest.status === "rejected") {
       return res
-          .status(400)
-          .json({ message: "This request has already been rejected." });
+        .status(400)
+        .json({ message: "This request has already been rejected." });
     }
     if (!session.createdBy.equals(userId)) {
       return res
-          .status(403)
-          .json({ message: "You are not authorized to accept this request" });
-    }
-    if (session.allowsOfficialPapers) {
-      if (candidateRequest.papers && candidateRequest.papers.length > 0) {
-        for (let paper of candidateRequest.papers) {
-          if (!paper.name || !paper.url) {
-            return res.status(400).json({
-              message: "Each paper must have a name and a valid URL",
-            });
-          }
-        }
-      }
-    } else {
-      candidateRequest.papers = [];
+        .status(403)
+        .json({ message: "You are not authorized to accept this request" });
     }
     candidateRequest.status = "approved";
     candidateRequest.approvedAt = Date.now();
@@ -188,7 +167,7 @@ router.post("/accept/:requestId", auth, async (req, res) => {
       nationalities: candidateRequest.nationalities,
       dobPob: candidateRequest.dobPob,
       promises: candidateRequest.promises,
-      papers: candidateRequest.papers,
+      paper: session.allowPapers ? candidateRequest.paper || null : null,
     });
     await session.save();
     await SessionParticipant.create({
@@ -209,7 +188,7 @@ router.post("/reject/:requestId", auth, async (req, res) => {
 
   try {
     const candidateRequest = await CandidateRequest.findById(
-        requestId
+      requestId
     ).populate("session");
 
     if (!candidateRequest) {
@@ -217,19 +196,19 @@ router.post("/reject/:requestId", auth, async (req, res) => {
     }
     if (candidateRequest.status === "approved") {
       return res
-          .status(400)
-          .json({ message: "This request has already been approved." });
+        .status(400)
+        .json({ message: "This request has already been approved." });
     }
     if (candidateRequest.status === "rejected") {
       return res
-          .status(400)
-          .json({ message: "This request has already been rejected." });
+        .status(400)
+        .json({ message: "This request has already been rejected." });
     }
     const session = candidateRequest.session;
     if (!session.createdBy.equals(userId)) {
       return res
-          .status(403)
-          .json({ message: "You are not authorized to reject this request" });
+        .status(403)
+        .json({ message: "You are not authorized to reject this request" });
     }
 
     candidateRequest.status = "rejected";
@@ -255,18 +234,18 @@ router.post("/invite/:userId", auth, async (req, res) => {
 
     if (!session.createdBy.equals(inviterId)) {
       return res
-          .status(403)
-          .json({ message: "Only the session leader can invite candidates" });
+        .status(403)
+        .json({ message: "Only the session leader can invite candidates" });
     }
 
     const alreadyCandidate = session.candidates.some((candidate) =>
-        candidate.user.equals(userId)
+      candidate.user.equals(userId)
     );
 
     if (alreadyCandidate) {
       return res
-          .status(400)
-          .json({ message: "User is already a candidate in this session" });
+        .status(400)
+        .json({ message: "User is already a candidate in this session" });
     }
     const existingInvite = await CandidateInvitation.findOne({
       sessionId,
@@ -280,13 +259,13 @@ router.post("/invite/:userId", auth, async (req, res) => {
       }
       if (existingInvite.status === "declined") {
         return res
-            .status(400)
-            .json({ message: "User previously declined the invitation" });
+          .status(400)
+          .json({ message: "User previously declined the invitation" });
       }
       if (existingInvite.status === "accepted") {
         return res
-            .status(400)
-            .json({ message: "User already accepted the invitation " });
+          .status(400)
+          .json({ message: "User already accepted the invitation " });
       }
     }
 
@@ -328,14 +307,14 @@ router.post("/invite/:inviteId/accept", auth, async (req, res) => {
 
     if (invitation.status === "accepted") {
       return res
-          .status(400)
-          .json({ message: "You have already accepted the invitation" });
+        .status(400)
+        .json({ message: "You have already accepted the invitation" });
     }
 
     if (invitation.status === "declined") {
       return res
-          .status(400)
-          .json({ message: "You have already declined this invitation" });
+        .status(400)
+        .json({ message: "You have already declined this invitation" });
     }
 
     invitation.status = "accepted";
@@ -347,13 +326,13 @@ router.post("/invite/:inviteId/accept", auth, async (req, res) => {
     }
 
     const alreadyCandidate = session.candidates.some((candidate) =>
-        candidate.user.equals(userId)
+      candidate.user.equals(userId)
     );
 
     if (alreadyCandidate) {
       return res
-          .status(400)
-          .json({ message: "User is already a candidate in this session" });
+        .status(400)
+        .json({ message: "User is already a candidate in this session" });
     }
 
     session.candidates.push({
@@ -368,7 +347,7 @@ router.post("/invite/:inviteId/accept", auth, async (req, res) => {
       nationalities: req.body.nationalities || [],
       dobPob: req.body.dobPob || {},
       promises: req.body.promises || [],
-      papers: session.allowPapers ? req.body.papers || [] : [],
+      paper: session.allowPapers ? req.body.paper || [] : [],
     });
 
     await session.save();
@@ -378,8 +357,8 @@ router.post("/invite/:inviteId/accept", auth, async (req, res) => {
       role: "candidate",
     });
     res
-        .status(200)
-        .json({ message: "Invitation accepted and user added as a candidate" });
+      .status(200)
+      .json({ message: "Invitation accepted and user added as a candidate" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
@@ -404,14 +383,14 @@ router.post("/invite/:inviteId/reject", auth, async (req, res) => {
 
     if (invitation.status === "accepted") {
       return res
-          .status(400)
-          .json({ message: "You have already accepted the invitation" });
+        .status(400)
+        .json({ message: "You have already accepted the invitation" });
     }
 
     if (invitation.status === "declined") {
       return res
-          .status(400)
-          .json({ message: "You have already declined this invitation" });
+        .status(400)
+        .json({ message: "You have already declined this invitation" });
     }
 
     invitation.status = "declined";

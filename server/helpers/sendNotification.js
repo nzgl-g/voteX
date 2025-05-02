@@ -18,6 +18,13 @@ const sendNotification = async (
     throw new Error("teamId is required when targetType is 'team'");
   }
   await notification.save();
+  const payload = {
+    type,
+    message,
+    link,
+    targetType,
+    createdAt: notification.createdAt,
+  };
   if (targetType === "all") {
     io.emit("new-notification", payload);
   } else if (targetType === "team" && teamId) {

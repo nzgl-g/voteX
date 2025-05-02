@@ -2,6 +2,8 @@ const express = require("express");
 const Session = require("../models/Sessions");
 const CandidateRequest = require("../models/CandidateRequest");
 const CandidateInvitation = require("../models/CandidateInvitation");
+const SessionParticipant = require("../models/SessionParticipants");
+const User = require("../models/User");
 const auth = require("../middleware/auth");
 const router = express.Router({ mergeParams: true });
 router.get("/", auth, async (req, res) => {
@@ -42,20 +44,25 @@ router.get("/", auth, async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 });
+
 router.post("/apply", auth, async (req, res) => {
   const userId = req.user._id;
   const sessionId = req.params.sessionId;
   const {
-    fullName,
     biography,
     experience,
     nationalities,
     dobPob,
     promises,
     partyName,
-    papers = [],
+    papers,
   } = req.body;
   try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    const fullName = user.fullName;
     const session = await Session.findById(sessionId);
     if (!session) {
       return res.status(404).json({ message: "Session not found" });
@@ -87,13 +94,14 @@ router.post("/apply", auth, async (req, res) => {
           .json({ message: "Your application is still pending." });
       }
     }
-    let candidatePapers = [];
-    if (session.allowsOfficialPapers && Array.isArray(papers)) {
-      candidatePapers = papers.map((paper) => ({
-        name: paper.name,
-        url: paper.url,
-      }));
-    }
+    const candidatePapers = session.allowDirectEdit
+      ? papers
+      : session.allowsOfficialPapers
+      ? papers.map((paper) => ({
+          name: paper.name,
+          url: paper.url,
+        }))
+      : [];
 
     const candidateRequest = new CandidateRequest({
       user: userId,
@@ -109,7 +117,9 @@ router.post("/apply", auth, async (req, res) => {
       status: "pending",
     });
     await candidateRequest.save();
-
+    session.markModified("candidateRequests");
+    session.candidateRequests.push(candidateRequest._id);
+    await session.save();
     res.status(201).json({
       message: "Your application to be a candidate has been submitted",
     });
@@ -118,45 +128,52 @@ router.post("/apply", auth, async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 });
+
 router.post("/accept/:requestId", auth, async (req, res) => {
   const userId = req.user._id;
   const requestId = req.params.requestId;
 
   try {
-    const candidateRequest = await CandidateRequest.findById(
-      requestId
-    ).populate("session");
-
+    const session = await Session.findById(req.params.sessionId).populate(
+      "candidateRequests"
+    );
+    if (!session) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+    const candidateRequest = await CandidateRequest.findById(requestId);
     if (!candidateRequest) {
       return res.status(404).json({ message: "Candidate request not found" });
     }
-
-    const session = candidateRequest.session;
+    if (candidateRequest.status === "approved") {
+      return res
+        .status(400)
+        .json({ message: "This request has already been approved." });
+    }
+    if (candidateRequest.status === "rejected") {
+      return res
+        .status(400)
+        .json({ message: "This request has already been rejected." });
+    }
     if (!session.createdBy.equals(userId)) {
       return res
         .status(403)
         .json({ message: "You are not authorized to accept this request" });
     }
-    if (
-      session.allowPapers &&
-      candidateRequest.papers &&
-      candidateRequest.papers.length > 0
-    ) {
-      for (let paper of candidateRequest.papers) {
-        if (!paper.name || !paper.url) {
-          return res.status(400).json({
-            message: "Each paper must have a name and a valid URL",
-          });
+    if (session.allowsOfficialPapers) {
+      if (candidateRequest.papers && candidateRequest.papers.length > 0) {
+        for (let paper of candidateRequest.papers) {
+          if (!paper.name || !paper.url) {
+            return res.status(400).json({
+              message: "Each paper must have a name and a valid URL",
+            });
+          }
         }
       }
-    } else if (candidateRequest.papers && candidateRequest.papers.length > 0) {
-      return res.status(400).json({
-        message: "This session does not allow papers to be submitted.",
-      });
+    } else {
+      candidateRequest.papers = [];
     }
     candidateRequest.status = "approved";
     candidateRequest.approvedAt = Date.now();
-
     await candidateRequest.save();
 
     session.candidates.push({
@@ -171,10 +188,14 @@ router.post("/accept/:requestId", auth, async (req, res) => {
       nationalities: candidateRequest.nationalities,
       dobPob: candidateRequest.dobPob,
       promises: candidateRequest.promises,
-      papers: candidateRequest.papers || [],
+      papers: candidateRequest.papers,
     });
     await session.save();
-
+    await SessionParticipant.create({
+      sessionId: session._id,
+      userId: candidateRequest.user,
+      role: "candidate",
+    });
     res.status(200).json({ message: "Candidate request accepted" });
   } catch (err) {
     console.error(err);
@@ -194,7 +215,16 @@ router.post("/reject/:requestId", auth, async (req, res) => {
     if (!candidateRequest) {
       return res.status(404).json({ message: "Candidate request not found" });
     }
-
+    if (candidateRequest.status === "approved") {
+      return res
+        .status(400)
+        .json({ message: "This request has already been approved." });
+    }
+    if (candidateRequest.status === "rejected") {
+      return res
+        .status(400)
+        .json({ message: "This request has already been rejected." });
+    }
     const session = candidateRequest.session;
     if (!session.createdBy.equals(userId)) {
       return res
@@ -214,10 +244,10 @@ router.post("/reject/:requestId", auth, async (req, res) => {
   }
 });
 
-router.post("/invite", auth, async (req, res) => {
-  const { userId } = req.body; // The user you're inviting
+router.post("/invite/:userId", auth, async (req, res) => {
   const inviterId = req.user._id;
   const sessionId = req.params.sessionId;
+  const userId = req.params.userId;
 
   try {
     const session = await Session.findById(sessionId);
@@ -277,9 +307,14 @@ router.post("/invite", auth, async (req, res) => {
 
 router.post("/invite/:inviteId/accept", auth, async (req, res) => {
   const userId = req.user._id;
-  const { inviteId } = req.params; // The invitation ID
+  const inviteId = req.params.inviteId;
 
   try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    const fullName = user.fullName;
     const invitation = await CandidateInvitation.findById(inviteId);
     if (!invitation) {
       return res.status(404).json({ message: "Invitation not found" });
@@ -310,19 +345,7 @@ router.post("/invite/:inviteId/accept", auth, async (req, res) => {
     if (!session) {
       return res.status(404).json({ message: "Session not found" });
     }
-    if (session.allowPapers && req.body.papers && req.body.papers.length > 0) {
-      for (let paper of req.body.papers) {
-        if (!paper.name || !paper.url) {
-          return res.status(400).json({
-            message: "Each paper must have a name and a valid URL",
-          });
-        }
-      }
-    } else if (req.body.papers && req.body.papers.length > 0) {
-      return res.status(400).json({
-        message: "This session does not allow papers to be submitted.",
-      });
-    }
+
     const alreadyCandidate = session.candidates.some((candidate) =>
       candidate.user.equals(userId)
     );
@@ -335,19 +358,25 @@ router.post("/invite/:inviteId/accept", auth, async (req, res) => {
 
     session.candidates.push({
       user: userId,
-      status: "Verified",
-      papers: session.allowPapers ? req.body.papers : [],
-      fullName: invitation.fullName,
-      biography: invitation.biography,
-      experience: invitation.experience,
-      nationalities: invitation.nationalities,
-      dobPob: invitation.dobPob,
-      promises: invitation.promises,
-      partyName: invitation.partyName,
+      assignedReviewer: null,
+      partyName: req.body.partyName || "",
+      totalVotes: 0,
+      requiresReview: false,
+      fullName: fullName,
+      biography: req.body.biography || "",
+      experience: req.body.experience || "",
+      nationalities: req.body.nationalities || [],
+      dobPob: req.body.dobPob || {},
+      promises: req.body.promises || [],
+      papers: session.allowPapers ? req.body.papers || [] : [],
     });
 
     await session.save();
-
+    await SessionParticipant.create({
+      sessionId: session._id,
+      userId,
+      role: "candidate",
+    });
     res
       .status(200)
       .json({ message: "Invitation accepted and user added as a candidate" });

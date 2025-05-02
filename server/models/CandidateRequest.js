@@ -16,7 +16,13 @@ const candidateRequestSchema = new mongoose.Schema({
   approvedAt: { type: Date, default: null },
   rejectedAt: { type: Date, default: null },
   reasonForRejection: { type: String, default: null },
-
+  papers: [
+    {
+      name: { type: String, required: true },
+      url: { type: String, required: true },
+      uploadedAt: { type: Date, default: Date.now },
+    },
+  ],
   fullName: { type: String, required: true },
   biography: { type: String, default: "" },
   experience: { type: String, default: "" },

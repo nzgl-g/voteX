@@ -1,8 +1,8 @@
 const Notification = require("../models/Notification");
 
 const sendNotification = async (
-  req,
-  { recipients, type, message, link, targetType, teamId }
+    req,
+    { recipients, type, message, link, targetType, teamId }
 ) => {
   const io = req.app.get("io");
 

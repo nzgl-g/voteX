@@ -34,18 +34,7 @@ router.post("/", auth, isTeamLeader, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-//body
-// {
-//     "title": "Design homepage layout",
-//     "description": "Create the initial layout for the homepage UI",
-//     "priority": "high",
-//     "dueDate": "2025-05-10T23:59:00.000Z",
-//     "assignedMembers": ["6810b2b3837ce29367d98d99"],
-//     "session": "68109a226d834d87fae01b4c",
-//     "color": "#FFD700"
-//   }
 
-// Get all tasks for a session
 router.get("/session/:sessionId", async (req, res) => {
   try {
     const tasks = await Task.find({ session: req.params.sessionId });

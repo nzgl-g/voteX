@@ -6,7 +6,6 @@ const candidateSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
-
   assignedReviewer: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -15,6 +14,22 @@ const candidateSchema = new mongoose.Schema({
   partyName: { type: String, required: true },
   totalVotes: { type: Number, default: 0 },
   requiresReview: { type: Boolean, default: false },
+  papers: [
+    {
+      name: { type: String, required: true },
+      url: { type: String, required: true },
+      uploadedAt: { type: Date, default: Date.now },
+    },
+  ],
+  fullName: { type: String, required: true },
+  biography: { type: String, default: "" },
+  experience: { type: String, default: "" },
+  nationalities: [{ type: String }],
+  dobPob: {
+    dateOfBirth: { type: Date },
+    placeOfBirth: { type: String, default: "" },
+  },
+  promises: [{ type: String }],
 });
 
 const optionSchema = new mongoose.Schema({
@@ -103,6 +118,7 @@ const sessionSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  allowsOfficialPapers: { type: Boolean, default: false },
 });
 sessionSchema.discriminator(
   "Election",

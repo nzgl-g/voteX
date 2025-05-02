@@ -15,7 +15,18 @@ const candidateRequestSchema = new mongoose.Schema({
   requestedAt: { type: Date, default: Date.now },
   approvedAt: { type: Date, default: null },
   rejectedAt: { type: Date, default: null },
-  reasonForRejection: { type: String, default: null }, // Optional field for rejection reason
+  reasonForRejection: { type: String, default: null },
+
+  fullName: { type: String, required: true },
+  biography: { type: String, default: "" },
+  experience: { type: String, default: "" },
+  nationalities: [{ type: String }],
+  dobPob: {
+    dateOfBirth: { type: Date },
+    placeOfBirth: { type: String, default: "" },
+  },
+  promises: [{ type: String }],
+  partyName: { type: String, required: true },
 });
 
 module.exports = mongoose.model("CandidateRequest", candidateRequestSchema);

@@ -4,9 +4,8 @@ const CandidateRequest = require("../models/CandidateRequest");
 const CandidateInvitation = require("../models/CandidateInvitation");
 const auth = require("../middleware/auth");
 const router = express.Router({ mergeParams: true });
-router.get("", auth, async (req, res) => {
+router.get("/", auth, async (req, res) => {
   try {
-    // Fetch the session by ID and populate the 'user' and 'assignedReviewer' fields of candidates
     const session = await Session.findById(req.params.sessionId)
       .populate({
         path: "candidates.user",
@@ -21,14 +20,20 @@ router.get("", auth, async (req, res) => {
       return res.status(404).json({ message: "Session not found" });
     }
 
-    // Send back candidates for the session
     const candidates = session.candidates.map((candidate) => ({
-      user: candidate.user, // Contains populated user data (name, email)
+      user: candidate.user,
+      assignedReviewer: candidate.assignedReviewer,
       status: candidate.status,
       partyName: candidate.partyName,
       totalVotes: candidate.totalVotes,
       requiresReview: candidate.requiresReview,
-      assignedReviewer: candidate.assignedReviewer,
+      fullName: candidate.fullName,
+      biography: candidate.biography,
+      experience: candidate.experience,
+      nationalities: candidate.nationalities,
+      dobPob: candidate.dobPob,
+      promises: candidate.promises,
+      papers: candidate.papers,
     }));
 
     res.status(200).json(candidates);
@@ -39,9 +44,17 @@ router.get("", auth, async (req, res) => {
 });
 router.post("/apply", auth, async (req, res) => {
   const userId = req.user._id;
-  console.log(userId);
   const sessionId = req.params.sessionId;
-
+  const {
+    fullName,
+    biography,
+    experience,
+    nationalities,
+    dobPob,
+    promises,
+    partyName,
+    papers = [],
+  } = req.body;
   try {
     const session = await Session.findById(sessionId);
     if (!session) {
@@ -74,13 +87,27 @@ router.post("/apply", auth, async (req, res) => {
           .json({ message: "Your application is still pending." });
       }
     }
+    let candidatePapers = [];
+    if (session.allowsOfficialPapers && Array.isArray(papers)) {
+      candidatePapers = papers.map((paper) => ({
+        name: paper.name,
+        url: paper.url,
+      }));
+    }
 
     const candidateRequest = new CandidateRequest({
       user: userId,
       session: sessionId,
+      fullName,
+      biography,
+      experience,
+      nationalities,
+      dobPob,
+      promises,
+      partyName,
+      papers: candidatePapers,
       status: "pending",
     });
-
     await candidateRequest.save();
 
     res.status(201).json({
@@ -110,7 +137,23 @@ router.post("/accept/:requestId", auth, async (req, res) => {
         .status(403)
         .json({ message: "You are not authorized to accept this request" });
     }
-
+    if (
+      session.allowPapers &&
+      candidateRequest.papers &&
+      candidateRequest.papers.length > 0
+    ) {
+      for (let paper of candidateRequest.papers) {
+        if (!paper.name || !paper.url) {
+          return res.status(400).json({
+            message: "Each paper must have a name and a valid URL",
+          });
+        }
+      }
+    } else if (candidateRequest.papers && candidateRequest.papers.length > 0) {
+      return res.status(400).json({
+        message: "This session does not allow papers to be submitted.",
+      });
+    }
     candidateRequest.status = "approved";
     candidateRequest.approvedAt = Date.now();
 
@@ -118,11 +161,18 @@ router.post("/accept/:requestId", auth, async (req, res) => {
 
     session.candidates.push({
       user: candidateRequest.user,
-      status: "Verified",
-      partyName: "Party Name",
+      assignedReviewer: null,
+      partyName: candidateRequest.partyName,
       totalVotes: 0,
+      requiresReview: false,
+      fullName: candidateRequest.fullName,
+      biography: candidateRequest.biography,
+      experience: candidateRequest.experience,
+      nationalities: candidateRequest.nationalities,
+      dobPob: candidateRequest.dobPob,
+      promises: candidateRequest.promises,
+      papers: candidateRequest.papers || [],
     });
-
     await session.save();
 
     res.status(200).json({ message: "Candidate request accepted" });
@@ -260,7 +310,19 @@ router.post("/invite/:inviteId/accept", auth, async (req, res) => {
     if (!session) {
       return res.status(404).json({ message: "Session not found" });
     }
-
+    if (session.allowPapers && req.body.papers && req.body.papers.length > 0) {
+      for (let paper of req.body.papers) {
+        if (!paper.name || !paper.url) {
+          return res.status(400).json({
+            message: "Each paper must have a name and a valid URL",
+          });
+        }
+      }
+    } else if (req.body.papers && req.body.papers.length > 0) {
+      return res.status(400).json({
+        message: "This session does not allow papers to be submitted.",
+      });
+    }
     const alreadyCandidate = session.candidates.some((candidate) =>
       candidate.user.equals(userId)
     );
@@ -273,7 +335,15 @@ router.post("/invite/:inviteId/accept", auth, async (req, res) => {
 
     session.candidates.push({
       user: userId,
-      status: "Verified", // Automatically mark the candidate as verified on acceptance
+      status: "Verified",
+      papers: session.allowPapers ? req.body.papers : [],
+      fullName: invitation.fullName,
+      biography: invitation.biography,
+      experience: invitation.experience,
+      nationalities: invitation.nationalities,
+      dobPob: invitation.dobPob,
+      promises: invitation.promises,
+      partyName: invitation.partyName,
     });
 
     await session.save();

@@ -6,6 +6,7 @@ const SessionParticipant = require("../models/SessionParticipants");
 const User = require("../models/User");
 const auth = require("../middleware/auth");
 const router = express.Router({ mergeParams: true });
+// get all candidates
 router.get("/", auth, async (req, res) => {
   try {
     const session = await Session.findById(req.params.sessionId)
@@ -44,7 +45,22 @@ router.get("/", auth, async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 });
+// get all requests
+router.get("/candidate-requests", auth, async (req, res) => {
+  try {
+    const sessionId = req.params.sessionId;
 
+    const requests = await CandidateRequest.find({ session: sessionId })
+      .populate("user", "fullName email")
+      .populate("session", "name type");
+
+    res.status(200).json(requests);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+// apply to be a candidate
 router.post("/apply", auth, async (req, res) => {
   const userId = req.user._id;
   const sessionId = req.params.sessionId;
@@ -120,7 +136,7 @@ router.post("/apply", auth, async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 });
-
+// accept candidate request
 router.post("/accept/:requestId", auth, async (req, res) => {
   const userId = req.user._id;
   const requestId = req.params.requestId;
@@ -181,7 +197,7 @@ router.post("/accept/:requestId", auth, async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 });
-
+//reject candidate requets
 router.post("/reject/:requestId", auth, async (req, res) => {
   const userId = req.user._id;
   const requestId = req.params.requestId;
@@ -222,7 +238,7 @@ router.post("/reject/:requestId", auth, async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 });
-
+//invite user to be a candidate
 router.post("/invite/:userId", auth, async (req, res) => {
   const inviterId = req.user._id;
   const sessionId = req.params.sessionId;
@@ -283,7 +299,7 @@ router.post("/invite/:userId", auth, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
+//accept invite and be a candidate
 router.post("/invite/:inviteId/accept", auth, async (req, res) => {
   const userId = req.user._id;
   const inviteId = req.params.inviteId;
@@ -364,7 +380,7 @@ router.post("/invite/:inviteId/accept", auth, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
+//decline invitation to be candidate
 router.post("/invite/:inviteId/reject", auth, async (req, res) => {
   const userId = req.user._id;
   const { inviteId } = req.params;

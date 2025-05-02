@@ -1,7 +1,7 @@
 "use client"
 
 import { useParams } from "next/navigation"
-import { Suspense } from "react"
+import { Suspense, useState } from "react"
 import { SiteHeader } from "@/components/sidebar/site-header"
 import { Button } from "@/components/shadcn-ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/shadcn-ui/card"
@@ -10,9 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn-ui
 import { Skeleton } from "@/components/shadcn-ui/skeleton"
 import { toast } from "@/hooks/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/shadcn-ui/alert"
-import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { VoteSessionManagement } from "@/components/session-profile/vote-session-management"
+import { CandidateRequestsTable } from "@/components/session-profile/candidate-requests-table"
 
 export default function TeamMemberSessionPage() {
   const params = useParams()
@@ -101,54 +101,73 @@ export default function TeamMemberSessionPage() {
       <SiteHeader title="Session Management" />
       <div className="container mx-auto py-6 px-4 md:px-6">
         <Suspense fallback={<Skeleton className="h-[600px] w-full" />}>
-          <VoteSessionManagement />
-          
-          {/* Session Controls */}
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Session Controls</CardTitle>
-              <CardDescription>
-                Start, end, or delete this voting session
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Important</AlertTitle>
-                <AlertDescription>
-                  Changes to session state cannot be undone. Make sure you want to perform these actions.
-                </AlertDescription>
-              </Alert>
-            </CardContent>
-            <CardFooter className="flex flex-wrap gap-2">
-              <Button 
-                variant="default" 
-                className="bg-green-600 hover:bg-green-700"
-                onClick={handleStartSession}
-                disabled={isLoading}
-              >
-                <PlayCircle className="mr-2 h-4 w-4" />
-                Start Session
-              </Button>
-              <Button 
-                variant="default" 
-                className="bg-amber-600 hover:bg-amber-700"
-                onClick={handleEndSession}
-                disabled={isLoading}
-              >
-                <StopCircle className="mr-2 h-4 w-4" />
-                End Session
-              </Button>
-              <Button 
-                variant="destructive"
-                onClick={handleDeleteSession}
-                disabled={isLoading}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Session
-              </Button>
-            </CardFooter>
-          </Card>
+          {/* Session Management Tabs */}
+          <Tabs defaultValue="overview" className="mb-6">
+            <TabsList className="mb-4">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="candidates">Candidates</TabsTrigger>
+              <TabsTrigger value="settings">Settings</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="overview">
+              <VoteSessionManagement />
+            </TabsContent>
+            
+            <TabsContent value="candidates">
+              <div className="grid gap-6">
+                <CandidateRequestsTable sessionId={sessionId} />
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="settings">
+              {/* Session Controls */}
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>Session Controls</CardTitle>
+                  <CardDescription>
+                    Start, end, or delete this voting session
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Important</AlertTitle>
+                    <AlertDescription>
+                      Changes to session state cannot be undone. Make sure you want to perform these actions.
+                    </AlertDescription>
+                  </Alert>
+                </CardContent>
+                <CardFooter className="flex flex-wrap gap-2">
+                  <Button 
+                    variant="default" 
+                    className="bg-green-600 hover:bg-green-700"
+                    onClick={handleStartSession}
+                    disabled={isLoading}
+                  >
+                    <PlayCircle className="mr-2 h-4 w-4" />
+                    Start Session
+                  </Button>
+                  <Button 
+                    variant="default" 
+                    className="bg-amber-600 hover:bg-amber-700"
+                    onClick={handleEndSession}
+                    disabled={isLoading}
+                  >
+                    <StopCircle className="mr-2 h-4 w-4" />
+                    End Session
+                  </Button>
+                  <Button 
+                    variant="destructive"
+                    onClick={handleDeleteSession}
+                    disabled={isLoading}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Session
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </Suspense>
       </div>
     </>

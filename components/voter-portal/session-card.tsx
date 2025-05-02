@@ -1,116 +1,154 @@
-import { Badge } from "@/components/shadcn-ui/badge";
-import { Button } from "@/components/shadcn-ui/button";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/shadcn-ui/card";
-import { cn } from "@/lib/utils";
-import { UserPlus, Vote, FileText, Calendar } from "lucide-react";
+"use client";
 
-type SessionStatus = "nomination" | "started" | "ended" | "upcoming";
+import { useState } from "react";
+import { Card, CardContent, CardFooter } from "@/components/shadcn-ui/card";
+import { Button } from "@/components/shadcn-ui/button";
+import { Badge } from "@/components/shadcn-ui/badge";
+import { Eye, Award, Vote as VoteIcon, ChartBar, Calendar } from "lucide-react";
 
 interface SessionCardProps {
     title: string;
     description: string;
     bannerUrl: string;
-    status: SessionStatus;
+    status: "nomination" | "started" | "ended" | "upcoming";
+    hasAppliedAsCandidate?: boolean;
     onViewSession: () => void;
     onJoinAsCandidate?: () => void;
     onVote?: () => void;
     onShowResults?: () => void;
-    onSecretPhraseConfirmed?: (phrase: string) => void;
 }
+
+const statusConfig = {
+    nomination: {
+        colorClass: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
+        label: "Nomination Phase",
+        accentClass: "border-blue-500 dark:border-blue-400"
+    },
+    started: {
+        colorClass: "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400",
+        label: "Voting Active",
+        accentClass: "border-green-500 dark:border-green-400"
+    },
+    ended: {
+        colorClass: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+        label: "Session Ended",
+        accentClass: "border-gray-500 dark:border-gray-400"
+    },
+    upcoming: {
+        colorClass: "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400",
+        label: "Upcoming",
+        accentClass: "border-purple-500 dark:border-purple-400"
+    },
+};
 
 export function SessionCard({
                                 title,
                                 description,
                                 bannerUrl,
                                 status,
+                                hasAppliedAsCandidate = false,
                                 onViewSession,
                                 onJoinAsCandidate,
                                 onVote,
                                 onShowResults,
-                                onSecretPhraseConfirmed,
                             }: SessionCardProps) {
-    const statusColors: Record<SessionStatus, string> = {
-        nomination: "bg-amber-500 hover:bg-amber-600",
-        started: "bg-green-500 hover:bg-green-600",
-        ended: "bg-gray-500 hover:bg-gray-600",
-        upcoming: "bg-blue-500 hover:bg-blue-600",
-    };
-
-    const statusDisplay: Record<SessionStatus, string> = {
-        nomination: "Nomination",
-        started: "In Progress",
-        ended: "Ended",
-        upcoming: "Upcoming",
-    };
-
-    const renderActionButton = () => {
-        switch (status) {
-            case "nomination":
-                return (
-                    <Button
-                        variant="secondary"
-                        onClick={onJoinAsCandidate}
-                        className="flex-1"
-                    >
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Join as Candidate
-                    </Button>
-                );
-            case "started":
-                return (
-                    <Button
-                        variant="secondary"
-                        onClick={onVote}
-                        className="flex-1"
-                    >
-                        <Vote className="mr-2 h-4 w-4" />
-                        Vote
-                    </Button>
-                );
-            case "ended":
-                return (
-                    <Button
-                        variant="secondary"
-                        onClick={onShowResults}
-                        className="flex-1"
-                    >
-                        <FileText className="mr-2 h-4 w-4" />
-                        Show Results
-                    </Button>
-                );
-            default:
-                return null;
-        }
-    };
+    const { colorClass, label, accentClass } = statusConfig[status];
 
     return (
-        <Card className="overflow-hidden flex flex-col h-full transition-transform hover:shadow-lg hover:scale-[1.01]">
-            <div className="relative h-40 w-full overflow-hidden">
+        <Card className={`h-full overflow-hidden border-l-4 ${accentClass} hover:shadow-md transition-shadow`}>
+            <div className="relative aspect-video overflow-hidden">
                 <img
                     src={bannerUrl}
-                    alt={`${title} banner`}
-                    className="w-full h-full object-cover"
+                    alt={title}
+                    className="h-full w-full object-cover"
                 />
-                <Badge
-                    className={cn("absolute top-3 right-3", statusColors[status])}
-                >
-                    {statusDisplay[status]}
+                <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
+                <Badge className={`absolute right-3 top-3 ${colorClass}`}>
+                    {label}
                 </Badge>
             </div>
-            <CardHeader className="pb-2">
-                <h3 className="text-xl font-bold">{title}</h3>
-            </CardHeader>
-            <CardContent className="flex-grow">
-                <p className="text-muted-foreground line-clamp-3">{description}</p>
+
+            <CardContent className="p-4">
+                <h3 className="text-xl font-semibold mb-2">{title}</h3>
+                <p className="line-clamp-2 text-sm text-muted-foreground">
+                    {description}
+                </p>
             </CardContent>
-            <CardFooter className="border-t pt-4 gap-2 flex">
+
+            <CardFooter className="flex flex-wrap gap-2 p-4 pt-0 justify-between">
+                {/* Primary action button based on status */}
+                <div>
+                    {status === "nomination" && !hasAppliedAsCandidate && onJoinAsCandidate && (
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="gap-2"
+                            onClick={onJoinAsCandidate}
+                        >
+                            <Award className="h-4 w-4" />
+                            Join as Candidate
+                        </Button>
+                    )}
+
+                    {status === "nomination" && hasAppliedAsCandidate && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            disabled
+                        >
+                            <Award className="h-4 w-4" />
+                            Application Submitted
+                        </Button>
+                    )}
+
+                    {status === "started" && onVote && (
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="gap-2"
+                            onClick={onVote}
+                        >
+                            <VoteIcon className="h-4 w-4" />
+                            Vote Now
+                        </Button>
+                    )}
+
+                    {status === "ended" && onShowResults && (
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="gap-2"
+                            onClick={onShowResults}
+                        >
+                            <ChartBar className="h-4 w-4" />
+                            View Results
+                        </Button>
+                    )}
+
+                    {status === "upcoming" && (
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="gap-2"
+                            onClick={onViewSession}
+                        >
+                            <Calendar className="h-4 w-4" />
+                            View Details
+                        </Button>
+                    )}
+                </div>
+
+                {/* Always show view details button */}
                 <Button
-                    className="flex-1"
+                    variant="ghost"
+                    size="sm"
+                    className="gap-2"
                     onClick={onViewSession}
                 >
-                    View Session
+                    <Eye className="h-4 w-4" />
+                    Details
                 </Button>
-                {renderActionButton()}
             </CardFooter>
         </Card>
     );

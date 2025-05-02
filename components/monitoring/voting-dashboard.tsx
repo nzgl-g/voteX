@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/shadcn-ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/shadcn-ui/dropdown-menu"
 import { VotesOverTimeChart } from "./votes-over-time-chart"
-import { CandidatesList } from "./candidates-list"
 import { VoteDistributionChart } from "./vote-distribution-chart"
 import { CountdownTimer } from "./countdown-timer"
 import { TotalVotesCard } from "./total-votes-card"
@@ -361,28 +360,6 @@ export default function VotingDashboard({ sessionId }: VotingDashboardProps) {
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Candidates</CardTitle>
-          <CardDescription>
-            Detailed breakdown of votes by candidate
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {sessionStatus === 'not_started' ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <AlertTriangle className="h-8 w-8 text-yellow-500 mb-2" />
-              <p className="text-lg font-medium">No voting data available yet</p>
-              <p className="text-sm text-muted-foreground">
-                Candidate voting data will be displayed once the session begins
-              </p>
-            </div>
-          ) : (
-            <CandidatesList candidates={session.candidates || []} timeRange={timeRange} />
-          )}
-        </CardContent>
-      </Card>
     </div>
   )
 }

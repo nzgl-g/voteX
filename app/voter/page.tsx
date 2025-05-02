@@ -3,7 +3,8 @@ import { useState, Suspense, useEffect } from "react";
 import { ThemeToggle } from "@/components/shadcn-ui/theme-toggle";
 import { UserProfile } from "@/components/shared/user-profile";
 import { sessionService, Session } from "@/api/session-service";
-import { SessionCard } from "@/components/voter-portal/session-card-modern";
+import { candidateService } from "@/api/candidate-service";
+import { SessionCard } from "@/components/voter-portal/session-card";
 import { SecretPhraseDialog } from "@/components/voter-portal/secret-phrase-dialog";
 import { CandidateNominationForm } from "@/components/voter-portal/candidate-nomination-form";
 import { ElectionResultsDialog } from "@/components/voter-portal/election-results-dialog";
@@ -15,7 +16,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PricingDialog } from "@/components/pricing-dialog";
-import { VoterSkeleton } from "@/components/voter-portal/voter-skeleton";
 import { authApi } from "@/lib/api";
 
 // Interface for our formatted session data
@@ -26,14 +26,15 @@ interface FormattedSession {
     bannerUrl: string;
     status: "nomination" | "upcoming" | "started" | "ended";
     secretPhrase?: string;
+    hasAppliedAsCandidate?: boolean;
 }
 
 const VoterPortalContent = () => {
     const [sessions, setSessions] = useState<FormattedSession[]>([]);
     const [showPricingDialog, setShowPricingDialog] = useState(false);
-    const [userData, setUserData] = useState<{ name: string; email: string; avatar?: string }>({ 
-        name: "User", 
-        email: "" 
+    const [userData, setUserData] = useState<{ name: string; email: string; avatar?: string }>({
+        name: "User",
+        email: ""
     });
     const [isLoading, setIsLoading] = useState(true);
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -57,9 +58,9 @@ const VoterPortalContent = () => {
                 console.error("Failed to fetch user profile:", error);
             }
         };
-        
+
         fetchUserData();
-        
+
         // Fetch all sessions
         fetchSessions();
     }, []);
@@ -70,17 +71,43 @@ const VoterPortalContent = () => {
         try {
             // Fetch all sessions
             const allSessions = await sessionService.getAllSessions();
-            
+
+            // Filter out private sessions with secret phrase (only show public sessions by default)
+            const publicSessions = allSessions.filter(session => 
+                session.accessLevel === 'Public' || 
+                (session.accessLevel === 'Private' && !session.securityMethod || session.securityMethod !== 'Secret Phrase')
+            );
+
             // Format the sessions for display
-            const formattedSessions = allSessions.map(session => ({
-                id: session._id,
-                title: session.name,
-                description: session.description || "No description available",
-                bannerUrl: session.banner || "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?auto=format&fit=crop&w=800&q=80",
-                status: mapSessionStatus(session.sessionLifecycle) as "nomination" | "upcoming" | "started" | "ended",
-                secretPhrase: session.secretPhrase
-            }));
+            const formattedSessions: FormattedSession[] = [];
             
+            // Process each session individually to avoid Promise.all failures
+            for (const session of publicSessions) {
+                try {
+                    // Check if the user has already applied as a candidate for this session
+                    let hasApplied = false;
+                    try {
+                        hasApplied = await candidateService.hasUserApplied(session._id);
+                    } catch (error) {
+                        // Silently handle errors here - we'll assume the user hasn't applied
+                        console.warn(`Failed to check candidate status for session ${session._id}:`, error);
+                    }
+                    
+                    formattedSessions.push({
+                        id: session._id,
+                        title: session.name,
+                        description: session.description || "No description available",
+                        bannerUrl: session.banner || "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?auto=format&fit=crop&w=800&q=80",
+                        status: mapSessionStatus(session.sessionLifecycle) as "nomination" | "upcoming" | "started" | "ended",
+                        secretPhrase: session.secretPhrase,
+                        hasAppliedAsCandidate: hasApplied
+                    });
+                } catch (error) {
+                    console.error(`Error processing session ${session._id}:`, error);
+                    // Continue with the next session
+                }
+            }
+                
             setSessions(formattedSessions);
         } catch (error) {
             console.error("Failed to fetch sessions:", error);
@@ -99,14 +126,36 @@ const VoterPortalContent = () => {
         setShowCandidateForm(true);
     };
 
-    const handleCandidateFormSubmit = async (data: any) => {
-        // This will be replaced with the actual API call when implemented
-        console.log("Candidate form submitted:", data);
-        console.log("For session:", selectedSessionId);
-        
-        toast.success("Your nomination has been submitted successfully");
+    const handleCandidateFormClose = () => {
         setShowCandidateForm(false);
         setSelectedSessionId(null);
+    };
+
+    const handleCandidateFormSubmit = async (data: any) => {
+        try {
+            if (!selectedSessionId) {
+                throw new Error("No session selected");
+            }
+
+            // Submit the candidate application
+            const result = await candidateService.applyAsCandidate(selectedSessionId, data);
+            
+            // Update the session to show that the user has applied
+            setSessions(prevSessions => 
+                prevSessions.map(session => 
+                    session.id === selectedSessionId 
+                        ? { ...session, hasAppliedAsCandidate: true } 
+                        : session
+                )
+            );
+
+            toast.success(result.message || "Your nomination has been submitted successfully");
+            setShowCandidateForm(false);
+            setSelectedSessionId(null);
+        } catch (error: any) {
+            console.error("Error submitting nomination:", error);
+            toast.error(error.message || "Failed to submit nomination. Please try again.");
+        }
     };
 
     const handleVote = (sessionId: string) => {
@@ -122,7 +171,7 @@ const VoterPortalContent = () => {
         // This will be replaced with the actual API call when implemented
         console.log("Vote submitted for candidate:", candidateId);
         console.log("In session:", votingSessionId);
-        
+
         toast.success("Your vote has been recorded successfully");
         setVotingSessionId(null);
         setVotingSessionTitle("");
@@ -152,6 +201,20 @@ const VoterPortalContent = () => {
         try {
             const session = await sessionService.getSessionByPhrase(phrase);
             
+            // Verify this is a valid session that should be accessible via secret phrase
+            if (session.accessLevel !== 'Private' || session.securityMethod !== 'Secret Phrase') {
+                throw new Error("This session does not require a secret phrase to access");
+            }
+
+            // Check if the user has already applied as a candidate for this session
+            let hasApplied = false;
+            try {
+                hasApplied = await candidateService.hasUserApplied(session._id);
+            } catch (error) {
+                console.error(`Failed to check candidate status for session ${session._id}:`, error);
+                // Continue with hasApplied = false if there's an error
+            }
+
             // Map the server response to match our session format
             const formattedSession: FormattedSession = {
                 id: session._id,
@@ -159,12 +222,13 @@ const VoterPortalContent = () => {
                 description: session.description || "No description available",
                 bannerUrl: session.banner || "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?auto=format&fit=crop&w=800&q=80",
                 status: mapSessionStatus(session.sessionLifecycle) as "nomination" | "upcoming" | "started" | "ended",
-                secretPhrase: session.secretPhrase
+                secretPhrase: session.secretPhrase,
+                hasAppliedAsCandidate: hasApplied
             };
-            
+
             // Check if session already exists in the list (to avoid duplicates)
             const exists = sessions.some(s => s.id === formattedSession.id);
-            
+
             if (!exists) {
                 // Add the new session to the beginning of the array
                 setSessions(prevSessions => [formattedSession, ...prevSessions]);
@@ -172,24 +236,53 @@ const VoterPortalContent = () => {
             } else {
                 toast.info("This session is already in your list");
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to get session by phrase:", error);
-            toast.error("Invalid secret phrase or session not found");
+            toast.error(error.message || "Invalid secret phrase or session not found");
         } finally {
             setIsLoading(false);
         }
     };
-    
+
     // Helper function to map session lifecycle to our status format
     const mapSessionStatus = (lifecycle: any): "nomination" | "upcoming" | "started" | "ended" => {
         const now = new Date();
+        
+        // Check if session has officially ended
+        if (lifecycle.endedAt && new Date(lifecycle.endedAt) < now) {
+            return "ended";
+        }
+        
+        // Check if session has officially started
+        if (lifecycle.startedAt && new Date(lifecycle.startedAt) < now) {
+            // If it has started but not yet reached end time
+            if (!lifecycle.endedAt || new Date(lifecycle.endedAt) > now) {
+                return "started";
+            }
+            return "ended"; // If end date exists and has passed
+        }
+        
+        // Check if session is scheduled in the future
         const startDate = lifecycle.scheduledAt?.start ? new Date(lifecycle.scheduledAt.start) : null;
         const endDate = lifecycle.scheduledAt?.end ? new Date(lifecycle.scheduledAt.end) : null;
         
-        if (lifecycle.endedAt) return "ended";
-        if (lifecycle.startedAt) return "started";
-        if (startDate && startDate > now) return "upcoming";
-        return "nomination"; // Default state
+        // If a start date is defined and it's in the future, session is upcoming
+        if (startDate && startDate > now) {
+            return "upcoming";
+        }
+        
+        // If a start date is defined, has passed, but the end date is in the future
+        if (startDate && startDate < now && endDate && endDate > now) {
+            return "started";
+        }
+        
+        // If both start and end dates are defined and both have passed
+        if (startDate && endDate && endDate < now) {
+            return "ended";
+        }
+        
+        // Default to nomination phase (when no specific dates are set or matched)
+        return "nomination";
     };
 
     const handleCreateSession = () => {
@@ -200,7 +293,7 @@ const VoterPortalContent = () => {
     const handlePlanSelected = (plan: "free" | "pro" | "enterprise") => {
         // Close pricing dialog
         setShowPricingDialog(false);
-        
+
         // Navigate to session setup page with the selected plan
         router.push(`/session-setup?plan=${plan}`);
     };
@@ -221,7 +314,7 @@ const VoterPortalContent = () => {
                     </div>
                     <div className="flex items-center gap-2">
                         <ThemeToggle />
-                        <UserProfile 
+                        <UserProfile
                             userName={userData.name}
                             userEmail={userData.email}
                             userAvatar={userData.avatar}
@@ -258,6 +351,7 @@ const VoterPortalContent = () => {
                                 description={session.description}
                                 bannerUrl={session.bannerUrl}
                                 status={session.status}
+                                hasAppliedAsCandidate={session.hasAppliedAsCandidate}
                                 onViewSession={() => handleViewSession(session.id)}
                                 onJoinAsCandidate={() => handleJoinAsCandidate(session.id)}
                                 onVote={() => handleVote(session.id)}
@@ -268,11 +362,11 @@ const VoterPortalContent = () => {
                 ) : (
                     <div className="flex flex-col items-center justify-center py-12 text-center">
                         <div className="rounded-full bg-muted p-6 mb-4">
-                            <Image 
-                                src="/images/empty-state.svg" 
-                                alt="No sessions" 
-                                width={120} 
-                                height={120} 
+                            <Image
+                                src="/images/empty-state.svg"
+                                alt="No sessions"
+                                width={120}
+                                height={120}
                                 className="opacity-70"
                             />
                         </div>
@@ -288,16 +382,17 @@ const VoterPortalContent = () => {
                 )}
             </main>
 
-            <PricingDialog 
-                open={showPricingDialog} 
+            <PricingDialog
+                open={showPricingDialog}
                 onOpenChange={setShowPricingDialog}
                 onPlanSelected={handlePlanSelected}
             />
 
-            {selectedSessionId && (
+            {selectedSessionId && showCandidateForm && (
                 <CandidateNominationForm
                     sessionId={selectedSessionId}
                     onSubmit={handleCandidateFormSubmit}
+                    onClose={handleCandidateFormClose}
                 />
             )}
 
@@ -324,9 +419,7 @@ const VoterPortalContent = () => {
 const Index = () => {
     return (
         <div className="min-h-screen bg-background flex flex-col">
-            <Suspense fallback={<VoterSkeleton />}>
                 <VoterPortalContent />
-            </Suspense>
         </div>
     );
 };

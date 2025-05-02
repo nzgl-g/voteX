@@ -3,7 +3,11 @@ import api from '../lib/api';
 // Types for Candidate API
 export interface CandidateRequest {
   _id: string;
-  user: string;
+  user: {
+    _id: string;
+    fullName: string;
+    email: string;
+  };
   session: string;
   status: 'pending' | 'approved' | 'rejected';
   requestedAt: string;
@@ -14,11 +18,8 @@ export interface CandidateRequest {
   biography: string;
   experience: string;
   nationalities: string[];
-  dobPob: {
-    dateOfBirth: string;
-    placeOfBirth: string;
-  };
-  promises: string[];
+  dobPob: string;
+  promises: string;
   partyName: string;
   papers?: {
     name: string;
@@ -45,12 +46,9 @@ export interface Candidate {
   biography: string;
   experience: string;
   nationalities: string[];
-  dobPob: {
-    dateOfBirth: string;
-    placeOfBirth: string;
-  };
+  dobPob: string;
   promises: string[];
-  papers: {
+  paper?: {
     name: string;
     url: string;
     uploadedAt?: string;
@@ -61,11 +59,11 @@ export interface CandidateApplicationData {
   fullName: string;
   biography: string;
   experience: string;
-  nationalities: string;
+  nationalities: string[];
   dobPob: string;
   promises: string;
   partyName: string;
-  papers?: {
+  paper?: {
     name: string;
     url: string;
   }[];
@@ -81,11 +79,8 @@ export interface CandidateInvitation {
   biography?: string;
   experience?: string;
   nationalities?: string[];
-  dobPob?: {
-    dateOfBirth: string;
-    placeOfBirth: string;
-  };
-  promises?: string[];
+  dobPob?: string;
+  promises?: string;
   partyName?: string;
 }
 
@@ -98,11 +93,65 @@ export const candidateService = {
    */
   async getCandidates(sessionId: string): Promise<Candidate[]> {
     try {
-      const response = await api.get(`/votex/api/sessions/${sessionId}/candidates`);
-      return response.data;
+      console.log('Fetching candidates for session:', sessionId);
+      
+      // Updated with double slash as confirmed from Postman testing
+      const response = await api.get(`/sessions/${sessionId}/candidate//candidate-requests`);
+      
+      // Handle HTML responses
+      if (typeof response.data === 'string' && response.data.includes('<!DOCTYPE html>')) {
+        console.warn('Received HTML response for candidates');
+        return [];
+      }
+      
+      console.log('Received candidates:', response.data);
+      return Array.isArray(response.data) ? response.data : [];
     } catch (error: any) {
       console.error('Failed to fetch candidates:', error);
-      throw new Error(error.response?.data?.message || 'Failed to fetch candidates');
+      // Return empty array to prevent UI crashes
+      return [];
+    }
+  },
+
+  /**
+   * Check if the current user has already applied as a candidate for a session
+   * @param sessionId Session ID
+   * @returns True if user has already applied, false otherwise
+   */
+  async hasUserApplied(sessionId: string): Promise<boolean> {
+    try {
+      // Get the current user from localStorage
+      const userString = localStorage.getItem('user');
+      if (!userString) {
+        return false;
+      }
+      
+      const user = JSON.parse(userString);
+      const userId = user._id;
+      
+      try {
+        // Check if there's an existing candidate request with double slash
+        const response = await api.get(`/sessions/${sessionId}/candidate//candidate-requests`);
+        
+        // If data is HTML (a string that contains HTML), return false rather than throwing an error
+        if (typeof response.data === 'string' && response.data.includes('<!DOCTYPE html>')) {
+          console.warn('Received HTML response instead of JSON for candidate-requests');
+          return false;
+        }
+        
+        const requests = response.data;
+        
+        // Find if user has any pending or approved request
+        return requests.some((request: CandidateRequest) => 
+          request.user._id === userId && ['pending', 'approved'].includes(request.status));
+      } catch (error) {
+        console.error('Error fetching candidate requests:', error);
+        // Rather than failing, we'll default to false
+        return false;
+      }
+    } catch (error) {
+      console.error('Error checking if user has applied:', error);
+      return false;
     }
   },
 
@@ -122,32 +171,45 @@ export const candidateService = {
         fullName: candidateData.fullName,
         biography: candidateData.biography,
         experience: candidateData.experience,
-        nationalities: candidateData.nationalities.split(',').map(n => n.trim()),
-        // Convert dobPob string to the expected object format
-        dobPob: {
-          // If in format "Jan 1, 1990 - New York", parse it appropriately
-          dateOfBirth: candidateData.dobPob.includes('-')
-              ? new Date(candidateData.dobPob.split('-')[0].trim())
-              : new Date(),
-          placeOfBirth: candidateData.dobPob.includes('-')
-              ? candidateData.dobPob.split('-')[1].trim()
-              : candidateData.dobPob
-        },
-        promises: candidateData.promises.split('\n').filter(p => p.trim().length > 0),
+        nationalities: candidateData.nationalities,
+        dobPob: candidateData.dobPob,
+        promises: candidateData.promises,
         partyName: candidateData.partyName,
         // Only include papers if they are provided
-        ...(candidateData.papers && candidateData.papers.length > 0 ? { papers: candidateData.papers } : {})
+        ...(candidateData.paper && candidateData.paper.length > 0 ? { paper: candidateData.paper } : {})
       };
 
-      console.log('Submitting candidate application:', formattedData);
+      console.log('Submitting candidate application for session:', sessionId);
+      console.log('Candidate data:', formattedData);
+      console.log('API endpoint:', `/sessions/${sessionId}/candidate/apply`);
 
       const response = await api.post(
-        `/votex/api/sessions/${sessionId}/candidates/apply`,
+        `/sessions/${sessionId}/candidate/apply`,
         formattedData
       );
       return response.data;
     } catch (error: any) {
       console.error('Failed to apply as candidate:', error);
+      // More detailed error information
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        
+        // Check for specific error cases
+        if (error.response.status === 400) {
+          const errorMessage = error.response.data?.message || error.message;
+          
+          // Handle the case where user already has a pending application
+          if (errorMessage.toLowerCase().includes('pending') || 
+              errorMessage.toLowerCase().includes('already applied')) {
+            throw new Error("You already have a pending application for this session.");
+          }
+        }
+      } else if (error.request) {
+        console.error('No response received from server');
+      } else {
+        console.error('Error message:', error.message);
+      }
       throw new Error(error.response?.data?.message || 'Failed to apply as candidate');
     }
   },
@@ -159,12 +221,23 @@ export const candidateService = {
    */
   async getCandidateRequests(sessionId: string): Promise<CandidateRequest[]> {
     try {
-      // This endpoint should be created on the backend as it's missing
-      const response = await api.get(`/votex/api/sessions/${sessionId}/candidate-requests`);
-      return response.data;
+      console.log('Fetching candidate requests for session:', sessionId);
+      
+      // Updated to use the double slash in endpoint as confirmed by Postman
+      const response = await api.get(`/sessions/${sessionId}/candidate//candidate-requests`);
+      
+      // Handle HTML responses
+      if (typeof response.data === 'string' && response.data.includes('<!DOCTYPE html>')) {
+        console.warn('Received HTML response for candidate requests');
+        return [];
+      }
+      
+      console.log('Received candidate requests:', response.data);
+      return Array.isArray(response.data) ? response.data : [];
     } catch (error: any) {
       console.error('Failed to fetch candidate requests:', error);
-      throw new Error(error.response?.data?.message || 'Failed to fetch candidate requests');
+      // Return empty array to prevent UI crashes
+      return [];
     }
   },
 
@@ -179,9 +252,14 @@ export const candidateService = {
     requestId: string
   ): Promise<{ message: string }> {
     try {
+      console.log('Accepting candidate request:', requestId, 'for session:', sessionId);
+      
+      // Updated to use the correct endpoint from the server implementation
       const response = await api.post(
-        `/votex/api/sessions/${sessionId}/candidates/accept/${requestId}`
+        `/sessions/${sessionId}/candidate/accept/${requestId}`
       );
+      
+      console.log('Accept response:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Failed to accept candidate request:', error);
@@ -200,9 +278,14 @@ export const candidateService = {
     requestId: string
   ): Promise<{ message: string }> {
     try {
+      console.log('Rejecting candidate request:', requestId, 'for session:', sessionId);
+      
+      // Updated to use the correct endpoint from the server implementation
       const response = await api.post(
-        `/votex/api/sessions/${sessionId}/candidates/reject/${requestId}`
+        `/sessions/${sessionId}/candidate/reject/${requestId}`
       );
+      
+      console.log('Reject response:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Failed to reject candidate request:', error);
@@ -221,9 +304,9 @@ export const candidateService = {
     userId: string
   ): Promise<{ message: string }> {
     try {
+      // Updated to use the singular 'candidate' in the endpoint
       const response = await api.post(
-        `/votex/api/sessions/${sessionId}/candidates/invite`,
-        { userId }
+        `/sessions/${sessionId}/candidate/invite/${userId}`
       );
       return response.data;
     } catch (error: any) {
@@ -234,7 +317,6 @@ export const candidateService = {
 
   /**
    * Accept a candidate invitation
-   * @param sessionId Session ID
    * @param inviteId Invitation ID
    * @param candidateData Optional candidate data
    * @returns Success message
@@ -246,36 +328,22 @@ export const candidateService = {
   ): Promise<{ message: string }> {
     try {
       // Format candidate data if provided
-      let formattedData = {};
-      
-      if (candidateData) {
-        formattedData = {
-          ...(candidateData.fullName ? { fullName: candidateData.fullName } : {}),
-          ...(candidateData.biography ? { biography: candidateData.biography } : {}),
-          ...(candidateData.experience ? { experience: candidateData.experience } : {}),
-          ...(candidateData.nationalities ? { 
-            nationalities: candidateData.nationalities.split(',').map(n => n.trim())
-          } : {}),
-          ...(candidateData.dobPob ? {
-            dobPob: {
-              dateOfBirth: candidateData.dobPob.includes('-')
-                ? new Date(candidateData.dobPob.split('-')[0].trim())
-                : new Date(),
-              placeOfBirth: candidateData.dobPob.includes('-')
-                ? candidateData.dobPob.split('-')[1].trim()
-                : candidateData.dobPob
-            }
-          } : {}),
-          ...(candidateData.promises ? {
-            promises: candidateData.promises.split('\n').filter(p => p.trim().length > 0)
-          } : {}),
-          ...(candidateData.partyName ? { partyName: candidateData.partyName } : {}),
-          ...(candidateData.papers && candidateData.papers.length > 0 ? { papers: candidateData.papers } : {})
-        };
-      }
-      
+      const formattedData = candidateData 
+        ? {
+            fullName: candidateData.fullName || '',
+            biography: candidateData.biography || '',
+            experience: candidateData.experience || '',
+            nationalities: candidateData.nationalities || [],
+            dobPob: candidateData.dobPob || '',
+            promises: candidateData.promises || '',
+            partyName: candidateData.partyName || '',
+            ...(candidateData.paper ? { paper: candidateData.paper } : {})
+          }
+        : {};
+
+      // Updated to use the singular 'candidate' in the endpoint
       const response = await api.post(
-        `/votex/api/sessions/${sessionId}/candidates/invite/${inviteId}/accept`,
+        `/sessions/${sessionId}/candidate/invite/${inviteId}/accept`,
         formattedData
       );
       return response.data;
@@ -287,7 +355,6 @@ export const candidateService = {
 
   /**
    * Reject a candidate invitation
-   * @param sessionId Session ID
    * @param inviteId Invitation ID
    * @returns Success message
    */
@@ -296,7 +363,10 @@ export const candidateService = {
     inviteId: string
   ): Promise<{ message: string }> {
     try {
-      const response = await api.post(`/votex/api/sessions/${sessionId}/candidates/invite/${inviteId}/reject`);
+      // Updated to use the singular 'candidate' in the endpoint
+      const response = await api.post(
+        `/sessions/${sessionId}/candidate/invite/${inviteId}/reject`
+      );
       return response.data;
     } catch (error: any) {
       console.error('Failed to reject invitation:', error);
@@ -306,15 +376,112 @@ export const candidateService = {
 
   /**
    * Get all invitations for the current user
-   * @returns Array of invitations
+   * @returns Array of candidate invitations
    */
   async getMyInvitations(): Promise<CandidateInvitation[]> {
     try {
-      const response = await api.get('/votex/api/candidates/my-invitations');
+      // Updated to use the singular 'candidate' in the endpoint
+      const response = await api.get('/candidate/invitations');
       return response.data;
     } catch (error: any) {
       console.error('Failed to fetch invitations:', error);
       throw new Error(error.response?.data?.message || 'Failed to fetch invitations');
+    }
+  },
+
+  /**
+   * Fetch candidate requests with automatic retry
+   * @param sessionId Session ID
+   * @param maxRetries Maximum number of retries
+   * @returns Array of candidate requests or empty array
+   */
+  async fetchCandidateRequestsWithRetry(
+    sessionId: string, 
+    maxRetries: number = 3
+  ): Promise<CandidateRequest[]> {
+    let retries = 0;
+    let lastError: any = null;
+
+    while (retries < maxRetries) {
+      try {
+        console.log(`Attempt ${retries + 1}/${maxRetries} to fetch candidate requests`);
+        
+        // Try the standard endpoint with double slash
+        const standardEndpoint = `/sessions/${sessionId}/candidate//candidate-requests`;
+        try {
+          console.log('Trying standard endpoint:', standardEndpoint);
+          const response = await api.get(standardEndpoint);
+          
+          // Check for HTML response
+          if (typeof response.data === 'string' && response.data.includes('<!DOCTYPE html>')) {
+            console.warn('Received HTML from standard endpoint, will retry');
+            throw new Error('HTML response');
+          }
+          
+          console.log('Successfully fetched candidate requests:', response.data);
+          return Array.isArray(response.data) ? response.data : [];
+        } catch (endpointError) {
+          console.warn(`Standard endpoint failed, trying fallback`);
+          
+          // Try a fallback endpoint with double slash
+          const fallbackEndpoint = `/sessions/${sessionId}/candidate//candidate-requests`;
+          try {
+            console.log('Trying fallback endpoint:', fallbackEndpoint);
+            const fallbackResponse = await api.get(fallbackEndpoint);
+            
+            // Check for HTML response
+            if (typeof fallbackResponse.data === 'string' && fallbackResponse.data.includes('<!DOCTYPE html>')) {
+              throw new Error('HTML response from fallback');
+            }
+            
+            console.log('Successfully fetched from fallback:', fallbackResponse.data);
+            return Array.isArray(fallbackResponse.data) ? fallbackResponse.data : [];
+          } catch (fallbackError) {
+            // Both attempts failed for this retry, save error and continue retrying
+            lastError = endpointError;
+            console.warn(`Fallback endpoint also failed, will retry`);
+          }
+        }
+      } catch (error) {
+        lastError = error;
+        console.warn(`Retry ${retries + 1} failed:`, error);
+      }
+      
+      retries++;
+      if (retries < maxRetries) {
+        // Wait before retrying with exponential backoff: 1s, 2s, 4s, etc.
+        const delay = Math.pow(2, retries - 1) * 1000;
+        console.log(`Waiting ${delay}ms before retry ${retries + 1}`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    
+    console.error(`All ${maxRetries} attempts to fetch candidate requests failed`, lastError);
+    return []; // Return empty array after all retries failed
+  },
+  
+  /**
+   * Remove a candidate from a session
+   * @param sessionId Session ID
+   * @param candidateId Candidate ID 
+   * @returns Success message
+   */
+  async removeCandidate(
+    sessionId: string,
+    candidateId: string
+  ): Promise<{ message: string }> {
+    try {
+      console.log('Removing candidate:', candidateId, 'from session:', sessionId);
+      
+      const response = await api.delete(
+        `/sessions/${sessionId}/candidate/${candidateId}`
+      );
+      
+      console.log('Remove response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Failed to remove candidate:', error);
+      throw new Error(error.response?.data?.message || 'Failed to remove candidate');
     }
   }
 }; 

@@ -40,6 +40,20 @@ export const useNotification = (userId?: string) => {
       setNotifications(prev => [payload, ...prev]);
     });
 
+    // Add the new notification event listener as requested by backend
+    socketInstance.on("newNotification", (data) => {
+      console.log("🔔 New Notification:", data);
+      const newNotification: NotificationPayload = {
+        id: data.id || new Date().toISOString(),
+        message: data.message,
+        type: data.type || 'info',
+        timestamp: data.timestamp || new Date().toISOString(),
+        read: false,
+        data: data
+      };
+      setNotifications(prev => [newNotification, ...prev]);
+    });
+
     setSocket(socketInstance);
 
     // Clean up the socket connection on component unmount
@@ -48,6 +62,22 @@ export const useNotification = (userId?: string) => {
     };
   }, [userId]);
 
+  // Return the state values so they can be used in components
+  return {
+    notifications,
+    connected,
+    socket,
+    clearNotifications: () => setNotifications([]),
+    markAsRead: (id: string) => {
+      setNotifications(prev => 
+        prev.map(notification => 
+          notification.id === id 
+            ? { ...notification, read: true } 
+            : notification
+        )
+      );
+    }
+  };
 };
 
 export default useNotification; 

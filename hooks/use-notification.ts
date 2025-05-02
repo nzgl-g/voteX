@@ -48,38 +48,6 @@ export const useNotification = (userId?: string) => {
     };
   }, [userId]);
 
-  // Function to mark a notification as read
-  const markAsRead = (notificationId: string) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === notificationId 
-          ? { ...notification, read: true } 
-          : notification
-      )
-    );
-    
-    // You can also emit to server that notification was read
-    if (socket && connected) {
-      socket.emit("mark-notification-read", { notificationId, userId });
-    }
-  };
-
-  // Function to clear all notifications
-  const clearNotifications = () => {
-    setNotifications([]);
-    
-    // You can also emit to server to clear notifications
-    if (socket && connected) {
-      socket.emit("clear-notifications", userId);
-    }
-  };
-
-  return {
-    notifications,
-    markAsRead,
-    clearNotifications,
-    connected
-  };
 };
 
 export default useNotification; 

@@ -176,6 +176,12 @@ export function VoteSessionForm({ plan, onComplete }: VoteSessionFormProps) {
           }
         }
         break
+      case 3: // Access Control
+        if (formState.accessLevel === "private" && formState.securityMethod === "secret phrase" && 
+            (!formState.secretPhrase || formState.secretPhrase.trim() === "")) {
+          newErrors.secretPhrase = "Secret phrase is required for private sessions"
+        }
+        break
       case 6: // Setup Configuration
         if (formState.type === "poll" && (!formState.options || formState.options.length === 0)) {
           newErrors.options = "At least one option is required"
@@ -408,6 +414,7 @@ export function VoteSessionForm({ plan, onComplete }: VoteSessionFormProps) {
         candidateStep: formState.candidateStep,
         requirePapers: formState.requirePapers,
         subscription: prepareSubscription(),
+        secretPhrase: formState.securityMethod === "secret phrase" ? formState.secretPhrase : null,
         // Add type-specific fields
         ...(formState.type === 'election' && { candidates: prepareCandidates() }),
         ...(formState.type === 'poll' && { options: prepareOptions() }),

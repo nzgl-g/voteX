@@ -15,9 +15,11 @@ import { Button } from "@/components/shadcn-ui/button"
 interface AccessControlStepProps {
   formState: SessionFormState
   updateFormState: (newState: Partial<SessionFormState>) => void
+  errors?: Record<string, string>
+  jumpToStep?: (step: number) => void
 }
 
-export function AccessControlStep({ formState, updateFormState }: AccessControlStepProps) {
+export function AccessControlStep({ formState, updateFormState, errors = {} }: AccessControlStepProps) {
 
   const handleAccessLevelChange = (value: "public" | "private") => {
     updateFormState({
@@ -143,10 +145,17 @@ export function AccessControlStep({ formState, updateFormState }: AccessControlS
                           placeholder="Enter a secret phrase"
                           value={formState.secretPhrase || ""}
                           onChange={handleSecretPhraseChange}
+                          className={errors.secretPhrase ? "border-destructive" : ""}
                       />
-                      <p className="text-sm text-muted-foreground">
-                        This phrase will be required to access the voting session
-                      </p>
+                      {errors.secretPhrase ? (
+                        <p className="text-sm text-destructive">
+                          {errors.secretPhrase}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          This phrase will be required to access the voting session
+                        </p>
+                      )}
                     </div>
                   </div>
               )}

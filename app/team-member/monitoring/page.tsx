@@ -6,8 +6,8 @@ import { SiteHeader } from "@/components/sidebar/site-header"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/shadcn-ui/card"
 import { Button } from "@/components/shadcn-ui/button"
 import { Skeleton } from "@/components/shadcn-ui/skeleton"
-import { BarChart2, Calendar, Eye, Award } from "lucide-react"
-import { toast } from "@/hooks/use-toast"
+import { BarChart2, Calendar, Eye, Award, Users } from "lucide-react"
+import { toast } from "sonner"
 
 interface Session {
   id: string
@@ -17,6 +17,8 @@ interface Session {
   endDate: string
   status: "active" | "scheduled" | "completed"
   participantCount: number
+  candidateCount: number
+  nominationActive: boolean
 }
 
 // Mock sessions - in a real app, you would fetch these from an API
@@ -27,8 +29,10 @@ const mockSessions: Session[] = [
     type: "election",
     startDate: "2023-12-01T10:00:00Z",
     endDate: "2023-12-15T23:59:59Z",
-    status: "scheduled",
-    participantCount: 1200
+    status: "active",
+    participantCount: 1200,
+    candidateCount: 5,
+    nominationActive: true
   },
   {
     id: "session-2",
@@ -37,7 +41,9 @@ const mockSessions: Session[] = [
     startDate: "2023-11-10T09:00:00Z",
     endDate: "2023-11-20T18:00:00Z",
     status: "active",
-    participantCount: 45
+    participantCount: 45,
+    candidateCount: 3,
+    nominationActive: false
   },
   {
     id: "session-3",
@@ -46,7 +52,9 @@ const mockSessions: Session[] = [
     startDate: "2023-10-15T08:00:00Z",
     endDate: "2023-10-25T20:00:00Z",
     status: "completed",
-    participantCount: 128
+    participantCount: 128,
+    candidateCount: 12,
+    nominationActive: false
   }
 ]
 
@@ -68,11 +76,7 @@ export default function TeamMemberMonitoringPage() {
         setSessions(mockSessions)
       } catch (error) {
         console.error("Error fetching sessions:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load sessions. Please try again.",
-          variant: "destructive",
-        })
+        toast.error("Failed to load sessions. Please try again.")
       } finally {
         setLoading(false)
       }
@@ -126,7 +130,7 @@ export default function TeamMemberMonitoringPage() {
       <SiteHeader title="Available Sessions" />
       <div className="container mx-auto py-6 px-4 md:px-6">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold mb-2">Your Sessions</h2>
+          <h2 className="text-2xl font-bold mb-2">Monitoring Dashboard</h2>
           <p className="text-muted-foreground">
             View and monitor sessions you have access to
           </p>
@@ -193,6 +197,17 @@ export default function TeamMemberMonitoringPage() {
                         <span className="text-muted-foreground">Participants:</span>
                         <span>{session.participantCount}</span>
                       </p>
+                      <p className="flex justify-between">
+                        <span className="text-muted-foreground">Candidates:</span>
+                        <span className="font-medium">{session.candidateCount}</span>
+                      </p>
+                      {session.nominationActive && (
+                        <p className="mt-2">
+                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                            Nominations Open
+                          </span>
+                        </p>
+                      )}
                     </div>
                   </CardContent>
                   <CardFooter>
@@ -201,7 +216,7 @@ export default function TeamMemberMonitoringPage() {
                       onClick={() => navigateToSession(session.id)}
                     >
                       <Eye className="mr-2 h-4 w-4" />
-                      View Session
+                      Monitor Session
                     </Button>
                   </CardFooter>
                 </Card>

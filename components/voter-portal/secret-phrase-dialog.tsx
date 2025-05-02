@@ -34,12 +34,12 @@ export function SecretPhraseDialog({ onPhraseConfirmed }: SecretPhraseDialogProp
             // Check if the phrase is valid (either by checking availability or directly trying to get the session)
             // We use the negation here because available: true means the phrase is not used yet
             const { available } = await sessionService.checkSecretPhraseAvailability(phrase);
-            
+
             if (available) {
                 toast.error("Invalid secret phrase. Please try again.");
                 return;
             }
-            
+
             onPhraseConfirmed(phrase);
             setOpen(false);
             setPhrase("");

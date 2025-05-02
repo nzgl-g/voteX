@@ -62,8 +62,8 @@ export function BasicInformationStep({ formState, updateFormState, errors = {} }
 
   // Update the JSX to show error messages and improve banner selection
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
+    <div className="space-y-6 md:space-y-8">
+      <div className="space-y-2 max-w-4xl">
         <Label htmlFor="title" className="text-base font-medium">
           Title <span className="text-red-500">*</span>
         </Label>
@@ -79,7 +79,7 @@ export function BasicInformationStep({ formState, updateFormState, errors = {} }
         <div className="text-xs text-muted-foreground text-right">{titleCharCount}/100 characters</div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 max-w-4xl">
         <Label htmlFor="description" className="text-base font-medium">
           Description <span className="text-red-500">*</span>
         </Label>
@@ -89,12 +89,12 @@ export function BasicInformationStep({ formState, updateFormState, errors = {} }
           onChange={handleDescriptionChange}
           placeholder="Provide details about this vote session"
           required
-          className={`min-h-[120px] w-full ${errors.description ? "border-red-500" : ""}`}
+          className={`min-h-[100px] sm:min-h-[120px] md:min-h-[150px] w-full ${errors.description ? "border-red-500" : ""}`}
         />
         {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description}</p>}
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 max-w-4xl">
         <Label htmlFor="organization" className="text-base font-medium">
           Organization Name <span className="text-muted-foreground">(optional)</span>
         </Label>
@@ -111,17 +111,17 @@ export function BasicInformationStep({ formState, updateFormState, errors = {} }
         <Label className="text-base font-medium">Banner</Label>
 
         <Tabs defaultValue="select" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="select" className="flex items-center gap-2">
-              <ImageIcon className="h-4 w-4" /> Select from library
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="select" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4" /> Select from library
             </TabsTrigger>
-            <TabsTrigger value="upload" className="flex items-center gap-2">
-              <Upload className="h-4 w-4" /> Upload custom
+            <TabsTrigger value="upload" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <Upload className="h-3 w-3 sm:h-4 sm:w-4" /> Upload custom
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="select" className="mt-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <TabsContent value="select" className="mt-3 sm:mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
               {bannerOptions.map((url, index) => (
                 <Card
                   key={index}
@@ -142,16 +142,16 @@ export function BasicInformationStep({ formState, updateFormState, errors = {} }
             </div>
           </TabsContent>
 
-          <TabsContent value="upload" className="mt-4">
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-muted-foreground/20 rounded-lg">
-                <Upload className="h-10 w-10 text-muted-foreground mb-4" />
-                <p className="text-center text-muted-foreground mb-2">Drag and drop your banner image here</p>
-                <p className="text-xs text-center text-muted-foreground mb-4">
+          <TabsContent value="upload" className="mt-3 sm:mt-4">
+            <Card className="max-w-4xl">
+              <CardContent className="flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 border-2 border-dashed border-muted-foreground/20 rounded-lg">
+                <Upload className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground mb-2 sm:mb-4" />
+                <p className="text-center text-muted-foreground mb-1 sm:mb-2 text-sm sm:text-base">Drag and drop your banner image here</p>
+                <p className="text-xs text-center text-muted-foreground mb-3 sm:mb-4">
                   Same dimensions as Facebook cover photo - 851×315 pixels
                 </p>
                 <label htmlFor="banner-upload" className="cursor-pointer">
-                  <div className="px-4 py-2 bg-muted hover:bg-muted/80 rounded-md text-sm">Browse files</div>
+                  <div className="px-3 sm:px-4 py-1.5 sm:py-2 bg-muted hover:bg-muted/80 rounded-md text-xs sm:text-sm">Browse files</div>
                   <input
                     id="banner-upload"
                     type="file"
@@ -161,8 +161,8 @@ export function BasicInformationStep({ formState, updateFormState, errors = {} }
                   />
                 </label>
                 {formState.banner && formState.banner !== bannerOptions[0] && formState.banner !== bannerOptions[1] && (
-                  <div className="mt-4 w-full">
-                    <p className="text-sm mb-2">Selected banner:</p>
+                  <div className="mt-3 sm:mt-4 w-full">
+                    <p className="text-xs sm:text-sm mb-1 sm:mb-2">Selected banner:</p>
                     <img
                       src={formState.banner || "/placeholder.svg"}
                       alt="Custom banner"

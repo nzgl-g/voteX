@@ -126,8 +126,8 @@ export function SetupConfigurationStep({
               <div className="space-y-4">
                 {options.length === 0 && (
                     <Card>
-                      <CardContent className="flex flex-col items-center justify-center p-6">
-                        <p className="text-muted-foreground mb-4">No options added yet</p>
+                      <CardContent className="flex flex-col items-center justify-center p-4 sm:p-6">
+                        <p className="text-muted-foreground mb-4 text-center">No options added yet</p>
                         <Button onClick={addOption} variant="outline" className="flex items-center gap-1">
                           <Plus className="h-4 w-4" /> Add your first option
                         </Button>
@@ -137,21 +137,21 @@ export function SetupConfigurationStep({
 
                 {options.map((option, index) => (
                     <Card key={option.id || index} className="relative">
-                      <CardHeader className="p-4 flex flex-row items-center justify-between">
+                      <CardHeader className="p-3 sm:p-4 flex flex-col sm:flex-row gap-2 sm:items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <GripVertical className="h-5 w-5 text-muted-foreground cursor-move" />
-                          <span className="font-medium">Option {index + 1}</span>
+                          <GripVertical className="h-5 w-5 text-muted-foreground cursor-move shrink-0" />
+                          <span className="font-medium truncate">Option {index + 1}</span>
                         </div>
                         <Button
                             onClick={() => removeOption(index)}
                             variant="ghost"
                             size="sm"
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 self-end sm:self-auto"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </CardHeader>
-                      <CardContent className="p-4 pt-0 space-y-3">
+                      <CardContent className="p-3 sm:p-4 pt-0 space-y-3">
                         <div className="space-y-2">
                           <Label htmlFor={`option-name-${index}`}>Option Name</Label>
                           <Input
@@ -187,7 +187,7 @@ export function SetupConfigurationStep({
               </div>
 
               {/* Setup Mode Selection using Cards instead of Tabs */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                 {/* Manual Entry Card */}
                 <Card
                     className={cn(
@@ -198,25 +198,17 @@ export function SetupConfigurationStep({
                     )}
                     onClick={() => handleSetupModeChange("manual")}
                 >
-                  <CardHeader className="p-4">
-                    <div className="flex items-center gap-2">
-                      <div className={cn(
-                          "p-2 rounded-full",
-                          setupMode === "manual" ? "bg-primary/20" : "bg-muted"
-                      )}>
-                        <UserPlus className={cn(
-                            "h-5 w-5",
-                            setupMode === "manual" ? "text-primary" : "text-muted-foreground"
-                        )} />
-                      </div>
-                      <div>
-                        <CardTitle className="text-base">Manual Entry</CardTitle>
-                        <CardDescription>
-                          Add {formState.type === "election" ? "candidates" : "participants"} directly
-                        </CardDescription>
-                      </div>
+                  <CardContent className="p-4 flex flex-col items-center text-center sm:text-left sm:flex-row sm:items-start gap-3">
+                    <div className="bg-primary/10 p-3 rounded-full mb-2 sm:mb-0">
+                      <UserPlus className="h-5 w-5 text-primary" />
                     </div>
-                  </CardHeader>
+                    <div>
+                      <h3 className="font-medium mb-1">Manual Setup</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Add candidates or participants directly. You control the entire process.
+                      </p>
+                    </div>
+                  </CardContent>
                 </Card>
 
                 {/* Nomination Period Card */}
@@ -225,29 +217,33 @@ export function SetupConfigurationStep({
                         "cursor-pointer transition-all",
                         setupMode === "nomination"
                             ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
-                            : "hover:border-muted-foreground/30"
+                            : "hover:border-muted-foreground/30",
+                        !isNominationConfigured && "opacity-60"
                     )}
-                    onClick={() => handleSetupModeChange("nomination")}
+                    onClick={() => {
+                      if (isNominationConfigured) {
+                        handleSetupModeChange("nomination")
+                      } else if (jumpToStep) {
+                        jumpToStep(2) // Jump to Lifecycle step to configure nomination period
+                      }
+                    }}
                 >
-                  <CardHeader className="p-4">
-                    <div className="flex items-center gap-2">
-                      <div className={cn(
-                          "p-2 rounded-full",
-                          setupMode === "nomination" ? "bg-primary/20" : "bg-muted"
-                      )}>
-                        <Users className={cn(
-                            "h-5 w-5",
-                            setupMode === "nomination" ? "text-primary" : "text-muted-foreground"
-                        )} />
-                      </div>
-                      <div>
-                        <CardTitle className="text-base">Nomination Period</CardTitle>
-                        <CardDescription>
-                          Allow people to nominate {formState.type === "election" ? "candidates" : "participants"}
-                        </CardDescription>
-                      </div>
+                  <CardContent className="p-4 flex flex-col items-center text-center sm:text-left sm:flex-row sm:items-start gap-3">
+                    <div className="bg-primary/10 p-3 rounded-full mb-2 sm:mb-0">
+                      <Users className="h-5 w-5 text-primary" />
                     </div>
-                  </CardHeader>
+                    <div>
+                      <h3 className="font-medium mb-1">Nomination Process</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Allow users to nominate themselves during a nomination period.
+                      </p>
+                      {!isNominationConfigured && (
+                          <div className="text-xs text-amber-600 flex items-center gap-1 mt-2">
+                            <AlertCircle className="h-3 w-3" /> Requires nomination period configuration
+                          </div>
+                      )}
+                    </div>
+                  </CardContent>
                 </Card>
               </div>
 

@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/shadcn-ui/button";
 import { Input } from "@/components/shadcn-ui/input";
 import { toast } from "sonner";
+import { sessionService } from "@/api/session-service";
 
 interface SecretPhraseDialogProps {
     onPhraseConfirmed: (phrase: string) => void;
@@ -19,16 +20,34 @@ interface SecretPhraseDialogProps {
 export function SecretPhraseDialog({ onPhraseConfirmed }: SecretPhraseDialogProps) {
     const [phrase, setPhrase] = useState("");
     const [open, setOpen] = useState(false);
+    const [isChecking, setIsChecking] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (phrase.trim()) {
+        if (!phrase.trim()) {
+            toast.error("Please enter a secret phrase");
+            return;
+        }
+
+        setIsChecking(true);
+        try {
+            // Check if the phrase is valid (either by checking availability or directly trying to get the session)
+            // We use the negation here because available: true means the phrase is not used yet
+            const { available } = await sessionService.checkSecretPhraseAvailability(phrase);
+            
+            if (available) {
+                toast.error("Invalid secret phrase. Please try again.");
+                return;
+            }
+            
             onPhraseConfirmed(phrase);
             setOpen(false);
             setPhrase("");
-            toast.success("Secret phrase confirmed");
-        } else {
-            toast.error("Please enter a secret phrase");
+        } catch (error) {
+            console.error("Error checking secret phrase:", error);
+            toast.error("An error occurred. Please try again.");
+        } finally {
+            setIsChecking(false);
         }
     };
 
@@ -52,9 +71,12 @@ export function SecretPhraseDialog({ onPhraseConfirmed }: SecretPhraseDialogProp
                         placeholder="Enter secret phrase"
                         className="w-full"
                         autoComplete="off"
+                        disabled={isChecking}
                     />
                     <DialogFooter className="sm:justify-end">
-                        <Button type="submit">Confirm</Button>
+                        <Button type="submit" disabled={isChecking}>
+                            {isChecking ? "Checking..." : "Confirm"}
+                        </Button>
                     </DialogFooter>
                 </form>
             </DialogContent>

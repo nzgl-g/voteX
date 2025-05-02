@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/shadcn-ui/card"
 import { Button } from "@/components/shadcn-ui/button"
 import { Input } from "@/components/shadcn-ui/input"
@@ -9,8 +9,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/shadcn-ui/select"
 import { Label } from "@/components/shadcn-ui/label"
 import type { CandidateStatus } from "./vote-session-management"
-import { Plus, Search, Trash, User } from "lucide-react"
+import { Plus, Search, Trash, User, UserPlus } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
+import { Badge } from "@/components/shadcn-ui/badge"
 
 interface Candidate {
   id: string
@@ -21,11 +22,12 @@ interface Candidate {
 
 interface CandidateTableProps {
   candidates: Candidate[]
-  onUpdate: (candidates: Candidate[]) => void
+  isEditing: boolean
   isNominationActive: boolean
+  onUpdate: (candidates: Candidate[]) => void
 }
 
-export function CandidateTable({ candidates, onUpdate, isNominationActive }: CandidateTableProps) {
+export function CandidateTable({ candidates, isEditing, isNominationActive, onUpdate }: CandidateTableProps) {
   const [candidateList, setCandidateList] = useState<Candidate[]>(candidates)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<CandidateStatus | "All">("All")
@@ -37,11 +39,9 @@ export function CandidateTable({ candidates, onUpdate, isNominationActive }: Can
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [currentCandidate, setCurrentCandidate] = useState<Candidate | null>(null)
-  const [newCandidate, setNewCandidate] = useState<Omit<Candidate, "id">>({
-    fullName: "",
-    email: "",
-    status: "Pending",
-  })
+  const [newFullName, setNewFullName] = useState("")
+  const [newEmail, setNewEmail] = useState("")
+  const [isUpdating, setIsUpdating] = useState(false)
 
   // Sorting function
   const requestSort = (key: keyof Candidate) => {
@@ -87,36 +87,72 @@ export function CandidateTable({ candidates, onUpdate, isNominationActive }: Can
     return filteredCandidates
   }
 
+  // Update parent component when candidate list changes, but only when not currently in update cycle
+  useEffect(() => {
+    if (isEditing && !isUpdating) {
+      onUpdate(candidateList)
+    }
+  }, [candidateList, isEditing, onUpdate, isUpdating])
+
+  // Update the candidate list when the candidates prop changes
+  useEffect(() => {
+    // Only update if the arrays are different (deep comparison)
+    if (JSON.stringify(candidates) !== JSON.stringify(candidateList)) {
+      setCandidateList(candidates)
+    }
+  }, [candidates])
+
+  // Create a memoized function to handle candidate status changes
+  const handleCandidateStatusChange = (candidateId: string, newStatus: CandidateStatus) => {
+    // Prevent update loops
+    setIsUpdating(true)
+    
+    const updatedCandidates = candidateList.map((c) =>
+      c.id === candidateId ? { ...c, status: newStatus } : c
+    )
+    
+    setCandidateList(updatedCandidates)
+    
+    // Reset the flag after a short delay
+    setTimeout(() => {
+      setIsUpdating(false)
+      // Explicitly call onUpdate after state has been updated
+      if (isEditing) {
+        onUpdate(updatedCandidates)
+      }
+    }, 0)
+  }
+
   const handleAddCandidate = () => {
-    if (!newCandidate.fullName.trim() || !newCandidate.email.trim()) {
+    if (!newFullName.trim() || !newEmail.trim()) {
       toast({
-        title: "Error",
-        description: "Name and email are required",
+        title: "Missing information",
+        description: "Please provide both a name and email for the candidate.",
         variant: "destructive",
       })
       return
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(newCandidate.email)) {
+    if (!emailRegex.test(newEmail)) {
       toast({
-        title: "Error",
-        description: "Please enter a valid email address",
+        title: "Invalid email",
+        description: "Please provide a valid email address.",
         variant: "destructive",
       })
       return
     }
 
-    const newId = `cand${Date.now()}`
-    const updatedCandidates = [...candidateList, { id: newId, ...newCandidate }]
+    const newCandidate = {
+      id: `candidate-${Date.now()}`,
+      fullName: newFullName,
+      email: newEmail,
+      status: "Accepted" as CandidateStatus,
+    }
 
-    setCandidateList(updatedCandidates)
-    onUpdate(updatedCandidates)
-    setNewCandidate({
-      fullName: "",
-      email: "",
-      status: "Pending",
-    })
+    setCandidateList([...candidateList, newCandidate])
+    setNewFullName("")
+    setNewEmail("")
     setIsAddDialogOpen(false)
 
     toast({
@@ -179,7 +215,10 @@ export function CandidateTable({ candidates, onUpdate, isNominationActive }: Can
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-xl font-bold">Candidates</CardTitle>
+        <CardTitle className="text-xl font-bold">
+          Candidates 
+          {isNominationActive && <Badge className="ml-2 bg-green-500">Nomination Active</Badge>}
+        </CardTitle>
         {isNominationActive && (
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
@@ -197,8 +236,10 @@ export function CandidateTable({ candidates, onUpdate, isNominationActive }: Can
                   <Label htmlFor="fullName">Full Name</Label>
                   <Input
                     id="fullName"
-                    value={newCandidate.fullName}
-                    onChange={(e) => setNewCandidate({ ...newCandidate, fullName: e.target.value })}
+                    value={newFullName}
+                    onChange={(e) => setNewFullName(e.target.value)}
+                    placeholder="Enter candidate name"
+                    className="mt-1"
                   />
                 </div>
                 <div className="grid gap-2">
@@ -206,30 +247,11 @@ export function CandidateTable({ candidates, onUpdate, isNominationActive }: Can
                   <Input
                     id="email"
                     type="email"
-                    value={newCandidate.email}
-                    onChange={(e) => setNewCandidate({ ...newCandidate, email: e.target.value })}
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="Enter candidate email"
+                    className="mt-1"
                   />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={newCandidate.status}
-                    onValueChange={(value) =>
-                      setNewCandidate({
-                        ...newCandidate,
-                        status: value as CandidateStatus,
-                      })
-                    }
-                  >
-                    <SelectTrigger id="status">
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Accepted">Accepted</SelectItem>
-                      <SelectItem value="Pending">Pending</SelectItem>
-                      <SelectItem value="Refused">Refused</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
               <DialogFooter>
@@ -281,10 +303,7 @@ export function CandidateTable({ candidates, onUpdate, isNominationActive }: Can
                   <Select
                     value={currentCandidate.status}
                     onValueChange={(value) =>
-                      setCurrentCandidate({
-                        ...currentCandidate,
-                        status: value as CandidateStatus,
-                      })
+                      handleCandidateStatusChange(currentCandidate.id, value as CandidateStatus)
                     }
                   >
                     <SelectTrigger id="editStatus">
@@ -355,14 +374,29 @@ export function CandidateTable({ candidates, onUpdate, isNominationActive }: Can
                       <span className="ml-1">{sortConfig.direction === "ascending" ? "↑" : "↓"}</span>
                     )}
                   </TableHead>
-                  <TableHead className="w-[150px] text-right">Actions</TableHead>
+                  {isEditing && <TableHead className="w-[100px] text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredCandidates.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
-                      No candidates found. Add your first candidate or adjust your filters.
+                    <TableCell colSpan={isEditing ? 4 : 3} className="text-center text-muted-foreground h-32">
+                      {isNominationActive ? (
+                        <div className="flex flex-col items-center">
+                          <UserPlus className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                          <p>Nominations are open. Waiting for candidates to join.</p>
+                        </div>
+                      ) : isEditing ? (
+                        <div className="flex flex-col items-center">
+                          <UserPlus className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                          <p>No candidates added yet. Add your first candidate above.</p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <UserPlus className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                          <p>No candidates available for this session.</p>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -371,43 +405,48 @@ export function CandidateTable({ candidates, onUpdate, isNominationActive }: Can
                       <TableCell>{candidate.fullName}</TableCell>
                       <TableCell>{candidate.email}</TableCell>
                       <TableCell>
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            candidate.status === "Accepted"
-                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
-                              : candidate.status === "Pending"
-                                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
-                                : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
-                          }`}
-                        >
-                          {candidate.status}
-                        </span>
+                        {isEditing ? (
+                          <Select
+                            value={candidate.status}
+                            onValueChange={(value) =>
+                              handleCandidateStatusChange(candidate.id, value as CandidateStatus)
+                            }
+                          >
+                            <SelectTrigger className="w-[130px]">
+                              <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Accepted">Accepted</SelectItem>
+                              <SelectItem value="Pending">Pending</SelectItem>
+                              <SelectItem value="Refused">Refused</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge
+                            variant={
+                              candidate.status === "Accepted"
+                                ? "default"
+                                : candidate.status === "Pending"
+                                ? "secondary"
+                                : "destructive"
+                            }
+                          >
+                            {candidate.status}
+                          </Badge>
+                        )}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                      {isEditing && (
+                        <TableCell className="text-right">
                           <Button
                             variant="ghost"
-                            size="sm"
-                            className="h-8"
-                            onClick={() => {
-                              // In a real app, this would navigate to a profile page
-                              toast({
-                                title: "View Profile",
-                                description: `Viewing profile for ${candidate.fullName}`,
-                              })
-                            }}
+                            size="icon"
+                            onClick={() => handleDeleteCandidate(candidate.id)}
                           >
-                            <User className="h-4 w-4 mr-2" />
-                            View Profile
+                            <Trash className="h-4 w-4" />
+                            <span className="sr-only">Delete</span>
                           </Button>
-                          {isNominationActive && (
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteCandidate(candidate.id)}>
-                              <Trash className="h-4 w-4" />
-                              <span className="sr-only">Delete</span>
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}

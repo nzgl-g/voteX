@@ -44,14 +44,34 @@ export const userService = {
   /**
    * Search for users by username or email
    * @param query Search query string
-   * @returns Array of matching users
+   * @returns Array of matching users with current user filtered out
    */
   async searchUsers(query: string): Promise<User[]> {
     try {
-      const response = await api.get(`/users/search?query=${encodeURIComponent(query)}`);
-      return response.data;
+      if (!query || query.trim().length < 3) {
+        return []; // Return empty array for short queries
+      }
+      
+      const response = await api.get(`/users/search?query=${encodeURIComponent(query.trim())}`);
+      const users = response.data;
+      
+      // Get current user to filter them out of results
+      const currentUser = this.getCurrentUserFromStorage();
+      if (currentUser) {
+        // Filter out the current user from search results
+        return users.filter((user: User) => user._id !== currentUser._id);
+      }
+      
+      return users;
     } catch (error: any) {
       console.error('Failed to search users:', error);
+      
+      if (error.response?.status === 400) {
+        throw new Error('Search query must be at least 3 characters');
+      } else if (error.response?.status === 401) {
+        throw new Error('You must be logged in to search for users');
+      }
+      
       throw new Error(error.response?.data?.message || 'Failed to search users');
     }
   },

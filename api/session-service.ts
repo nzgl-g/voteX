@@ -258,11 +258,21 @@ export const sessionService = {
    */
   async deleteSession(sessionId: string): Promise<{ message: string }> {
     try {
+      if (!sessionId) {
+        throw new Error("Session ID is required");
+      }
+
+      console.log(`Deleting session with ID: ${sessionId}`);
       const response = await api.delete(`/sessions/${sessionId}`);
       return response.data;
     } catch (error: any) {
       console.error(`Failed to delete session with ID ${sessionId}:`, error);
-      throw new Error(error.response?.data?.message || "Failed to delete session");
+      
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.message || 
+                          "Failed to delete session";
+                          
+      throw new Error(errorMessage);
     }
   },
 
@@ -288,22 +298,46 @@ export const sessionService = {
    */
   async getSessionTeam(sessionId: string): Promise<string> {
     try {
-      const response = await api.get(`/sessions/${sessionId}`);
-      console.log('Session data:', response.data);
+      if (!sessionId) {
+        throw new Error("Session ID is required");
+      }
+      
+      // First try to get only the team field to reduce data transfer
+      const url = `/sessions/${sessionId}?fields=team`;
+      console.log(`Fetching session team with URL: ${url}`);
+      
+      const response = await api.get(url);
+      console.log('Session team data:', response.data);
       
       // Check different possible paths to the team ID
       if (response.data.team?._id) {
         return response.data.team._id;
-      } else if (response.data.team) {
-        // If team is directly the ID
+      } else if (typeof response.data.team === 'string') {
+        // If team is directly the ID as string
         return response.data.team;
+      } else if (response.data.team) {
+        // If team exists but structure is unclear
+        console.warn('Team structure unexpected:', response.data.team);
+        // Try to convert to string if possible
+        return String(response.data.team);
       } else {
         // For debugging, log the structure
-        console.log('Team structure not found in:', response.data);
-        throw new Error(`Team not found in session ${sessionId}`);
+        console.log('Team not found in response:', response.data);
+        throw new Error(`Team not found for session ${sessionId}`);
       }
     } catch (error: any) {
       console.error(`Failed to get team for session with ID ${sessionId}:`, error);
+      
+      if (error.response?.status === 400) {
+        throw new Error("Invalid session ID format");
+      } else if (error.response?.status === 404) {
+        throw new Error("Session not found");
+      } else if (error.response?.status === 403) {
+        throw new Error("Not authorized to access this session's team");
+      } else if (error.message.includes("Team not found")) {
+        throw new Error(`No team associated with session ${sessionId}`);
+      }
+      
       throw new Error(error.response?.data?.message || "Failed to get session team");
     }
   },
@@ -339,6 +373,55 @@ export const sessionService = {
     } catch (error: any) {
       console.error("Failed to join session with phrase:", error);
       throw new Error(error.response?.data?.message || "Failed to join session with phrase");
+    }
+  },
+
+  /**
+   * Update an existing session
+   * @param sessionId ID of the session to update
+   * @param updateData Data to update on the session
+   * @returns Updated session object
+   */
+  async updateSession(sessionId: string, updateData: any): Promise<Session> {
+    try {
+      if (!sessionId) {
+        throw new Error("Session ID is required");
+      }
+      
+      // Validate update data
+      if (!updateData || Object.keys(updateData).length === 0) {
+        throw new Error("Invalid update data: empty object");
+      }
+      
+      // Log the update data for debugging
+      console.log(`Updating session with ID: ${sessionId}`, JSON.stringify(updateData, null, 2));
+      
+      // Make sure to use the right endpoint
+      const response = await api.patch(`/sessions/${sessionId}/edit-request`, updateData);
+      
+      console.log("Session update successful:", response.status);
+      return response.data;
+    } catch (error: any) {
+      console.error(`Failed to update session with ID ${sessionId}:`, error);
+      
+      // Provide detailed error messages
+      let errorMessage = "Failed to update session";
+      
+      if (error.response) {
+        if (error.response.data) {
+          errorMessage = error.response.data.error || 
+                        error.response.data.message || 
+                        errorMessage;
+        } else {
+          // Handle case when error.response.data is empty
+          errorMessage = `Server returned ${error.response.status} without details`;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      console.error("Update session error details:", errorMessage);
+      throw new Error(errorMessage);
     }
   }
 };

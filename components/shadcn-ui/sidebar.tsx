@@ -3,7 +3,8 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
-import { PanelLeftIcon } from "lucide-react"
+import { PanelLeftIcon, BellIcon } from "lucide-react"
+import { lazy } from "react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
@@ -332,14 +333,27 @@ function SidebarInput({
   )
 }
 
-function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
+function SidebarHeader({ 
+  className, 
+  notificationSlot,
+  ...props 
+}: React.ComponentProps<"div"> & { 
+  notificationSlot?: React.ReactNode 
+}) {
   return (
     <div
       data-slot="sidebar-header"
       data-sidebar="header"
       className={cn("flex flex-col gap-2 p-2", className)}
       {...props}
-    />
+    >
+      {notificationSlot && (
+        <div className="flex justify-end mb-2">
+          {notificationSlot}
+        </div>
+      )}
+      {props.children}
+    </div>
   )
 }
 

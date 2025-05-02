@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/shadcn-ui/card"
 import { Button } from "@/components/shadcn-ui/button"
 import { Input } from "@/components/shadcn-ui/input"
@@ -14,79 +14,36 @@ interface PollOption {
 }
 
 interface PollOptionsProps {
-  options: PollOption[]
-  onUpdate: (options: PollOption[]) => void
+  options: { id: string; name: string }[]
+  isEditing: boolean
+  onUpdate: (options: { id: string; name: string }[]) => void
 }
 
-export function PollOptions({ options, onUpdate }: PollOptionsProps) {
-  const [pollOptions, setPollOptions] = useState<PollOption[]>(options)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editValue, setEditValue] = useState("")
-  const [newOption, setNewOption] = useState("")
-
-  const handleEdit = (option: PollOption) => {
-    setEditingId(option.id)
-    setEditValue(option.name)
-  }
-
-  const handleSave = (id: string) => {
-    if (editValue.trim() === "") {
-      toast({
-        title: "Error",
-        description: "Option name cannot be empty",
-        variant: "destructive",
-      })
-      return
+export function PollOptions({ options, isEditing, onUpdate }: PollOptionsProps) {
+  const [pollOptions, setPollOptions] = useState(options)
+  
+  useEffect(() => {
+    if (isEditing) {
+      onUpdate(pollOptions)
     }
+  }, [pollOptions, isEditing, onUpdate])
 
-    const updatedOptions = pollOptions.map((option) => (option.id === id ? { ...option, name: editValue } : option))
-    setPollOptions(updatedOptions)
-    onUpdate(updatedOptions)
-    setEditingId(null)
-    setEditValue("")
-
-    toast({
-      title: "Option updated",
-      description: "Poll option has been updated successfully.",
-    })
-  }
-
-  const handleCancel = () => {
-    setEditingId(null)
-    setEditValue("")
-  }
-
-  const handleDelete = (id: string) => {
-    const updatedOptions = pollOptions.filter((option) => option.id !== id)
-    setPollOptions(updatedOptions)
-    onUpdate(updatedOptions)
-
-    toast({
-      title: "Option deleted",
-      description: "Poll option has been deleted successfully.",
-    })
-  }
-
-  const handleAddOption = () => {
-    if (newOption.trim() === "") {
-      toast({
-        title: "Error",
-        description: "Option name cannot be empty",
-        variant: "destructive",
-      })
-      return
+  const addOption = () => {
+    const newOption = {
+      id: `option-${Date.now()}`,
+      name: "",
     }
+    setPollOptions([...pollOptions, newOption])
+  }
 
-    const newId = `opt${Date.now()}`
-    const updatedOptions = [...pollOptions, { id: newId, name: newOption }]
-    setPollOptions(updatedOptions)
-    onUpdate(updatedOptions)
-    setNewOption("")
+  const removeOption = (id: string) => {
+    setPollOptions(pollOptions.filter((option) => option.id !== id))
+  }
 
-    toast({
-      title: "Option added",
-      description: "New poll option has been added successfully.",
-    })
+  const updateOption = (id: string, name: string) => {
+    setPollOptions(
+      pollOptions.map((option) => (option.id === id ? { ...option, name } : option))
+    )
   }
 
   return (
@@ -94,78 +51,58 @@ export function PollOptions({ options, onUpdate }: PollOptionsProps) {
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-xl font-bold">Poll Options</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Add new option"
-              value={newOption}
-              onChange={(e) => setNewOption(e.target.value)}
-              className="flex-1"
-            />
-            <Button onClick={handleAddOption}>
+      <CardContent className="space-y-6">
+        {isEditing ? (
+          <div className="space-y-4">
+            {pollOptions.map((option) => (
+              <div key={option.id} className="flex gap-2 items-center">
+                <Input
+                  value={option.name}
+                  onChange={(e) => updateOption(option.id, e.target.value)}
+                  placeholder="Enter option name"
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => removeOption(option.id)}
+                  className="shrink-0"
+                >
+                  <Trash className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button 
+              variant="outline" 
+              onClick={addOption} 
+              className="w-full"
+              disabled={pollOptions.length >= 10}
+            >
               <Plus className="h-4 w-4 mr-2" />
-              Add Option
+              Add Option {pollOptions.length >= 10 && "(Max 10)"}
             </Button>
           </div>
-
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Option Name</TableHead>
-                  <TableHead className="w-[100px] text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pollOptions.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={2} className="text-center text-muted-foreground">
-                      No options available. Add your first option above.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  pollOptions.map((option) => (
-                    <TableRow key={option.id}>
-                      <TableCell>
-                        {editingId === option.id ? (
-                          <Input value={editValue} onChange={(e) => setEditValue(e.target.value)} autoFocus />
-                        ) : (
-                          option.name
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {editingId === option.id ? (
-                          <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => handleSave(option.id)}>
-                              <Save className="h-4 w-4" />
-                              <span className="sr-only">Save</span>
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={handleCancel}>
-                              <X className="h-4 w-4" />
-                              <span className="sr-only">Cancel</span>
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => handleEdit(option)}>
-                              <Edit className="h-4 w-4" />
-                              <span className="sr-only">Edit</span>
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDelete(option.id)}>
-                              <Trash className="h-4 w-4" />
-                              <span className="sr-only">Delete</span>
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+        ) : (
+          <div className="space-y-3">
+            {options.length === 0 ? (
+              <div className="p-8 text-center">
+                <div className="text-muted-foreground">No options added yet</div>
+              </div>
+            ) : (
+              options.map((option, index) => (
+                <div
+                  key={option.id}
+                  className="flex items-center p-3 rounded-md bg-muted/50"
+                >
+                  <div className="h-6 w-6 mr-2 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium">
+                    {index + 1}
+                  </div>
+                  <div className="font-medium">{option.name}</div>
+                </div>
+              ))
+            )}
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   )

@@ -4,6 +4,8 @@ import "./globals.css";
 import {ThemeProvider} from "@/components/theme-provider";
 import {cn} from "@/lib/utils";
 import { ClientLoadingBar } from "@/components/ui/client-loading-bar";
+import NotificationListener from "@/components/NotificationListener";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -28,7 +30,8 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
         >
-
+            <NotificationListener userId="current-user-id" />
+            <Toaster position="top-right" />
             {children}
         </ThemeProvider>
         </body>

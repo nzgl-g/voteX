@@ -1,84 +1,105 @@
 "use client";
 
-import { VoteSessionForm } from "@/components/setup-form/vote-session-form";
-import { ToastProvider } from "@/components/shadcn-ui/toast";
-import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/shadcn-ui/button";
+import { VoteSessionForm } from "@/components/setup-form/vote-session-form";
+import { ArrowLeft } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { ThemeToggle } from "@/components/shadcn-ui/theme-toggle";
+import { UserProfile } from "@/components/shared/user-profile";
 import { authApi } from "@/lib/api";
+import { toast } from "sonner";
 
-export default function Home() {
-  const searchParams = useSearchParams();
+export default function SessionSetupPage() {
   const router = useRouter();
-  const [plan, setPlan] = useState<"free" | "pro" | "enterprise" | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const searchParams = useSearchParams();
+  const [plan, setPlan] = useState<"free" | "pro" | "enterprise" | undefined>(undefined);
+  const [userData, setUserData] = useState<{ name: string; email: string; avatar?: string }>({ 
+      name: "User", 
+      email: "" 
+  });
   
   useEffect(() => {
-    // Check if user is authenticated
-    const checkAuth = () => {
-      const authenticated = authApi.isAuthenticated();
-      setIsAuthenticated(authenticated);
-      
-      if (!authenticated) {
-        // Store the current URL with plan parameter to redirect back after login
-        const planParam = searchParams.get("plan");
-        if (planParam) {
-          localStorage.setItem('redirectAfterLogin', `session-setup?plan=${planParam}`);
-        }
-        
-        // Redirect to login page
-        router.push('/login');
-      } else {
-        // User is authenticated, check for plan parameter
-        const planParam = searchParams.get("plan");
-        
-        if (planParam === "free" || planParam === "pro" || planParam === "enterprise") {
-          setPlan(planParam);
-        } else {
-          // If no valid plan is in the URL, we'll keep plan as null
-          setPlan(null);
-        }
-        
-        setIsLoading(false);
+    // Get plan from URL parameters
+    const planParam = searchParams.get("plan");
+    console.log("Plan parameter detected in URL:", planParam);
+    
+    if (planParam && ["free", "pro", "enterprise"].includes(planParam)) {
+      console.log("Setting plan to:", planParam);
+      setPlan(planParam as "free" | "pro" | "enterprise");
+    } else {
+      // Default to free if no plan specified
+      console.log("No valid plan detected, defaulting to free");
+      setPlan("free");
+    }
+
+    // Fetch user data
+    const fetchUserData = async () => {
+      try {
+        const userProfile = await authApi.fetchUserProfile();
+        setUserData({
+          name: userProfile.name || "User",
+          email: userProfile.email || "",
+          avatar: userProfile.avatar || undefined
+        });
+      } catch (error) {
+        console.error("Failed to fetch user profile:", error);
       }
     };
     
-    checkAuth();
-  }, [searchParams, router]);
+    fetchUserData();
+  }, [searchParams]);
 
-  const handleBackToPricing = () => {
-    router.push("/#subscription");
+  const handleSessionCreated = () => {
+    toast.success("Session created successfully!");
+    router.push("/voter");
   };
-
-  // If still loading or not authenticated, show loading state
-  if (isLoading) {
-    return (
-      <ToastProvider>
-        <main className="container mx-auto py-8 px-4">
-          <div className="flex flex-col items-center justify-center p-8">
-            <h2 className="text-xl font-semibold mb-4">Loading...</h2>
-          </div>
-        </main>
-      </ToastProvider>
-    );
-  }
   
   return (
-    <ToastProvider>
-      <main className="container mx-auto py-8 px-4">
-        <h1 className="text-3xl font-bold mb-8 text-center">Create Vote Session</h1>
-        
-        {plan ? (
-          <VoteSessionForm plan={plan} />
-        ) : (
-          <div className="flex flex-col items-center justify-center p-8 bg-card rounded-lg shadow-lg">
-            <h2 className="text-xl font-semibold mb-4">Please select a pricing plan first</h2>
-            <p className="text-muted-foreground mb-6">You need to select a pricing plan before creating a vote session.</p>
-            <Button onClick={handleBackToPricing}>Go to Pricing Plans</Button>
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center justify-between max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2">
+            <Link href="/" className="flex items-center">
+              <div className="hidden dark:block">
+                <Image src="/logo/expended-dark.png" alt="Vote System Logo" width={120} height={40} className="mr-2" />
+              </div>
+              <div className="block dark:hidden">
+                <Image src="/logo/expended.png" alt="Vote System Logo" width={120} height={40} className="mr-2" />
+              </div>
+            </Link>
           </div>
-        )}
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => router.push("/voter")}
+              className="mr-2 flex items-center gap-1"
+            >
+              <ArrowLeft className="h-4 w-4" /> Back to Sessions
+            </Button>
+            <ThemeToggle />
+            <UserProfile 
+              userName={userData.name}
+              userEmail={userData.email}
+              userAvatar={userData.avatar}
+              variant="dropdown"
+            />
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1 container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-[1400px] mx-auto">
+          <h1 className="text-2xl sm:text-3xl font-bold mb-6">Create Vote Session</h1>
+          <VoteSessionForm 
+            plan={plan} 
+            onComplete={handleSessionCreated}
+          />
+        </div>
       </main>
-    </ToastProvider>
+    </div>
   );
 }

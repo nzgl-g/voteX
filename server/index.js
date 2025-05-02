@@ -51,10 +51,39 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("mark-notification-read", ({ notificationId, userId }) => {
+    console.log(`Marking notification ${notificationId} as read for user ${userId}`);
+    // Here you would typically update the notification status in your database
+  });
+
+  socket.on("clear-notifications", (userId) => {
+    console.log(`Clearing all notifications for user ${userId}`);
+    // Here you would typically clear notifications in your database
+  });
+
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
   });
 });
+
+// Helper function to send notifications
+// Can be used from other parts of your application
+const sendNotification = (userId, notification) => {
+  if (io) {
+    // If userId is provided, send only to that user
+    if (userId) {
+      io.to(userId.toString()).emit("new-notification", notification);
+      console.log(`Notification sent to user ${userId}`);
+    } else {
+      // Otherwise broadcast to all connected clients
+      io.emit("new-notification", notification);
+      console.log("Notification broadcasted to all users");
+    }
+  }
+};
+
+// Expose the function globally
+app.sendNotification = sendNotification;
 
 // Start server function
 const startServer = async (port) => {
@@ -83,3 +112,5 @@ const startServer = async (port) => {
 connectDB().then(() => {
   startServer(2000);
 });
+
+module.exports = { app, sendNotification };

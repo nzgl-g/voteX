@@ -102,31 +102,26 @@ const PricingCard = ({ plan, onClick, isLoading, isSelected }: PricingCardProps)
     )
 }
 
-interface PricingDialogProps {
-    open?: boolean;
-    onOpenChange?: (open: boolean) => void;
+export interface PricingDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onPlanSelected?: (plan: "free" | "pro" | "enterprise") => void;
 }
 
-export function PricingDialog({ open: externalOpen, onOpenChange }: PricingDialogProps = {}) {
-    const [internalOpen, setInternalOpen] = useState(false)
-    const [isLoading, setIsLoading] = useState(false)
-    const [selectedId, setSelectedId] = useState<string | null>(null)
-    const router = useRouter()
+export function PricingDialog({
+    open,
+    onOpenChange,
+    onPlanSelected
+}: PricingDialogProps) {
+    const router = useRouter();
     
-    // Use external state if provided, otherwise use internal state
-    const open = externalOpen !== undefined ? externalOpen : internalOpen;
-    const setOpen = onOpenChange || setInternalOpen;
-
-    const handlePlanSelection = (plan: PricingPlan) => {
-        setIsLoading(true)
-        setSelectedId(plan.selectId)
-        
-        // Close the dialog
-        setOpen(false)
-        
-        // Redirect to session creation with the selected plan
-        router.push(`/session-setup?plan=${plan.id}`)
-    }
+    const handleSelectPlan = (plan: "free" | "pro" | "enterprise") => {
+        if (onPlanSelected) {
+            onPlanSelected(plan);
+        } else {
+            router.push(`/session-setup?plan=${plan}`);
+        }
+    };
 
     const pricingPlans = [
         {
@@ -160,7 +155,7 @@ export function PricingDialog({ open: externalOpen, onOpenChange }: PricingDialo
             id: "enterprise",
             name: "Enterprise",
             subtitle: "Unlimited voters",
-            price: "$199.99",
+            price: "Coming Soon",
             buttonText: "Contact Sales",
             actionUrl: "/contact",
             selectId: "sub-ent-001",
@@ -175,9 +170,9 @@ export function PricingDialog({ open: externalOpen, onOpenChange }: PricingDialo
     ]
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={onOpenChange}>
             {/* Only render the DialogTrigger when not controlled externally */}
-            {externalOpen === undefined && (
+            {open === undefined && (
                 <DialogTrigger asChild>
                     <Button size="lg">View Pricing Plans</Button>
                 </DialogTrigger>
@@ -195,9 +190,9 @@ export function PricingDialog({ open: externalOpen, onOpenChange }: PricingDialo
                         <PricingCard
                             key={plan.id}
                             plan={plan}
-                            onClick={handlePlanSelection}
-                            isLoading={isLoading}
-                            isSelected={selectedId === plan.selectId}
+                            onClick={() => handleSelectPlan(plan.id as "free" | "pro" | "enterprise")}
+                            isLoading={false}
+                            isSelected={false}
                         />
                     ))}
                 </div>

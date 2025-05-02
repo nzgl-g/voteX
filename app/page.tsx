@@ -46,7 +46,7 @@ const LandingPageContent = () => {
   
   return (
     <>
-      <header>
+      <header className="mt-2">
         <Navbar/>
       </header>
       <main className="flex-1 flex flex-col items-center w-full landing-page">

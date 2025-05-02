@@ -40,7 +40,7 @@ export function AccessControlStep({ formState, updateFormState }: AccessControlS
       <div className="space-y-8">
         <div className="space-y-4">
           <h3 className="text-lg font-medium">Access Control</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Public Access */}
             <Card
                 className={`cursor-pointer transition-all hover:border-primary ${
@@ -48,12 +48,16 @@ export function AccessControlStep({ formState, updateFormState }: AccessControlS
                 }`}
                 onClick={() => handleAccessLevelChange("public")}
             >
-              <CardHeader className="pb-2">
-                <Globe className="h-8 w-8 text-primary mb-2" />
-                <CardTitle>Public Session</CardTitle>
-                <CardDescription>Anyone can access this session</CardDescription>
+              <CardHeader className="pb-2 p-4">
+                <div className="flex flex-row sm:flex-col items-center sm:items-start gap-3 sm:gap-0">
+                  <Globe className="h-6 w-6 sm:h-8 sm:w-8 text-primary sm:mb-2" />
+                  <div>
+                    <CardTitle className="text-base sm:text-lg">Public Session</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">Anyone can access this session</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-0 p-4">
                 {formState.accessLevel === "public" && (
                     <div className="h-6 flex items-center justify-end">
                       <Check className="h-5 w-5 text-primary" />
@@ -69,12 +73,16 @@ export function AccessControlStep({ formState, updateFormState }: AccessControlS
                 } ${!isPro ? "opacity-80" : ""}`}
                 onClick={() => isPro && handleAccessLevelChange("private")}
             >
-              <CardHeader className="pb-2">
-                <Lock className="h-8 w-8 text-primary mb-2" />
-                <CardTitle>Private Session</CardTitle>
-                <CardDescription>Access restricted to specific users</CardDescription>
+              <CardHeader className="pb-2 p-4">
+                <div className="flex flex-row sm:flex-col items-center sm:items-start gap-3 sm:gap-0">
+                  <Lock className="h-6 w-6 sm:h-8 sm:w-8 text-primary sm:mb-2" />
+                  <div>
+                    <CardTitle className="text-base sm:text-lg">Private Session</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">Access restricted to specific users</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-0 p-4">
                 {!isPro && <ProFeatureBadge />}
                 {formState.accessLevel === "private" && (
                     <div className="h-6 flex items-center justify-end">
@@ -93,7 +101,7 @@ export function AccessControlStep({ formState, updateFormState }: AccessControlS
               <RadioGroup
                   value={formState.securityMethod || ""}
                   onValueChange={(value) => handleSecurityMethodChange(value as "secret phrase" | "csv")}
-                  className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-4"
               >
                 <div>
                   <RadioGroupItem value="secret phrase" id="secret-phrase" className="peer sr-only" />

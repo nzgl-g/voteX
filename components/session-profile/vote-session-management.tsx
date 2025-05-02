@@ -13,6 +13,8 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { toast } from "@/hooks/use-toast"
 import { sessionService, Session } from "@/api/session-service"
 import { Skeleton } from "@/components/shadcn-ui/skeleton"
+import { Button } from "@/components/shadcn-ui/button"
+import { Edit, Save, X } from "lucide-react"
 
 export type SessionType = "Poll" | "Election" | "Tournament"
 export type VotingMode = "Single Choice" | "Multiple Choice" | "Ranked Choice"
@@ -45,6 +47,12 @@ export interface SessionData {
     email: string
     status: CandidateStatus
   }[]
+  subscription?: {
+    name?: string
+    price?: number
+    voterLimit?: number | null
+    features?: string[]
+  }
 }
 
 // Helper function to map backend session to frontend SessionData format
@@ -69,6 +77,11 @@ const mapSessionToSessionData = (session: Session): SessionData => {
   // Extract dates from sessionLifecycle
   const now = new Date().toISOString();
   const creationDate = session.sessionLifecycle?.createdAt || now;
+  
+  // Properly handle nomination period dates with better null/undefined checks
+  const hasScheduledNomination = session.sessionLifecycle?.scheduledAt && 
+                               (session.sessionLifecycle.scheduledAt.start || session.sessionLifecycle.scheduledAt.end);
+                               
   const nominationStart = session.sessionLifecycle?.scheduledAt?.start || now;
   const nominationEnd = session.sessionLifecycle?.scheduledAt?.end || now;
   const votingStart = session.sessionLifecycle?.startedAt || now;
@@ -108,7 +121,13 @@ const mapSessionToSessionData = (session: Session): SessionData => {
     secretPhrase: session.secretPhrase || "",
     csvEmailFiltering: false, // Not available in backend model
     pollOptions,
-    candidates
+    candidates,
+    subscription: session.subscription ? {
+      name: session.subscription.name,
+      price: session.subscription.price,
+      voterLimit: session.subscription.voterLimit,
+      features: session.subscription.features || []
+    } : undefined
   };
 };
 
@@ -116,28 +135,135 @@ const mapSessionToSessionData = (session: Session): SessionData => {
 const mapSessionDataToBackendUpdates = (sessionData: Partial<SessionData>) => {
   const updates: any = {};
   
-  if (sessionData.title) updates.name = sessionData.title;
+  // Map basic session fields
+  if (sessionData.title !== undefined) updates.name = sessionData.title;
   if (sessionData.description !== undefined) updates.description = sessionData.description;
   if (sessionData.organizationName !== undefined) updates.organizationName = sessionData.organizationName;
   
-  // Map dates if provided
-  if (sessionData.nominationStart || sessionData.nominationEnd) {
-    updates.sessionLifecycle = { scheduledAt: {} };
-    if (sessionData.nominationStart) {
+  // Initialize sessionLifecycle if needed
+  if (!updates.sessionLifecycle && (
+    sessionData.nominationStart !== undefined || 
+    sessionData.nominationEnd !== undefined ||
+    sessionData.votingStart !== undefined ||
+    sessionData.votingEnd !== undefined
+  )) {
+    updates.sessionLifecycle = {};
+  }
+  
+  // Handle scheduledAt (nomination dates)
+  if (sessionData.nominationStart !== undefined || sessionData.nominationEnd !== undefined) {
+    if (!updates.sessionLifecycle) updates.sessionLifecycle = {};
+    updates.sessionLifecycle.scheduledAt = updates.sessionLifecycle.scheduledAt || {};
+    
+    if (sessionData.nominationStart !== undefined) {
       updates.sessionLifecycle.scheduledAt.start = sessionData.nominationStart;
     }
-    if (sessionData.nominationEnd) {
+    
+    if (sessionData.nominationEnd !== undefined) {
       updates.sessionLifecycle.scheduledAt.end = sessionData.nominationEnd;
     }
   }
   
-  // Map other fields as needed
-  if (sessionData.accessLevel) updates.accessLevel = sessionData.accessLevel;
-  if (sessionData.secretPhrase) updates.secretPhrase = sessionData.secretPhrase;
-  if (sessionData.verificationMethod) {
+  // Handle voting dates
+  if (sessionData.votingStart !== undefined) {
+    if (!updates.sessionLifecycle) updates.sessionLifecycle = {};
+    updates.sessionLifecycle.startedAt = sessionData.votingStart;
+  }
+  
+  if (sessionData.votingEnd !== undefined) {
+    if (!updates.sessionLifecycle) updates.sessionLifecycle = {};
+    updates.sessionLifecycle.endedAt = sessionData.votingEnd;
+  }
+  
+  // Map session type and voting mode if changed
+  if (sessionData.sessionType !== undefined) {
+    updates.type = sessionData.sessionType.toLowerCase();
+  }
+  
+  if (sessionData.votingMode !== undefined) {
+    updates.subtype = sessionData.votingMode === "Single Choice" ? "single" :
+                     sessionData.votingMode === "Multiple Choice" ? "multiple" : "ranked";
+  }
+  
+  // Map security settings
+  if (sessionData.accessLevel !== undefined) {
+    updates.accessLevel = sessionData.accessLevel;
+  }
+  
+  if (sessionData.secretPhrase !== undefined) {
+    updates.secretPhrase = sessionData.secretPhrase;
+    if (sessionData.secretPhrase && sessionData.accessLevel === "Private") {
+      updates.securityMethod = "Secret Phrase";
+    }
+  }
+  
+  if (sessionData.verificationMethod !== undefined) {
     updates.verificationMethod = sessionData.verificationMethod === "Standard" ? null : sessionData.verificationMethod;
   }
   
+  // Map poll options if present
+  if (sessionData.pollOptions !== undefined && Array.isArray(sessionData.pollOptions)) {
+    updates.options = sessionData.pollOptions.map(option => ({
+      name: option.name,
+      description: null
+    }));
+  }
+  
+  // Map candidates if present
+  if (sessionData.candidates !== undefined && Array.isArray(sessionData.candidates)) {
+    // Only include valid candidate data
+    updates.candidates = sessionData.candidates
+      .filter(candidate => candidate && candidate.id && candidate.fullName)
+      .map(candidate => ({
+        user: candidate.id,
+        status: candidate.status,
+        partyName: candidate.fullName
+      }));
+  }
+  
+  // Validate sessionLifecycle object
+  if (updates.sessionLifecycle) {
+    // Ensure proper date format for all date fields
+    if (updates.sessionLifecycle.scheduledAt) {
+      if (updates.sessionLifecycle.scheduledAt.start) {
+        const startDate = new Date(updates.sessionLifecycle.scheduledAt.start);
+        if (!isNaN(startDate.getTime())) {
+          updates.sessionLifecycle.scheduledAt.start = startDate.toISOString();
+        } else {
+          delete updates.sessionLifecycle.scheduledAt.start;
+        }
+      }
+      
+      if (updates.sessionLifecycle.scheduledAt.end) {
+        const endDate = new Date(updates.sessionLifecycle.scheduledAt.end);
+        if (!isNaN(endDate.getTime())) {
+          updates.sessionLifecycle.scheduledAt.end = endDate.toISOString();
+        } else {
+          delete updates.sessionLifecycle.scheduledAt.end;
+        }
+      }
+    }
+    
+    if (updates.sessionLifecycle.startedAt) {
+      const startDate = new Date(updates.sessionLifecycle.startedAt);
+      if (!isNaN(startDate.getTime())) {
+        updates.sessionLifecycle.startedAt = startDate.toISOString();
+      } else {
+        delete updates.sessionLifecycle.startedAt;
+      }
+    }
+    
+    if (updates.sessionLifecycle.endedAt) {
+      const endDate = new Date(updates.sessionLifecycle.endedAt);
+      if (!isNaN(endDate.getTime())) {
+        updates.sessionLifecycle.endedAt = endDate.toISOString();
+      } else {
+        delete updates.sessionLifecycle.endedAt;
+      }
+    }
+  }
+  
+  console.log("Mapped session data for API:", updates);
   return updates;
 };
 
@@ -150,6 +276,8 @@ export function VoteSessionManagement() {
   const [loading, setLoading] = useState(true);
   const [sessionData, setSessionData] = useState<SessionData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState<Partial<SessionData>>({});
 
   // Fetch session data from backend
   useEffect(() => {
@@ -165,6 +293,7 @@ export function VoteSessionManagement() {
         const session = await sessionService.getSessionById(sessionId);
         const mappedSession = mapSessionToSessionData(session as Session);
         setSessionData(mappedSession);
+        setEditData(mappedSession);
         setError(null);
       } catch (err: any) {
         console.error("Failed to fetch session:", err);
@@ -182,36 +311,159 @@ export function VoteSessionManagement() {
     fetchSessionData();
   }, [sessionId]);
 
-  // Handle session updates
-  const handleUpdateSession = async (updatedData: Partial<SessionData>) => {
+  // Helper to check if session is active (voting has started)
+  const isSessionActive = () => {
+    if (!sessionData) return false;
+    
+    const now = new Date();
+    const votingStart = new Date(sessionData.votingStart);
+    return now >= votingStart;
+  };
+
+  // Check if session has PRO features
+  const hasProFeatures = () => {
+    if (!sessionData) return false;
+    
+    // Check if session type is not Poll (Election and Tournament are Pro features)
+    // or if the subscription name explicitly has "pro" in it
+    return sessionData.sessionType !== "Poll" || 
+           sessionData.subscription?.name?.toLowerCase() === "pro" ||
+           sessionData.subscription?.name?.toLowerCase() === "enterprise";
+  };
+
+  // Handle field changes during editing
+  const handleFieldChange = (field: keyof SessionData, value: any) => {
+    setEditData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Handle cancelling edits
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    if (sessionData) {
+      setEditData(sessionData);
+    }
+  };
+
+  // Handle saving all edits
+  const handleSaveEdit = async () => {
     if (!sessionData) return;
     
     try {
-      // Optimistically update UI
-      setSessionData(prev => prev ? { ...prev, ...updatedData } : null);
+      // Prepare data for update
+      const updateData = { ...editData };
+      
+      // Check if nomination dates are valid
+      const hasValidNomination = updateData.nominationStart && 
+                               updateData.nominationEnd && 
+                               new Date(updateData.nominationStart) < new Date(updateData.nominationEnd);
+                               
+      if (!hasValidNomination) {
+        updateData.nominationStart = undefined;
+        updateData.nominationEnd = undefined;
+      }
+      
+      // When session is active, only restrict specific fields
+      // Title, description, and other fields should always be editable
+      if (isSessionActive()) {
+        // Remove only fields that can't be changed after session starts
+        delete updateData.votingStart; // Can't change start date
+        delete updateData.candidates;   // Can't change candidates
+        delete updateData.pollOptions;  // Can't change poll options
+      }
+      
+      // Show loading toast
+      toast({
+        title: "Saving changes...",
+        description: "Please wait while we save your changes.",
+      });
+      
+      // Ensure we're only sending fields that have actually changed
+      const originalData = { ...sessionData };
+      const changedFields = Object.keys(updateData).filter(key => {
+        const typedKey = key as keyof SessionData;
+        if (typedKey === 'candidates' || typedKey === 'pollOptions') {
+          return JSON.stringify(updateData[typedKey]) !== JSON.stringify(originalData[typedKey]);
+        }
+        return updateData[typedKey] !== originalData[typedKey];
+      });
+      
+      // Create a clean update object with only changed fields
+      const cleanUpdateData: Partial<SessionData> = {};
+      changedFields.forEach(key => {
+        const typedKey = key as keyof SessionData;
+        cleanUpdateData[typedKey] = updateData[typedKey] as any;
+      });
+      
+      // Don't send empty update
+      if (Object.keys(cleanUpdateData).length === 0) {
+        toast({
+          title: "No changes detected",
+          description: "No changes were made to save.",
+        });
+        setIsEditing(false);
+        return;
+      }
+      
+      console.log('Sending update with clean data:', cleanUpdateData);
       
       // Map frontend updates to backend format
-      const backendUpdates = mapSessionDataToBackendUpdates(updatedData);
+      const backendUpdates = mapSessionDataToBackendUpdates(cleanUpdateData);
       
-      // Call backend API to update session (commented out as the PATCH endpoint is not ready yet)
-      // await sessionService.updateSession(sessionData.id, backendUpdates);
+      // Call backend API to update session
+      const updatedSession = await sessionService.updateSession(sessionData.id, backendUpdates);
+      
+      // Map the updated session back to our format
+      const mappedSession = mapSessionToSessionData(updatedSession as Session);
+      
+      // Update UI after successful save
+      setSessionData(mappedSession);
+      setEditData(mappedSession);
+      
+      // Exit edit mode
+      setIsEditing(false);
       
       toast({
         title: "Changes saved",
-        description: "Session has been updated successfully.",
+        description: "All session changes have been updated successfully.",
       });
     } catch (err: any) {
       console.error("Failed to update session:", err);
       toast({
         title: "Error",
-        description: "Failed to update session. Please try again.",
+        description: err.message || "Failed to update session. Please try again.",
         variant: "destructive"
       });
-      
-      // Revert optimistic update on error
-      const session = await sessionService.getSessionById(sessionId);
-      const mappedSession = mapSessionToSessionData(session as Session);
-      setSessionData(mappedSession);
+    }
+  };
+
+  // Update a part of the session (used by child components)
+  const handleUpdateSession = (updatedData: Partial<SessionData>) => {
+    if (!isEditing || !sessionData) return;
+    
+    // Only update if something actually changed to prevent unnecessary re-renders
+    let hasChanges = false;
+    
+    // Check if any values have changed before updating state
+    Object.keys(updatedData).forEach(key => {
+      const typedKey = key as keyof SessionData;
+      // Use deep comparison for arrays like candidates and pollOptions
+      if (typedKey === 'candidates' || typedKey === 'pollOptions') {
+        if (JSON.stringify(updatedData[typedKey]) !== JSON.stringify(editData[typedKey])) {
+          hasChanges = true;
+        }
+      } else if (updatedData[typedKey] !== editData[typedKey]) {
+        hasChanges = true;
+      }
+    });
+    
+    // Only update state if something actually changed
+    if (hasChanges) {
+      // Use functional state update to ensure latest state
+      setEditData(prev => {
+        const newState = { ...prev, ...updatedData };
+        console.log('Updated edit data', newState);
+        return newState;
+      });
     }
   };
 
@@ -274,21 +526,6 @@ export function VoteSessionManagement() {
     if (!sessionData) return;
     
     try {
-      // Get available sessions before deleting the current one
-      const [mySessions, memberSessions] = await Promise.all([
-        sessionService.getUserSessions(),
-        sessionService.getUserSessionsAsMember()
-      ]);
-      
-      // Combine all sessions
-      const allSessions = [
-        ...mySessions,
-        ...(memberSessions.sessions || [])
-      ];
-      
-      // Filter out the current session
-      const otherSessions = allSessions.filter(session => session._id !== sessionData.id);
-      
       // Delete the current session
       await sessionService.deleteSession(sessionData.id);
       
@@ -297,26 +534,45 @@ export function VoteSessionManagement() {
         description: `Your ${sessionData.sessionType.toLowerCase()} session has been deleted.`,
       });
       
-      // Redirect logic
-      if (otherSessions.length > 0) {
-        // Get the first available session
-        const nextSession = otherSessions[0];
+      // After deletion, check if user has any other sessions
+      try {
+        // Get all sessions (both as leader and member)
+        const [mySessions, memberSessions] = await Promise.all([
+          sessionService.getUserSessions(),
+          sessionService.getUserSessionsAsMember()
+        ]);
         
-        // Determine the role based on the session creator
-        const isLeader = nextSession.createdBy?._id === sessionService.getCurrentUserId();
-        const roleSegment = isLeader ? 'team-leader' : 'team-member';
+        // Get all sessions
+        const allSessions = [
+          ...(mySessions || []),
+          ...(memberSessions?.sessions || [])
+        ];
         
-        // Navigate to the next available session
-        router.push(`/${roleSegment}/monitoring/${nextSession._id}`);
-      } else {
-        // If no other sessions available, go to dashboard
-        router.push("/dashboard");
+        // Navigate based on available sessions
+        if (allSessions.length > 0) {
+          // If there are other sessions, navigate to the first one
+          const nextSession = allSessions[0];
+          
+          // Determine if user is leader or member
+          const isLeader = nextSession.createdBy?._id === sessionService.getCurrentUserId();
+          const role = isLeader ? 'team-leader' : 'team-member';
+          
+          // Navigate to the next session
+          router.push(`/${role}/monitoring/${nextSession._id}`);
+        } else {
+          // If no other sessions, go to voter page
+          router.push('/voter');
+        }
+      } catch (error) {
+        console.error("Error checking for other sessions:", error);
+        // Default fallback - go to voter page
+        router.push('/voter');
       }
     } catch (err: any) {
       console.error("Failed to delete session:", err);
       toast({
         title: "Error",
-        description: "Failed to delete session. Please try again.",
+        description: err.message || "Failed to delete session. Please try again.",
         variant: "destructive"
       });
     }
@@ -358,7 +614,39 @@ export function VoteSessionManagement() {
     <div className="flex min-h-screen">
       {/* Main content */}
       <div className="flex-1 container mx-auto py-6 px-4 md:px-6 pb-24">
-        <SessionBanner sessionId={sessionData.id} />
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold">Session Management</h1>
+          {/* Edit button should always be visible */}
+          {sessionData && (
+            isEditing ? (
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleCancelEdit}>
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveEdit}>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save All Changes
+                </Button>
+              </div>
+            ) : (
+              <Button onClick={() => setIsEditing(true)}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Session
+              </Button>
+            )
+          )}
+        </div>
+
+        {isSessionActive() && (
+          <div className="bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded-md p-3 mb-4 text-yellow-800 dark:text-yellow-400">
+            <p className="text-sm">
+              <strong>Note:</strong> When a session is active, you can still edit most fields including title and description, but candidates/options and start date cannot be modified.
+            </p>
+          </div>
+        )}
+        
+        <SessionBanner sessionId={sessionData?.id || ""} />
 
         {isMobile ? (
           <Tabs defaultValue="metadata" className="w-full mt-6">
@@ -368,20 +656,37 @@ export function VoteSessionManagement() {
               <TabsTrigger value="content">Content</TabsTrigger>
             </TabsList>
             <TabsContent value="metadata">
-              <SessionMetadata sessionData={sessionData} onUpdate={handleUpdateSession} />
+              <SessionMetadata 
+                sessionData={sessionData as SessionData} 
+                editData={editData as SessionData}
+                isEditing={isEditing}
+                isActive={isSessionActive()}
+                onUpdate={handleUpdateSession}
+                onChange={handleFieldChange}
+              />
             </TabsContent>
             <TabsContent value="settings">
-              <SessionSettings sessionData={sessionData} onUpdate={handleUpdateSession} />
+              <SessionSettings 
+                sessionData={sessionData as SessionData} 
+                editData={editData as SessionData}
+                isEditing={isEditing}
+                isActive={isSessionActive()}
+                onUpdate={handleUpdateSession}
+                onChange={handleFieldChange}
+                hasProFeatures={hasProFeatures()}
+              />
             </TabsContent>
             <TabsContent value="content">
-              {sessionData.sessionType === "Poll" ? (
+              {sessionData?.sessionType === "Poll" ? (
                 <PollOptions
                   options={sessionData.pollOptions}
+                  isEditing={isEditing && !isSessionActive()}
                   onUpdate={(options) => handleUpdateSession({ pollOptions: options })}
                 />
               ) : (
                 <CandidateTable
-                  candidates={sessionData.candidates}
+                  candidates={sessionData?.candidates || []}
+                  isEditing={isEditing && !isSessionActive()}
                   onUpdate={(candidates) => handleUpdateSession({ candidates })}
                   isNominationActive={isNominationActive()}
                 />
@@ -391,18 +696,35 @@ export function VoteSessionManagement() {
         ) : (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-              <SessionMetadata sessionData={sessionData} onUpdate={handleUpdateSession} />
-              <SessionSettings sessionData={sessionData} onUpdate={handleUpdateSession} />
+              <SessionMetadata 
+                sessionData={sessionData as SessionData} 
+                editData={editData as SessionData}
+                isEditing={isEditing}
+                isActive={isSessionActive()}
+                onUpdate={handleUpdateSession}
+                onChange={handleFieldChange}
+              />
+              <SessionSettings 
+                sessionData={sessionData as SessionData} 
+                editData={editData as SessionData}
+                isEditing={isEditing}
+                isActive={isSessionActive()}
+                onUpdate={handleUpdateSession}
+                onChange={handleFieldChange}
+                hasProFeatures={hasProFeatures()}
+              />
             </div>
             <div className="mt-6">
-              {sessionData.sessionType === "Poll" ? (
+              {sessionData?.sessionType === "Poll" ? (
                 <PollOptions
                   options={sessionData.pollOptions}
+                  isEditing={isEditing && !isSessionActive()}
                   onUpdate={(options) => handleUpdateSession({ pollOptions: options })}
                 />
               ) : (
                 <CandidateTable
-                  candidates={sessionData.candidates}
+                  candidates={sessionData?.candidates || []}
+                  isEditing={isEditing && !isSessionActive()}
                   onUpdate={(candidates) => handleUpdateSession({ candidates })}
                   isNominationActive={isNominationActive()}
                 />
@@ -412,7 +734,7 @@ export function VoteSessionManagement() {
         )}
 
         <SessionActions
-          sessionType={sessionData.sessionType}
+          sessionType={sessionData?.sessionType || "Poll"}
           onStartSession={handleStartSession}
           onStopSession={handleStopSession}
           onDeleteSession={handleDeleteSession}
@@ -421,6 +743,3 @@ export function VoteSessionManagement() {
     </div>
   )
 }
-
-// Add Button import for error state
-import { Button } from "@/components/shadcn-ui/button"

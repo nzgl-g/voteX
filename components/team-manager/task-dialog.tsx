@@ -25,6 +25,7 @@ import { format } from "date-fns"
 import { CalendarIcon, Clock, Loader2 } from "lucide-react"
 import { teamService, TeamMember as ApiTeamMember } from "@/api/team-service"
 import { sessionService } from "@/api/session-service"
+import { taskService } from "@/api/task-service"
 
 interface TeamMember {
   _id: string
@@ -46,7 +47,7 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [color, setColor] = useState("#4f46e5")
-  const [priority, setPriority] = useState("medium")
+  const [priority, setPriority] = useState<"low" | "medium" | "high">("medium")
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [assignedMembers, setAssignedMembers] = useState<string[]>(selectedMembers)
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
@@ -122,14 +123,40 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    toast({
-      title: "Task created",
-      description: `Task "${title}" has been created and assigned to ${
-        assignedMembers.length
-      } member${assignedMembers.length !== 1 ? "s" : ""}.`,
-    })
-    resetForm()
-    onClose()
+    setIsLoading(true)
+    
+    const taskData = {
+      title,
+      description,
+      priority,
+      dueDate: date ? date.toISOString() : undefined,
+      assignedMembers,
+      session: sessionId,
+      color,
+    }
+    
+    taskService.createTask(taskData)
+      .then(createdTask => {
+        toast({
+          title: "Task created",
+          description: `Task "${title}" has been created and assigned to ${
+            assignedMembers.length
+          } member${assignedMembers.length !== 1 ? "s" : ""}.`,
+        })
+        resetForm()
+        onClose()
+      })
+      .catch(error => {
+        console.error("Error creating task:", error)
+        toast({
+          title: "Error",
+          description: "Failed to create task. Please try again.",
+          variant: "destructive",
+        })
+      })
+      .finally(() => {
+        setIsLoading(false)
+      })
   }
 
   const resetForm = () => {
@@ -203,7 +230,10 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
 
             <div className="space-y-2">
               <Label htmlFor="priority">Priority</Label>
-              <Select defaultValue={priority} onValueChange={setPriority}>
+              <Select 
+                defaultValue={priority} 
+                onValueChange={(value: "low" | "medium" | "high") => setPriority(value)}
+              >
                 <SelectTrigger id="priority">
                   <SelectValue placeholder="Select priority" />
                 </SelectTrigger>

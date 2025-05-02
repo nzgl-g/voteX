@@ -11,25 +11,27 @@ import { toast } from "@/hooks/use-toast"
 
 interface SessionSettingsProps {
   sessionData: SessionData
+  editData: SessionData
+  isEditing: boolean
+  isActive: boolean
+  hasProFeatures: boolean
   onUpdate: (data: Partial<SessionData>) => void
+  onChange: (field: keyof SessionData, value: any) => void
 }
 
-export function SessionSettings({ sessionData, onUpdate }: SessionSettingsProps) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [formData, setFormData] = useState(sessionData)
+export function SessionSettings({ 
+  sessionData, 
+  editData, 
+  isEditing, 
+  isActive,
+  hasProFeatures,
+  onUpdate, 
+  onChange 
+}: SessionSettingsProps) {
   const [showSecretPhrase, setShowSecretPhrase] = useState(false)
 
   const handleChange = (field: keyof SessionData, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const handleSave = () => {
-    onUpdate(formData)
-    setIsEditing(false)
-    toast({
-      title: "Changes saved",
-      description: "Session settings have been updated successfully.",
-    })
+    onChange(field, value);
   }
 
   const generateSecretPhrase = () => {
@@ -45,30 +47,6 @@ export function SessionSettings({ sessionData, onUpdate }: SessionSettingsProps)
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-xl font-bold">Session Settings</CardTitle>
-        {isEditing ? (
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setIsEditing(false)
-                setFormData(sessionData)
-              }}
-            >
-              <X className="h-4 w-4 mr-2" />
-              Cancel
-            </Button>
-            <Button size="sm" onClick={handleSave}>
-              <Save className="h-4 w-4 mr-2" />
-              Save
-            </Button>
-          </div>
-        ) : (
-          <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
-            <Edit className="h-4 w-4 mr-2" />
-            Edit
-          </Button>
-        )}
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-3">
@@ -76,7 +54,7 @@ export function SessionSettings({ sessionData, onUpdate }: SessionSettingsProps)
           <div className="grid grid-cols-2 gap-4">
             <div
               className={`border rounded-lg p-4 text-center cursor-pointer transition-colors ${
-                formData.resultVisibility === "Public"
+                editData.resultVisibility === "Public"
                   ? "border-primary bg-primary/5"
                   : isEditing
                     ? "hover:border-muted-foreground"
@@ -89,7 +67,7 @@ export function SessionSettings({ sessionData, onUpdate }: SessionSettingsProps)
             </div>
             <div
               className={`border rounded-lg p-4 text-center cursor-pointer transition-colors ${
-                formData.resultVisibility === "Private"
+                editData.resultVisibility === "Private"
                   ? "border-primary bg-primary/5"
                   : isEditing
                     ? "hover:border-muted-foreground"
@@ -108,7 +86,7 @@ export function SessionSettings({ sessionData, onUpdate }: SessionSettingsProps)
           <div className="grid grid-cols-2 gap-4">
             <div
               className={`border rounded-lg p-4 text-center cursor-pointer transition-colors ${
-                formData.verificationMethod === "Standard"
+                editData.verificationMethod === "Standard"
                   ? "border-primary bg-primary/5"
                   : isEditing
                     ? "hover:border-muted-foreground"
@@ -121,16 +99,19 @@ export function SessionSettings({ sessionData, onUpdate }: SessionSettingsProps)
             </div>
             <div
               className={`border rounded-lg p-4 text-center cursor-pointer transition-colors ${
-                formData.verificationMethod === "KYC"
+                editData.verificationMethod === "KYC"
                   ? "border-primary bg-primary/5"
-                  : isEditing
+                  : isEditing && hasProFeatures
                     ? "hover:border-muted-foreground"
-                    : ""
+                    : "opacity-50"
               }`}
-              onClick={() => isEditing && handleChange("verificationMethod", "KYC")}
+              onClick={() => isEditing && hasProFeatures && handleChange("verificationMethod", "KYC")}
             >
               <div className="font-medium mb-1">KYC</div>
-              <div className="text-xs text-muted-foreground">Advanced identity verification</div>
+              <div className="text-xs text-muted-foreground">
+                Advanced identity verification
+                {!hasProFeatures && <span className="block mt-1 text-yellow-500">Pro Plan Feature</span>}
+              </div>
             </div>
           </div>
         </div>
@@ -140,7 +121,7 @@ export function SessionSettings({ sessionData, onUpdate }: SessionSettingsProps)
           <div className="grid grid-cols-2 gap-4">
             <div
               className={`border rounded-lg p-4 text-center cursor-pointer transition-colors ${
-                formData.accessLevel === "Public"
+                editData.accessLevel === "Public"
                   ? "border-primary bg-primary/5"
                   : isEditing
                     ? "hover:border-muted-foreground"
@@ -153,36 +134,39 @@ export function SessionSettings({ sessionData, onUpdate }: SessionSettingsProps)
             </div>
             <div
               className={`border rounded-lg p-4 text-center cursor-pointer transition-colors ${
-                formData.accessLevel === "Private"
+                editData.accessLevel === "Private"
                   ? "border-primary bg-primary/5"
-                  : isEditing
+                  : isEditing && hasProFeatures
                     ? "hover:border-muted-foreground"
-                    : ""
+                    : "opacity-50"
               }`}
-              onClick={() => isEditing && handleChange("accessLevel", "Private")}
+              onClick={() => isEditing && hasProFeatures && handleChange("accessLevel", "Private")}
             >
               <div className="font-medium mb-1">Private</div>
-              <div className="text-xs text-muted-foreground">Restricted access</div>
+              <div className="text-xs text-muted-foreground">
+                Restricted access
+                {!hasProFeatures && <div className="mt-1 text-yellow-500">Pro Plan Feature</div>}
+              </div>
             </div>
           </div>
         </div>
 
-        {(formData.accessLevel === "Private" || sessionData.accessLevel === "Private") && (
+        {(editData.accessLevel === "Private" || sessionData.accessLevel === "Private") && hasProFeatures && (
           <div className="space-y-3">
             <Label>Private Access Methods</Label>
             <div className="grid grid-cols-2 gap-4">
               <div
                 className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                  formData.secretPhrase
+                  editData.secretPhrase
                     ? "border-primary bg-primary/5"
                     : isEditing
                       ? "hover:border-muted-foreground"
                       : ""
                 }`}
-                onClick={() => isEditing && handleChange("secretPhrase", formData.secretPhrase || "secret-phrase")}
+                onClick={() => isEditing && !editData.secretPhrase && generateSecretPhrase()}
               >
                 <div className="font-medium mb-2 text-center">Secret Phrase</div>
-                {formData.secretPhrase && (
+                {editData.secretPhrase && (
                   <div className="mt-2 space-y-2">
                     <div className="flex items-center justify-between">
                       <Label htmlFor="secretPhrase" className="text-xs">
@@ -219,7 +203,7 @@ export function SessionSettings({ sessionData, onUpdate }: SessionSettingsProps)
                       <Input
                         id="secretPhrase"
                         type={showSecretPhrase ? "text" : "password"}
-                        value={formData.secretPhrase}
+                        value={editData.secretPhrase}
                         onChange={(e) => {
                           e.stopPropagation()
                           handleChange("secretPhrase", e.target.value)
@@ -229,7 +213,7 @@ export function SessionSettings({ sessionData, onUpdate }: SessionSettingsProps)
                       />
                     ) : (
                       <div className="text-xs font-mono bg-muted p-1.5 rounded-md">
-                        {showSecretPhrase ? formData.secretPhrase : "••••••••••••••••"}
+                        {showSecretPhrase ? editData.secretPhrase : "••••••••••••••••"}
                       </div>
                     )}
                   </div>
@@ -238,30 +222,46 @@ export function SessionSettings({ sessionData, onUpdate }: SessionSettingsProps)
 
               <div
                 className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                  formData.csvEmailFiltering
+                  editData.csvEmailFiltering
                     ? "border-primary bg-primary/5"
-                    : isEditing
+                    : isEditing && hasProFeatures
                       ? "hover:border-muted-foreground"
-                      : ""
+                      : "opacity-50"
                 }`}
-                onClick={() => isEditing && handleChange("csvEmailFiltering", !formData.csvEmailFiltering)}
+                onClick={() => isEditing && hasProFeatures && handleChange("csvEmailFiltering", !editData.csvEmailFiltering)}
               >
                 <div className="font-medium mb-2 text-center">CSV Email Filtering</div>
-                {formData.csvEmailFiltering && (
-                  <div className="mt-2 space-y-2">
-                    {isEditing ? (
-                      <div className="border-2 border-dashed rounded-md p-2 flex flex-col items-center justify-center">
-                        <Upload className="h-4 w-4 text-muted-foreground mb-1" />
-                        <p className="text-xs text-muted-foreground">Upload CSV file</p>
-                        <p className="text-[10px] text-muted-foreground">Format: Full Name, Email</p>
-                      </div>
-                    ) : (
-                      <div className="text-xs text-center text-muted-foreground">CSV filtering is enabled</div>
-                    )}
+                <div className="text-xs text-muted-foreground text-center">
+                  Restrict access to specific emails
+                </div>
+                {editData.csvEmailFiltering && hasProFeatures && (
+                  <div className="mt-3 text-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-8 w-full"
+                      disabled={!isEditing}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        // Handle CSV upload
+                      }}
+                    >
+                      <Upload className="h-3 w-3 mr-1" />
+                      {isEditing ? "Upload CSV" : "CSV Uploaded"}
+                    </Button>
                   </div>
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {(editData.accessLevel === "Private" || sessionData.accessLevel === "Private") && !hasProFeatures && (
+          <div className="border rounded-lg p-4 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-800 text-center space-y-2 mt-4">
+            <div className="font-medium text-yellow-700 dark:text-yellow-400">Pro Plan Required</div>
+            <p className="text-sm text-yellow-700 dark:text-yellow-400">
+              Private access features require a Pro plan subscription. Upgrade to access Secret Phrase and CSV Email Filtering.
+            </p>
           </div>
         )}
       </CardContent>

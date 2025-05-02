@@ -86,11 +86,43 @@ export const teamService = {
    */
   async inviteUserToTeam(teamId: string, email: string): Promise<TeamInviteResponse> {
     try {
+      // Check if user is trying to invite themselves
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        if (user.email === email) {
+          throw new Error('You cannot invite yourself to the team.');
+        }
+      }
+      
       const response = await api.post(`/teams/${teamId}/invite`, { email });
       return response.data;
     } catch (error: any) {
+      // Handle specific error responses
+      if (error.response) {
+        const status = error.response.status;
+        const errorMessage = error.response.data;
+        
+        if (status === 400) {
+          if (errorMessage === "Pending invitation already exists") {
+            throw new Error('An invitation has already been sent to this user.');
+          } else if (errorMessage === "User is already part of the team") {
+            throw new Error('This user is already a member of the team.');
+          } else if (errorMessage === "Email is required") {
+            throw new Error('Please enter a valid email address.');
+          }
+        } else if (status === 404) {
+          if (errorMessage === "User not found") {
+            throw new Error('No user with this email was found in the system.');
+          } else if (errorMessage === "Team not found") {
+            throw new Error('The team information could not be found.');
+          }
+        }
+      }
+      
+      // If the error wasn't handled above, provide a detailed error
       console.error(`Failed to invite user to team ${teamId}:`, error);
-      throw new Error(error.response?.data || `Failed to invite user to team ${teamId}`);
+      throw new Error(error.response?.data || `Failed to send invitation. Please try again later.`);
     }
   },
 

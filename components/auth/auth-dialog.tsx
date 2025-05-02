@@ -23,6 +23,7 @@ import {
 import { Button } from "@/components/shadcn-ui/button"
 import { Input } from "@/components/shadcn-ui/input"
 import { Label } from "@/components/shadcn-ui/label"
+import { sessionService } from "@/api/session-service"
 
 // Login form types
 type LoginFormData = {
@@ -131,16 +132,14 @@ export function AuthDialog({
         // Fetch user sessions to determine where to redirect
         try {
           // First check if user has team leader sessions
-          const response = await fetch('/api/sessions/my-sessions')
-          const sessions = await response.json()
+          const sessions = await sessionService.getUserSessions();
           
           if (sessions && sessions.length > 0) {
             // User has team leader sessions, redirect to the first one
             router.push(`/team-leader/monitoring/${sessions[0]._id}`)
           } else {
             // Check if user has team member sessions
-            const memberResponse = await fetch('/api/sessions/my-sessions-as-member')
-            const memberData = await memberResponse.json()
+            const memberData = await sessionService.getUserSessionsAsMember();
             
             if (memberData.sessions && memberData.sessions.length > 0) {
               // User has team member sessions, redirect to the first one

@@ -186,6 +186,7 @@ export interface CalendarEvent {
   color?: EventColor;
   label?: string;
   location?: string;
+  etiquette?: string;
 }
 
 export type EventColor = "blue" | "orange" | "violet" | "rose" | "emerald";

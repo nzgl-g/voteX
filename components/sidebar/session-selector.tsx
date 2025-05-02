@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { ChevronDown, Plus, Vote, BarChart, Trophy, Loader2, AlertCircle, User, Users, Home } from "lucide-react"
 import { useRouter, usePathname } from "next/navigation"
 import apiClient from "@/lib/api"
+import { PricingDialog } from "@/components/pricing-dialog"
 
 import {
   DropdownMenu,
@@ -44,31 +45,45 @@ interface SessionItem {
 // No Sessions Dialog Component
 function NoSessionsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const router = useRouter()
+  const [isPricingOpen, setIsPricingOpen] = useState(false)
 
   const handleCreateSession = () => {
-    router.push('/subscription')
+    setIsPricingOpen(true)
     onOpenChange(false)
   }
 
+  const handlePlanSelected = (plan: "free" | "pro" | "enterprise") => {
+    setIsPricingOpen(false)
+    router.push(`/session-setup?plan=${plan}`)
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-yellow-500" />
-            No Sessions Available
-          </DialogTitle>
-          <DialogDescription>
-            You don't have any active sessions. Create a new session to get started.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="sm:justify-center">
-          <Button onClick={handleCreateSession} className="w-full">
-            Create New Session
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-500" />
+              No Sessions Available
+            </DialogTitle>
+            <DialogDescription>
+              You don't have any active sessions. Create a new session to get started.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center">
+            <Button onClick={handleCreateSession} className="w-full">
+              Create New Session
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <PricingDialog 
+        open={isPricingOpen} 
+        onOpenChange={setIsPricingOpen} 
+        onPlanSelected={handlePlanSelected} 
+      />
+    </>
   )
 }
 
@@ -80,6 +95,7 @@ export function SessionSelector() {
   const [showNoSessionsDialog, setShowNoSessionsDialog] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
+  const [isPricingOpen, setIsPricingOpen] = useState(false)
 
   // Function to fetch user sessions from the server
   const fetchSessions = async () => {
@@ -121,6 +137,12 @@ export function SessionSelector() {
         // If no sessions found, show the dialog
         if (allSessions.length === 0) {
           setShowNoSessionsDialog(true)
+          setActiveSession(null)
+          // Check if we're on a session-specific path, if so redirect to voter
+          const pathSegments = pathname.split('/')
+          if (pathSegments.includes('team-leader') || pathSegments.includes('team-member')) {
+            router.push('/voter')
+          }
         } else {
           setShowNoSessionsDialog(false)
           
@@ -147,6 +169,13 @@ export function SessionSelector() {
           console.error('Response error:', error.response.status, error.response.data)
         }
         setShowNoSessionsDialog(true)
+        setActiveSession(null)
+        
+        // If we're on a session-specific path and there's an error, redirect to voter
+        const pathSegments = pathname.split('/')
+        if (pathSegments.includes('team-leader') || pathSegments.includes('team-member')) {
+          router.push('/voter')
+        }
       }
     } finally {
       setLoading(false)
@@ -191,7 +220,12 @@ export function SessionSelector() {
 
   // Handle creating a new session
   const handleCreateSession = () => {
-    router.push('/subscription')
+    setIsPricingOpen(true)
+  }
+
+  const handlePlanSelected = (plan: "free" | "pro" | "enterprise") => {
+    setIsPricingOpen(false)
+    router.push(`/session-setup?plan=${plan}`)
   }
 
   // Handle navigating to voter page
@@ -268,6 +302,11 @@ export function SessionSelector() {
   return (
     <>
       <NoSessionsDialog open={showNoSessionsDialog} onOpenChange={setShowNoSessionsDialog} />
+      <PricingDialog 
+        open={isPricingOpen} 
+        onOpenChange={setIsPricingOpen} 
+        onPlanSelected={handlePlanSelected} 
+      />
       <SidebarMenu>
         <SidebarMenuItem>
           <DropdownMenu>

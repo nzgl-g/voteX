@@ -23,13 +23,19 @@ export function VerificationStep({ formState, updateFormState }: VerificationSte
         <h3 className="text-lg font-medium">Verification Method</h3>
         <p className="text-muted-foreground">Choose how voters will verify their identity before voting</p>
 
+        {!isPro && (
+          <div className="bg-muted/50 p-3 rounded-md text-sm text-muted-foreground mb-4 border border-border/50">
+            <span className="font-medium">Note:</span> KYC verification is available on Pro and Enterprise plans only.
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
           {/* Standard Verification */}
           <Card
             className={`cursor-pointer transition-all hover:border-primary ${
               formState.verificationMethod === "standard" ? "border-2 border-primary" : ""
             }`}
-            onClick={() => handleVerificationMethodChange("kyc")}
+            onClick={() => handleVerificationMethodChange("standard")}
           >
             <CardHeader className="pb-2">
               <Mail className="h-8 w-8 text-primary mb-2" />

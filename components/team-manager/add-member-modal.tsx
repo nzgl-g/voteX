@@ -21,6 +21,7 @@ import { Search, Mail, User, Check } from "lucide-react"
 import { teamService } from "@/api/team-service"
 import { sessionService } from "@/api/session-service"
 import { userService, User as UserType } from "@/api/user-service"
+import { invitationService } from "@/api/invitation-service"
 
 interface AddMemberModalProps {
   isOpen: boolean
@@ -54,6 +55,20 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
     e.preventDefault()
     if (!inviteEmail || !sessionId) return
     
+    // Check if the user is trying to invite themselves
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const currentUser = JSON.parse(userStr);
+      if (currentUser.email === inviteEmail) {
+        toast({
+          title: "Invalid Email",
+          description: "You cannot invite yourself to the team.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
     setIsLoading(true)
     try {
       let teamId;
@@ -72,6 +87,27 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
         throw new Error(`No team found for session ${sessionId}`)
       }
       
+      // Check if an invitation is already pending for this email
+      try {
+        const isPending = await invitationService.isInvitationPending(inviteEmail, teamId);
+        if (isPending) {
+          toast({
+            title: "Invitation Already Sent",
+            description: `An invitation has already been sent to ${inviteEmail}.`,
+            variant: "default",
+          });
+          
+          // Reset form and close modal
+          setInviteEmail("");
+          setMessage("Hi there! I'd like to invite you to join our team on our project management platform.");
+          onClose();
+          return;
+        }
+      } catch (error) {
+        // Continue even if the check fails - the backend will catch duplicate invitations anyway
+        console.warn("Failed to check pending invitation status:", error);
+      }
+      
       // Use the team service to send the invitation
       const response = await teamService.inviteUserToTeam(teamId, inviteEmail)
       
@@ -87,9 +123,21 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
       onClose()
     } catch (error: any) {
       console.error("Failed to send invitation:", error)
+      
+      // Handle specific error messages with user-friendly responses
+      let errorMessage = error.message || "Failed to send invitation. Please try again.";
+      
+      if (errorMessage.includes("invitation has already been sent")) {
+        errorMessage = `An invitation has already been sent to ${inviteEmail}.`;
+      } else if (errorMessage.includes("already a member")) {
+        errorMessage = `${inviteEmail} is already a member of this team.`;
+      } else if (errorMessage.includes("User not found")) {
+        errorMessage = `No user with the email ${inviteEmail} was found in the system.`;
+      }
+      
       toast({
         title: "Invitation Failed",
-        description: error.message || "Failed to send invitation. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -111,6 +159,13 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
     if (value.length < 3) {
       setShowDropdown(false)
       setSearchResults([])
+      
+      // Show a small hint to the user if they start typing
+      if (value.length > 0) {
+        setShowDropdown(true)
+        setSearchResults([])
+        // This will be handled in the UI to show a message
+      }
       return
     }
     
@@ -120,12 +175,13 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
         setIsSearching(true)
         const results = await userService.searchUsers(value)
         setSearchResults(results)
-        setShowDropdown(results.length > 0)
-      } catch (error) {
+        setShowDropdown(true) // Always show dropdown to display "no results" message if needed
+      } catch (error: any) {
         console.error("Error searching users:", error)
+        setSearchResults([])
         toast({
           title: "Search Error",
-          description: "Failed to search for users. Please try again.",
+          description: error.message || "Failed to search for users. Please try again.",
           variant: "destructive",
         })
       } finally {
@@ -135,6 +191,20 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
   }
   
   const handleUserSelect = (user: UserType) => {
+    // Get current user to check if they're selecting themselves
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const currentUser = JSON.parse(userStr);
+      if (currentUser._id === user._id) {
+        toast({
+          title: "Invalid Selection",
+          description: "You cannot invite yourself to the team.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
     setSelectedUser(user)
     setSearchEmail(user.email)
     setShowDropdown(false)
@@ -149,6 +219,20 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
         variant: "destructive",
       })
       return
+    }
+    
+    // Double-check that user isn't inviting themselves
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const currentUser = JSON.parse(userStr);
+      if (currentUser._id === selectedUser._id || currentUser.email === selectedUser.email) {
+        toast({
+          title: "Invalid Selection",
+          description: "You cannot invite yourself to the team.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
     
     setIsLoading(true)
@@ -169,6 +253,28 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
         throw new Error(`No team found for session ${sessionId}`)
       }
       
+      // Check if an invitation is already pending for this user
+      try {
+        const isPending = await invitationService.isInvitationPending(selectedUser.email, teamId);
+        if (isPending) {
+          toast({
+            title: "Invitation Already Sent",
+            description: `An invitation has already been sent to ${selectedUser.username}.`,
+            variant: "default",
+          });
+          
+          // Reset form and close modal
+          setSearchEmail("");
+          setSelectedUser(null);
+          setSearchResults([]);
+          onClose();
+          return;
+        }
+      } catch (error) {
+        // Continue even if the check fails - the backend will catch duplicate invitations anyway
+        console.warn("Failed to check pending invitation status:", error);
+      }
+      
       // Use the team service to send the invitation
       const response = await teamService.inviteUserToTeam(teamId, selectedUser.email)
       
@@ -185,9 +291,19 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
       onClose()
     } catch (error: any) {
       console.error("Failed to send invitation:", error)
+      
+      // Handle specific error messages with user-friendly responses
+      let errorMessage = error.message || "Failed to send invitation. Please try again.";
+      
+      if (errorMessage.includes("invitation has already been sent")) {
+        errorMessage = `An invitation has already been sent to ${selectedUser.username}.`;
+      } else if (errorMessage.includes("already a member")) {
+        errorMessage = `${selectedUser.username} is already a member of this team.`;
+      }
+      
       toast({
         title: "Invitation Failed",
-        description: error.message || "Failed to send invitation. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -231,31 +347,46 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
                   )}
                   
                   {/* User search results dropdown */}
-                  {showDropdown && searchResults.length > 0 && (
+                  {showDropdown && (
                     <div className="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
                       <ul className="max-h-60 overflow-auto py-1 text-sm">
-                        {searchResults.map((user) => (
-                          <li
-                            key={user._id}
-                            className={`flex cursor-pointer items-center px-3 py-2 hover:bg-gray-100 ${selectedUser?._id === user._id ? 'bg-gray-50' : ''}`}
-                            onClick={() => handleUserSelect(user)}
-                          >
-                            <div className="mr-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                              {user.profilePic ? (
-                                <img src={user.profilePic} alt={user.username} className="h-8 w-8 rounded-full" />
-                              ) : (
-                                <User className="h-4 w-4 text-primary" />
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <p className="font-medium">{user.fullName || user.username}</p>
-                              <p className="text-xs text-gray-500">{user.email}</p>
-                            </div>
-                            {selectedUser?._id === user._id && (
-                              <Check className="h-4 w-4 text-green-500" />
-                            )}
+                        {isSearching ? (
+                          <li className="flex items-center justify-center px-3 py-4">
+                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                            <span className="ml-2">Searching...</span>
                           </li>
-                        ))}
+                        ) : searchEmail.length < 3 ? (
+                          <li className="flex items-center px-3 py-4 text-muted-foreground">
+                            Please enter at least 3 characters to search
+                          </li>
+                        ) : searchResults.length === 0 ? (
+                          <li className="flex items-center px-3 py-4 text-muted-foreground">
+                            No users found. Try a different search term.
+                          </li>
+                        ) : (
+                          searchResults.map((user) => (
+                            <li
+                              key={user._id}
+                              className={`flex cursor-pointer items-center px-3 py-2 hover:bg-gray-100 ${selectedUser?._id === user._id ? 'bg-gray-50' : ''}`}
+                              onClick={() => handleUserSelect(user)}
+                            >
+                              <div className="mr-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                                {user.profilePic ? (
+                                  <img src={user.profilePic} alt={user.username} className="h-8 w-8 rounded-full" />
+                                ) : (
+                                  <User className="h-4 w-4 text-primary" />
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-medium">{user.fullName || user.username}</p>
+                                <p className="text-xs text-gray-500">{user.email}</p>
+                              </div>
+                              {selectedUser?._id === user._id && (
+                                <Check className="h-4 w-4 text-green-500" />
+                              )}
+                            </li>
+                          ))
+                        )}
                       </ul>
                     </div>
                   )}

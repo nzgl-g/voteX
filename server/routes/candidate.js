@@ -83,7 +83,11 @@ router.post("/apply", auth, async (req, res) => {
     if (!session) {
       return res.status(404).json({ message: "Session not found" });
     }
-
+    if (session.type === "poll") {
+      return res
+        .status(400)
+        .json({ message: "Poll sessions do not allow candidates." });
+    }
     if (session.createdBy.equals(userId)) {
       return res
         .status(400)

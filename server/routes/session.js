@@ -12,9 +12,9 @@ const router = express.Router();
 router.get("/", async (req, res) => {
   try {
     const sessions = await Session.find({})
-      .populate("team")
-      .populate("createdBy")
-      .exec();
+        .populate("team")
+        .populate("createdBy")
+        .exec();
 
     res.status(200).json(sessions);
   } catch (err) {
@@ -28,17 +28,17 @@ router.get("/my-sessions", auth, async (req, res) => {
     const userId = req.user._id;
     console.log(userId);
     const sessions = await Session.find({ createdBy: userId })
-      .populate("team")
-      .populate("createdBy", "username email")
-      .populate({
-        path: "participants",
-        select: "userId",
-      })
-      .populate({
-        path: "assignedReviewer",
-        select: "username",
-      })
-      .exec();
+        .populate("team")
+        .populate("createdBy", "username email")
+        .populate({
+          path: "participants",
+          select: "userId",
+        })
+        .populate({
+          path: "assignedReviewer",
+          select: "username",
+        })
+        .exec();
 
     res.status(200).json(sessions);
   } catch (err) {
@@ -90,8 +90,8 @@ router.get("/by-phrase/:phrase", auth, async (req, res) => {
 
     if (!session) {
       return res
-        .status(404)
-        .json({ message: "Session not found or invalid phrase" });
+          .status(404)
+          .json({ message: "Session not found or invalid phrase" });
     }
     res.json(session);
   } catch (err) {
@@ -106,14 +106,14 @@ router.get("/:sessionId", auth, async (req, res) => {
       return res.status(400).json({ error: "Invalid session ID" });
     }
     const session = await Session.findById(req.params.sessionId)
-      .populate("team")
-      .populate("createdBy", "username email")
-      .populate({
-        path: "participants",
-        select: "userId",
-      })
-      .populate("assignedReviewer", "username")
-      .exec();
+        .populate("team")
+        .populate("createdBy", "username email")
+        .populate({
+          path: "participants",
+          select: "userId",
+        })
+        .populate("assignedReviewer", "username")
+        .exec();
     if (!session) {
       return res.status(404).json({ message: "Session not found" });
     }
@@ -133,43 +133,31 @@ router.get("/:sessionId", auth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res
-      .status(500)
-      .json({ message: "Failed to fetch session", error: err.message });
+        .status(500)
+        .json({ message: "Failed to fetch session", error: err.message });
   }
 });
 router.delete("/:sessionId", auth, async (req, res) => {
   try {
-    const sessionId = req.params.sessionId;
-    
-    if (!isValidObjectId(sessionId)) {
-      return res.status(400).json({ error: "Invalid session ID format" });
-    }
-    
-    const session = await Session.findById(sessionId).populate("team");
-    if (!session) return res.status(404).json({ error: "Session not found" });
+    const session = await Session.findById(req.params.id).populate("team");
+    if (!session) return res.status(404).send("Session not found");
 
     const team = session.team;
-    if (!team) return res.status(400).json({ error: "No team assigned to this session" });
+    if (!team) return res.status(400).send("No team assigned to this session");
 
     if (!team.leader.equals(req.user._id)) {
       return res
-        .status(403)
-        .json({ error: "Access denied. Not authorized as team leader" });
+          .status(403)
+          .send("Access denied. Not authorized as team leader");
     }
-    
-    // Delete all participants
-    await SessionParticipant.deleteMany({ sessionId });
-    
-    // Delete team
+    await SessionParticipant.deleteMany({ _id: { $in: session.participants } });
     await Team.findByIdAndDelete(team._id);
-    
-    // Delete session
     await session.deleteOne();
 
-    res.status(200).json({ message: "Session deleted successfully" });
+    res.send({ message: "Session deleted successfully" });
   } catch (err) {
     console.error("Error deleting session:", err);
-    res.status(500).json({ error: "Server error", details: err.message });
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 
@@ -198,8 +186,8 @@ router.post("/", auth, async (req, res) => {
       const existingSession = await Session.findOne({ secretPhrase });
       if (existingSession) {
         return res
-          .status(400)
-          .json({ message: "This secret phrase is already in use." });
+            .status(400)
+            .json({ message: "This secret phrase is already in use." });
       }
     }
     const creator = req.user._id;
@@ -274,83 +262,42 @@ router.post("/", auth, async (req, res) => {
 router.patch("/:sessionId/edit-request", auth, async (req, res) => {
   try {
     const sessionId = req.params.sessionId;
-    
-    if (!isValidObjectId(sessionId)) {
-      return res.status(400).json({ error: "Invalid session ID format" });
-    }
-    
-    console.log(`Updating session ${sessionId} with data:`, JSON.stringify(req.body, null, 2));
-    
-    const session = await Session.findById(sessionId).populate("team");
+    const updates = req.body;
+    const userId = req.user._id;
+
+    const session = await Session.findById(sessionId);
     if (!session) return res.status(404).json({ error: "Session not found" });
+    await session.populate({
+      path: "team",
+      select: "leader members", // Only populate these fields
+    });
+    if (session.team.leader.equals(userId)) {
+      await session.updateOne({ $set: updates });
+      return res.status(200).json({ message: "Session updated successfully" });
+    }
+    if (session.allowDirectEdit) {
+      if (!session.team.members.some((m) => m.equals(userId))) {
+        return res
+            .status(403)
+            .json({ error: "Only team members can propose edits" });
+      }
+      await session.updateOne({ $set: updates });
+      return res.status(200).json({ message: "Session updated successfully" });
+    }
+    const editRequest = new SessionEditRequest({
+      session: sessionId,
+      proposedBy: userId,
+      updates,
+      status: "pending",
+    });
 
-    const team = session.team;
-    if (!team) return res.status(400).json({ error: "No team assigned to this session" });
-
-    // Check if user is authorized to update this session
-    if (!team.leader.equals(req.user._id)) {
-      return res
-        .status(403)
-        .json({ error: "Access denied. Not authorized as team leader" });
-    }
-    
-    // Get the data to update
-    const updateData = req.body;
-    
-    // Check if session has started - limit ONLY specific changes if it has
-    const hasSessionStarted = session.sessionLifecycle && 
-                            session.sessionLifecycle.startedAt && 
-                            new Date(session.sessionLifecycle.startedAt) <= new Date();
-                            
-    if (hasSessionStarted) {
-      console.log("Session already started, restricting only specific fields");
-      
-      // Prevent changing candidates or options after session has started
-      if (updateData.options) {
-        console.log("Removing options from update - session is active");
-        delete updateData.options;
-      }
-      
-      if (updateData.candidates) {
-        console.log("Removing candidates from update - session is active");
-        delete updateData.candidates;
-      }
-      
-      // Don't allow changing start date after session has started
-      if (updateData.sessionLifecycle && updateData.sessionLifecycle.startedAt) {
-        console.log("Removing startedAt from update - session is active");
-        delete updateData.sessionLifecycle.startedAt;
-      }
-      
-      // All other fields can be edited even if session has started
-    }
-    
-    console.log("Applying updates:", JSON.stringify(updateData, null, 2));
-    
-    // Update the session
-    try {
-      const updatedSession = await Session.findByIdAndUpdate(
-        sessionId, 
-        updateData, 
-        { new: true, runValidators: true }
-      );
-      
-      // Populate related fields
-      await updatedSession.populate("team");
-      await updatedSession.populate("createdBy", "username email");
-      
-      console.log("Session updated successfully");
-      return res.json(updatedSession);
-    } catch (updateError) {
-      console.error("Error during session update:", updateError);
-      return res.status(400).json({ 
-        error: "Invalid update data", 
-        details: updateError.message 
-      });
-    }
-  } catch (error) {
-    console.error("Error updating session:", error);
-    return res.status(500).json({ error: "Server error. Unable to update session" });
+    await editRequest.save();
+    res.status(201).json({ message: "Edit request submitted.", editRequest });
+  } catch (err) {
+    console.error("Submit edit request error:", err);
+    res
+        .status(500)
+        .json({ error: "Failed to submit edit request", details: err.message });
   }
 });
 
@@ -360,19 +307,19 @@ router.patch("/edit-requests/:requestId/approve", auth, async (req, res) => {
     const userId = req.user._id;
 
     const editRequest = await SessionEditRequest.findById(requestId).populate(
-      "session"
+        "session"
     );
     if (!editRequest || editRequest.status !== "pending") {
       return res
-        .status(404)
-        .json({ error: "Valid edit request not found or not pending" });
+          .status(404)
+          .json({ error: "Valid edit request not found or not pending" });
     }
 
     const team = await Team.findOne({ session: editRequest.session._id });
     if (!team || !team.leader.equals(userId)) {
       return res
-        .status(403)
-        .json({ error: "Only the team leader can approve edits" });
+          .status(403)
+          .json({ error: "Only the team leader can approve edits" });
     }
 
     const updates = editRequest.updates;
@@ -396,22 +343,22 @@ router.patch("/edit-requests/:requestId/approve", auth, async (req, res) => {
     }, {});
 
     const updatedSession = await Session.findByIdAndUpdate(
-      editRequest.session._id,
-      { $set: filteredUpdates },
-      { new: true, runValidators: true }
+        editRequest.session._id,
+        { $set: filteredUpdates },
+        { new: true, runValidators: true }
     );
 
     editRequest.status = "approved";
     await editRequest.save();
 
     res
-      .status(200)
-      .json({ message: "Edit approved and applied", updatedSession });
+        .status(200)
+        .json({ message: "Edit approved and applied", updatedSession });
   } catch (err) {
     console.error("Approve edit error:", err);
     res
-      .status(500)
-      .json({ error: "Failed to approve edit", details: err.message });
+        .status(500)
+        .json({ error: "Failed to approve edit", details: err.message });
   }
 });
 

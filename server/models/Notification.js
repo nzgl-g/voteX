@@ -1,60 +1,30 @@
-const mongoose = require("mongoose");
+const express = require("express");
+const router = express.Router();
+const Notification = require("../models/Notification");
+const auth = require("../middleware/auth");
 
-const notificationSchema = new mongoose.Schema({
-  recipients: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // Users receiving the notification
+router.get("/", auth, async (req, res) => {
+  let { limit = 5, skip = 0 } = req.query;
+  const userId = req.user._id;
 
-  targetType: {
-    type: String,
-    enum: ["user", "team", "all"],
-    default: "user",
-  },
-  teamId: {
-    // Optional field for team-based notifications
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Team",
-    required: function () {
-      return this.targetType === "team";
-    },
-  },
-  type: {
-    type: String,
-    enum: [
-      "vote-started",
-      "vote-ended",
-      "team-invite",
-      "candidate-invite",
-      "team-member-accepted",
-      "team-member-declined",
-      "session-edit-request",
-      "session-edit-approved",
-      "task-assigned",
-      "team-member-removed",
-      "support-response",
-      "system",
-    ],
-    required: true,
-  },
-  message: { type: String, required: true },
-  link: { type: String, required: true }, // Link to redirect user to relevant session, team, etc.
-  timestamp: { type: Date, default: Date.now },
-});
+  limit = parseInt(limit);
+  skip = parseInt(skip);
 
-notificationSchema.statics.getUserNotifications = function (
-  userId,
-  limit = 5,
-  skip = 0
-) {
-  return this.find({ recipients: userId })
-    .sort({ timestamp: -1 })
-    .skip(skip)
-    .limit(limit);
-};
-notificationSchema.pre("save", function (next) {
-  if (this.targetType === "all") {
-    this.recipients = [];
+  // Fallback/default handling
+  if (isNaN(limit) || limit < 1 || limit > 50) limit = 5;
+  if (isNaN(skip) || skip < 0) skip = 0;
+
+  try {
+    const notifications = await Notification.getUserNotifications(
+        userId,
+        limit,
+        skip
+    );
+    res.json(notifications);
+  } catch (err) {
+    console.error("Failed to fetch notifications:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
-  next();
 });
-const Notification = mongoose.model("Notification", notificationSchema);
 
-module.exports = Notification;
+module.exports = router;

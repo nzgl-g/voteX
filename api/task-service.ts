@@ -10,9 +10,7 @@ export interface Task {
   assignedMembers: string[];
   session: string;
   color: string;
-  completed: boolean;
-  completedBy?: string;
-  completedAt?: string;
+  status: "pending" | "completed";
   createdAt: string;
   updatedAt: string;
 }
@@ -25,6 +23,11 @@ export interface CreateTaskParams {
   assignedMembers: string[];
   session: string;
   color?: string;
+}
+
+export interface TaskResponse {
+  message: string;
+  task: Task;
 }
 
 // Task-related API methods
@@ -130,11 +133,32 @@ export const taskService = {
    */
   async toggleTaskCompletion(taskId: string): Promise<Task> {
     try {
-      const response = await api.patch(`/tasks/${taskId}/toggle-completion`, {});
-      return response.data;
+      // Get the current user role
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const isTeamLeader = user.role === 'team-leader';
+      
+      // Use different endpoint based on role
+      const endpoint = isTeamLeader 
+        ? `/tasks/${taskId}/toggle-completion-leader` 
+        : `/tasks/${taskId}/complete`;
+      
+      const response = await api.patch<TaskResponse>(endpoint, {});
+      return response.data.task;
     } catch (error: any) {
       console.error("Failed to toggle task completion:", error);
-      throw new Error(error.response?.data?.message || "Failed to toggle task completion");
+      
+      // Check if there's a specific message from the server
+      const errorMessage = error.response?.data?.message || "Failed to toggle task completion";
+      
+      // Log detailed error information for debugging
+      if (error.response) {
+        console.error("Server response:", {
+          status: error.response.status,
+          data: error.response.data
+        });
+      }
+      
+      throw new Error(errorMessage);
     }
   },
 }; 

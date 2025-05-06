@@ -12,6 +12,10 @@
       <excludeFolder url="file://$MODULE_DIR$/temp" />
       <excludeFolder url="file://$MODULE_DIR$/tmp" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/blockchain/artifacts" />
+      <excludeFolder url="file://$MODULE_DIR$/blockchain/cache" />
+      <excludeFolder url="file://$MODULE_DIR$/kyc/output" />
+      <excludeFolder url="file://$MODULE_DIR$/kyc/uploads" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

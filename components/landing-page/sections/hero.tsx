@@ -11,10 +11,12 @@ import { PricingDialog } from "@/components/pricing-dialog";
 import { authApi } from "@/lib/api";
 
 export const HeroSection = () => {
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showPricingDialog, setShowPricingDialog] = useState(false);
+  const [imageSrc, setImageSrc] = useState("/hero-image-light.jpeg");
+  const [mounted, setMounted] = useState(false);
   
   // Function to check authentication status
   const checkAuth = () => {
@@ -28,9 +30,18 @@ export const HeroSection = () => {
   };
   
   useEffect(() => {
+    // Mark as mounted
+    setMounted(true);
     // Check authentication status on component mount
     checkAuth();
   }, []);
+  
+  // Handle theme changes in a separate effect to avoid hydration mismatch
+  useEffect(() => {
+    if (mounted) {
+      setImageSrc(resolvedTheme === "dark" ? "/hero-image-dark.jpeg" : "/hero-image-light.jpeg");
+    }
+  }, [resolvedTheme, mounted]);
 
   return (
       <section className="container w-full">
@@ -110,12 +121,9 @@ export const HeroSection = () => {
             <Image
                 width={1200}
                 height={1200}
+                priority
                 className="w-full md:w-[1200px] mx-auto rounded-lg relative leading-none flex items-center border border-t-2 border-secondary border-t-primary/30"
-                src={
-                  theme === "light"
-                      ? "/hero-image-light.jpeg"
-                      : "/hero-image-dark.jpeg"
-                }
+                src={imageSrc}
                 alt="Blockchain Voting Dashboard"
             />
 

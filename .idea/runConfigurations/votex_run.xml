@@ -4,6 +4,7 @@
     <toRun name="deploy" type="js.build_tools.npm" />
     <toRun name="dev" type="js.build_tools.npm" />
     <toRun name="node" type="js.build_tools.npm" />
+    <toRun name="app" type="PythonConfigurationType" />
     <method v="2" />
   </configuration>
 </component>

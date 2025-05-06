@@ -1,7 +1,7 @@
 """
-KYC Verification API - Service Module
+KYC Verification API - Service Module with Multilingual Support
 
-Provides REST API endpoints for KYC identity verification services.
+Provides REST API endpoints for KYC identity verification services with enhanced multilingual capabilities.
 """
 import os
 import sys
@@ -52,7 +52,7 @@ def allowed_file(filename: str) -> bool:
 @kyc_api.route('/api/v1/verify', methods=['POST'])
 def verify_kyc():
     """
-    Process KYC verification API request.
+    Process KYC verification API request with multilingual support.
     
     Returns:
         JSON response with verification results or error message
@@ -94,7 +94,7 @@ def verify_kyc():
                     'message': f'Missing required fields: {", ".join(missing_fields)}'
                 }), 400
 
-            # Run KYC pipeline
+            # Run KYC pipeline with multilingual support
             pipeline_results = run_pipeline(form_data, filepath)
 
             # Get final decision
@@ -112,14 +112,43 @@ def verify_kyc():
                     "reason": decision_result
                 }
                 
-            # Construct simplified response
+            # Extract detailed OCR results
+            ocr_details = pipeline_results.get('OCR', {}).get('detailed_result', {})
+            
+            # Construct enhanced response with language information
             response = {
                 'status': 'success',
                 'verification_result': {
                     'decision': decision_obj.get('decision', 'unknown'),
                     'reason': decision_obj.get('reason', ''),
+                    'detected_language': pipeline_results.get('detected_language', 'unknown'),
                     'checks': {
-                        'ocr': pipeline_results.get('OCR', {}).get('status', 'unknown'),
+                        'ocr': {
+                            'status': pipeline_results.get('OCR', {}).get('status', 'unknown'),
+                            'similarity_score': pipeline_results.get('OCR', {}).get('Similarity Score', 0),
+                            'details': {
+                                'full_name': {
+                                    'match': ocr_details.get('full_name', {}).get('match', False),
+                                    'confidence': ocr_details.get('full_name', {}).get('confidence', 0),
+                                    'transliteration': ocr_details.get('full_name', {}).get('transliteration', None)
+                                },
+                                'dob': {
+                                    'match': ocr_details.get('dob', {}).get('match', False),
+                                    'confidence': ocr_details.get('dob', {}).get('confidence', 0),
+                                    'standardized_value': ocr_details.get('dob', {}).get('standardized_value', None)
+                                },
+                                'nationality': {
+                                    'match': ocr_details.get('nationality', {}).get('match', False),
+                                    'confidence': ocr_details.get('nationality', {}).get('confidence', 0),
+                                    'normalized_value': ocr_details.get('nationality', {}).get('normalized_value', None)
+                                },
+                                'id_number': {
+                                    'match': ocr_details.get('id_number', {}).get('match', False),
+                                    'confidence': ocr_details.get('id_number', {}).get('confidence', 0),
+                                    'normalized_value': ocr_details.get('id_number', {}).get('normalized_value', None)
+                                }
+                            }
+                        },
                         'metadata': pipeline_results.get('Metadata', {}).get('status', 'unknown'),
                         'image_integrity': pipeline_results.get('ELA', {}).get('status', 'unknown')
                     }

@@ -1,6 +1,6 @@
 "use client";
 import { Menu } from "lucide-react";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import {
   Sheet,
@@ -73,15 +73,24 @@ const featureList: FeatureProps[] = [
 
 export const Navbar = React.forwardRef<HTMLDivElement>((props, ref) => {
   const [isOpen, setIsOpen] = React.useState(false);
+  const { resolvedTheme } = useTheme();
+  const [logoSrc, setLogoSrc] = useState("/logo/expended.png");
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+  useEffect(() => {
+    if (mounted) {
+      setLogoSrc(resolvedTheme === "dark" ? "/logo/expended-dark.png" : "/logo/expended.png");
+    }
+  }, [resolvedTheme, mounted]);
+  
   return (
     <header ref={ref} className="shadow-inner bg-opacity-15 w-[90%] md:w-[70%] lg:w-[75%] lg:max-w-screen-xl top-5 mx-auto sticky border border-secondary z-40 rounded-2xl flex justify-between items-center p-2 bg-card">
       <Link href="/public" className="font-bold text-lg flex items-center">
-        <div className="hidden dark:block">
-          <Image src="/logo/expended-dark.png" alt="Vote System Logo" width={120} height={40} className="mr-2" />
-        </div>
-        <div className="block dark:hidden">
-          <Image src="/logo/expended.png" alt="Vote System Logo" width={120} height={40} className="mr-2" />
-        </div>
+        <Image src="/logo/expended.png" alt="Vote System Logo" width={120} height={40} className="mr-2" priority />
       </Link>
       {/* <!-- Mobile --> */}
       <div className="flex items-center lg:hidden">
@@ -101,12 +110,7 @@ export const Navbar = React.forwardRef<HTMLDivElement>((props, ref) => {
               <SheetHeader className="mb-4 ml-4">
                 <SheetTitle className="flex items-center">
                   <Link href="/public" className="flex items-center">
-                    <div className="hidden dark:block">
-                      <Image src="/logo/expended-dark.png" alt="Vote System Logo" width={120} height={40} className="mr-2" />
-                    </div>
-                    <div className="block dark:hidden">
-                      <Image src="/logo/expended.png" alt="Vote System Logo" width={120} height={40} className="mr-2" />
-                    </div>
+                    <Image src={logoSrc} alt="Vote System Logo" width={120} height={40} className="mr-2" />
                   </Link>
                 </SheetTitle>
               </SheetHeader>

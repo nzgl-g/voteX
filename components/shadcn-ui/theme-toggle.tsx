@@ -8,8 +8,11 @@ import { Sun, Moon } from "lucide-react";
 export function ThemeToggle({ className }: { className?: string }) {
     const { theme, setTheme } = useTheme();
     const [systemTheme, setSystemTheme] = useState<"light" | "dark">("light");
+    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
+        setMounted(true);
+        
         const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
         setSystemTheme(mediaQuery.matches ? "dark" : "light");
 
@@ -38,10 +41,30 @@ export function ThemeToggle({ className }: { className?: string }) {
     };
 
     const TOGGLE_THEME = () => {
-        if (!document.startViewTransition) SWITCH();
+        if (typeof document === 'undefined') return;
+        
+        if (!document.startViewTransition) {
+            SWITCH();
+            return;
+        }
 
         document.startViewTransition(SWITCH);
     };
+
+    // Prevent hydration issues by not rendering the toggle until after client-side hydration
+    if (!mounted) {
+        return (
+            <Button
+                variant="outline"
+                size="icon"
+                className={`rounded-full bg-background hover:bg-accent hover:text-accent-foreground ${className}`}
+                aria-label="Toggle theme"
+            >
+                <Sun className="h-[1.2rem] w-[1.2rem]" />
+                <span className="sr-only">Toggle theme</span>
+            </Button>
+        );
+    }
 
     return (
         <Button

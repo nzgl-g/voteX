@@ -18,8 +18,11 @@ import { LandingSkeleton } from "@/components/landing-page/landing-skeleton";
 const LandingPageContent = () => {
   const searchParams = useSearchParams();
   const [showPricingDialog, setShowPricingDialog] = useState(false);
+  const [mounted, setMounted] = useState(false);
   
   useEffect(() => {
+    setMounted(true);
+    
     // Check if we should show the pricing dialog based on URL parameter
     if (searchParams.get("showPricing") === "true") {
       setShowPricingDialog(true);
@@ -43,6 +46,10 @@ const LandingPageContent = () => {
       }
     };
   }, [searchParams]);
+  
+  if (!mounted) {
+    return <LandingSkeleton />;
+  }
   
   return (
     <>
@@ -84,8 +91,6 @@ const LandingPageContent = () => {
 // Main component with Suspense
 export default function Home() {
   return (
-    <Suspense fallback={<LandingSkeleton />}>
-      <LandingPageContent />
-    </Suspense>
+    <LandingPageContent />
   );
 }

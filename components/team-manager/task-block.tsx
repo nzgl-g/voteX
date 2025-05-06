@@ -49,9 +49,6 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
         task.assignedMembers.forEach(memberId => {
           memberIds.add(memberId)
         })
-        if (task.completedBy) {
-          memberIds.add(task.completedBy)
-        }
       })
       
       // TO-DO: Fetch member details for all IDs in memberIds
@@ -90,8 +87,8 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
       ))
       
       toast({
-        title: updatedTask.completed ? "Task completed" : "Task reopened",
-        description: updatedTask.completed 
+        title: updatedTask.status === "completed" ? "Task completed" : "Task reopened",
+        description: updatedTask.status === "completed" 
           ? `You've marked "${updatedTask.title}" as complete.` 
           : `You've reopened "${updatedTask.title}".`,
       })
@@ -161,7 +158,7 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
           {tasks.map((task) => (
             <Card 
               key={task._id} 
-              className={`overflow-hidden transition-opacity ${task.completed ? 'opacity-75' : ''}`}
+              className={`overflow-hidden transition-opacity ${task.status === "completed" ? 'opacity-75' : ''}`}
             >
               <div className="h-2" style={{ backgroundColor: task.color }}></div>
               <CardHeader className="pb-2">
@@ -173,13 +170,13 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
                     >
                       {updating === task._id ? (
                         <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : task.completed ? (
+                      ) : task.status === "completed" ? (
                         <CheckCircle className="h-5 w-5 text-green-500" />
                       ) : (
                         <Circle className="h-5 w-5 text-muted-foreground" />
                       )}
                     </div>
-                    <span className={task.completed ? 'line-through text-muted-foreground' : ''}>
+                    <span className={task.status === "completed" ? 'line-through text-muted-foreground' : ''}>
                       {task.title}
                     </span>
                   </CardTitle>
@@ -198,7 +195,7 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
                 {task.dueDate && (
                   <div className="flex items-center text-sm">
                     <Clock className="mr-2 h-4 w-4" />
-                    <span className={isPastDue(task.dueDate) && !task.completed ? 'text-red-500 font-medium' : 'text-muted-foreground'}>
+                    <span className={isPastDue(task.dueDate) && task.status !== "completed" ? 'text-red-500 font-medium' : 'text-muted-foreground'}>
                       Due: {format(new Date(task.dueDate), 'PPP')}
                     </span>
                   </div>
@@ -221,9 +218,9 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
                   </div>
                 </div>
 
-                {task.completed && task.completedBy && task.completedAt && (
+                {task.status === "completed" && (
                   <div className="text-xs text-muted-foreground pt-2 border-t">
-                    <span>Completed by {teamMembers[task.completedBy]?.fullName || teamMembers[task.completedBy]?.username || 'a team member'} on {format(new Date(task.completedAt), 'PPP')}</span>
+                    <span>Completed by {teamMembers[task.assignedMembers[0]]?.fullName || teamMembers[task.assignedMembers[0]]?.username || 'a team member'}</span>
                   </div>
                 )}
               </CardContent>

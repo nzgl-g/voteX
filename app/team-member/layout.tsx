@@ -29,12 +29,13 @@ const data = {
     navMain: [
         {title: "Monitoring", url: "/team-member/monitoring/default", icon: LayoutDashboard },
         {title: "Session", url: "/team-member/session/default", icon: CalendarClock },
+        {title: "Scheduler", url: "/team-member/tasks/default", icon: CheckSquare},
         {title: "Scheduler", url: "/team-member/scheduler/default", icon: CheckSquare},
+        {title: "Scheduler", url: "/team-member/support/default", icon: CheckSquare},
     ],
     navSecondary: [
         {title: "Settings", url: "#", icon: Settings },
         {title: "Help", url: "#", icon: HelpCircle},
-        {title: "Support", url: "#", icon: LifeBuoy},
     ]
 }
 

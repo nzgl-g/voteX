@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io"); // Socket.IO
+const initBlockchainService = require("../blockchainservice");
 
 let io;
 
@@ -32,6 +33,19 @@ app.use(express.json());
 
 const routes = require("./startup/routes");
 routes(app);
+
+
+
+
+
+// Initialize blockchain service
+const blockchainService = initBlockchainService(app);
+console.log("Blockchain service routes registered");
+
+
+
+
+
 
 io = new Server(server, {
   cors: {

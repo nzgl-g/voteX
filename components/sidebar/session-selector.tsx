@@ -6,6 +6,8 @@ import { ChevronDown, Plus, Vote, BarChart, Trophy, Loader2, AlertCircle, User, 
 import { useRouter, usePathname } from "next/navigation"
 import apiClient from "@/lib/api"
 import { PricingDialog } from "@/components/pricing-dialog"
+import { teamService, Team } from "@/api/team-service"
+import { sessionService } from "@/api/session-service"
 
 import {
   DropdownMenu,
@@ -35,11 +37,11 @@ import { Badge } from "@/components/shadcn-ui/badge"
 
 // Define session type for the team switcher
 interface SessionItem {
-  id: string
-  name: string
-  type: "poll" | "election" | "tournament"
-  plan: string
-  role?: "leader" | "member"
+  id: string;
+  name: string;
+  type: "poll" | "election" | "tournament";
+  plan: string;
+  role?: "leader" | "member";
 }
 
 // No Sessions Dialog Component
@@ -103,82 +105,114 @@ export function SessionSelector() {
       setLoading(true)
       
       try {
-        // Fetch sessions where user is a leader
-        const leaderResponse = await apiClient.get('/sessions/my-sessions')
+        // Get all teams the user is part of (as leader or member)
+        const teams = await teamService.getUserTeams();
         
-        // Transform the response data to match the SessionItem interface
-        const leaderSessionItems: SessionItem[] = leaderResponse.data.map((session: any) => ({
-          id: session._id,
-          name: session.name,
-          type: session.type as "poll" | "election" | "tournament",
-          plan: session.subscription?.name || "free",
-          role: "leader"
-        }))
+        // Create arrays to separate sessions by role
+        const leaderSessions: SessionItem[] = [];
+        const memberSessions: SessionItem[] = [];
         
-        setMySessions(leaderSessionItems)
+        // Process teams to determine which are led by the user vs which they're just a member of
+        for (const team of teams) {
+          // Get the user's ID from localStorage
+          const userStr = localStorage.getItem('user');
+          
+          if (!userStr) continue;
+          
+          const user = JSON.parse(userStr);
+          const userId = user._id;
+          
+          // Check if this team belongs to a session
+          if (team.session) {
+            // Fetch basic session info
+            try {
+              // Handle the type for session ID safely
+              const sessionId = typeof team.session === 'string' 
+                ? team.session 
+                : (team.session as any)._id || '';
+              
+              const sessionInfo = await sessionService.getSessionById(
+                sessionId,
+                'name,type,subscription'
+              );
+              
+              // Determine if user is leader or member
+              const isLeader = typeof team.leader === 'object' 
+                ? team.leader._id === userId 
+                : team.leader === userId;
+              
+              const sessionItem: SessionItem = {
+                id: sessionId,
+                name: team.sessionName || (sessionInfo as any).name || 'Unnamed Session',
+                type: ((sessionInfo as any).type as "poll" | "election" | "tournament") || 'poll',
+                plan: (sessionInfo as any).subscription?.name || 'free',
+                role: isLeader ? 'leader' : 'member'
+              };
+              
+              if (isLeader) {
+                leaderSessions.push(sessionItem);
+              } else {
+                memberSessions.push(sessionItem);
+              }
+            } catch (error) {
+              // Use optional chaining and type assertion for team._id
+              console.error(`Failed to fetch session info for team ${(team as any)._id || 'unknown'}:`, error);
+            }
+          }
+        }
         
-        // Fetch sessions where user is a member
-        const memberResponse = await apiClient.get('/sessions/my-sessions-as-member')
-        
-        // Transform the response data to match the SessionItem interface
-        const memberSessionItems: SessionItem[] = memberResponse.data.sessions.map((session: any) => ({
-          id: session._id,
-          name: session.name,
-          type: session.type as "poll" | "election" | "tournament",
-          plan: session.subscription?.name || "free",
-          role: "member"
-        }))
-        
-        setMemberSessions(memberSessionItems)
+        // Set the processed sessions
+        setMySessions(leaderSessions);
+        setMemberSessions(memberSessions);
         
         // Combine all sessions for active session detection
-        const allSessions = [...leaderSessionItems, ...memberSessionItems]
+        const allSessions = [...leaderSessions, ...memberSessions];
         
         // If no sessions found, show the dialog
         if (allSessions.length === 0) {
-          setShowNoSessionsDialog(true)
-          setActiveSession(null)
+          setShowNoSessionsDialog(true);
+          setActiveSession(null);
           // Check if we're on a session-specific path, if so redirect to voter
-          const pathSegments = pathname.split('/')
+          const pathSegments = pathname.split('/');
           if (pathSegments.includes('team-leader') || pathSegments.includes('team-member')) {
-            router.push('/voter')
+            router.push('/voter');
           }
         } else {
-          setShowNoSessionsDialog(false)
+          setShowNoSessionsDialog(false);
           
           // Find the current session from the pathname
-          const currentSessionId = getSessionIdFromPath(allSessions)
+          const currentSessionId = getSessionIdFromPath(allSessions);
           
           // Set the active session based on the current URL
           if (currentSessionId) {
-            const currentSession = allSessions.find(session => session.id === currentSessionId)
+            const currentSession = allSessions.find(session => session.id === currentSessionId);
             if (currentSession) {
-              setActiveSession(currentSession)
+              setActiveSession(currentSession);
             } else if (allSessions.length > 0) {
               // If current session not found in the list, set the first one as active
-              setActiveSession(allSessions[0])
+              setActiveSession(allSessions[0]);
             }
           } else if (allSessions.length > 0) {
             // If no session ID in the URL, set the first one as active
-            setActiveSession(allSessions[0])
+            setActiveSession(allSessions[0]);
           }
         }
       } catch (error: any) {
-        console.error('Error fetching sessions:', error)
+        console.error('Error fetching teams and sessions:', error);
         if (error.response) {
-          console.error('Response error:', error.response.status, error.response.data)
+          console.error('Response error:', error.response.status, error.response.data);
         }
-        setShowNoSessionsDialog(true)
-        setActiveSession(null)
+        setShowNoSessionsDialog(true);
+        setActiveSession(null);
         
         // If we're on a session-specific path and there's an error, redirect to voter
-        const pathSegments = pathname.split('/')
+        const pathSegments = pathname.split('/');
         if (pathSegments.includes('team-leader') || pathSegments.includes('team-member')) {
-          router.push('/voter')
+          router.push('/voter');
         }
       }
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 

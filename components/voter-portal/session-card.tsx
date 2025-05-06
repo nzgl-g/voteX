@@ -1,155 +1,146 @@
-"use client";
 
-import { useState } from "react";
-import { Card, CardContent, CardFooter } from "@/components/shadcn-ui/card";
-import { Button } from "@/components/shadcn-ui/button";
-import { Badge } from "@/components/shadcn-ui/badge";
-import { Eye, Award, Vote as VoteIcon, ChartBar, Calendar } from "lucide-react";
+import React, { useState } from 'react';
+import { Card } from '@/components/shadcn-ui/card';
+import { Button } from '@/components/shadcn-ui/button';
+import BadgeLabel from '@/components/voter-portal/badge-label';
+import { VoteSession } from './types';
+import { ArrowRight, Eye } from 'lucide-react';
+import CandidateFormDialog from './candidate-form-dialog';
 
-interface SessionCardProps {
-    title: string;
-    description: string;
-    bannerUrl: string;
-    status: "nomination" | "started" | "ended" | "upcoming";
-    hasAppliedAsCandidate?: boolean;
-    onViewSession: () => void;
-    onJoinAsCandidate?: () => void;
-    onVote?: () => void;
-    onShowResults?: () => void;
+interface VoteSessionCardProps {
+    session: VoteSession;
 }
 
-const statusConfig = {
-    nomination: {
-        colorClass: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
-        label: "Nomination Phase",
-        accentClass: "border-blue-500 dark:border-blue-400"
-    },
-    started: {
-        colorClass: "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400",
-        label: "Voting Active",
-        accentClass: "border-green-500 dark:border-green-400"
-    },
-    ended: {
-        colorClass: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
-        label: "Session Ended",
-        accentClass: "border-gray-500 dark:border-gray-400"
-    },
-    upcoming: {
-        colorClass: "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400",
-        label: "Upcoming",
-        accentClass: "border-purple-500 dark:border-purple-400"
-    },
-};
+const VoteSessionCard: React.FC<VoteSessionCardProps> = ({ session }) => {
+    const [showActionButton, setShowActionButton] = useState(false);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-export function SessionCard({
-                                title,
-                                description,
-                                bannerUrl,
-                                status,
-                                hasAppliedAsCandidate = false,
-                                onViewSession,
-                                onJoinAsCandidate,
-                                onVote,
-                                onShowResults,
-                            }: SessionCardProps) {
-    const { colorClass, label, accentClass } = statusConfig[status];
+    // Truncate description if it's too long
+    const truncateDescription = (text: string, limit = 150) => {
+        return text.length > limit ? `${text.substring(0, limit)}...` : text;
+    };
+
+    // Determine button text based on session status
+    const getActionButton = () => {
+        switch (session.status) {
+            case 'nominations':
+                return (
+                    <Button
+                        className="bg-vote-nominations hover:bg-vote-nominations/80 w-full"
+                        onClick={() => setIsDialogOpen(true)}
+                    >
+                        Join as Candidate
+                    </Button>
+                );
+            case 'upcoming':
+                return (
+                    <Button
+                        variant="outline"
+                        className="border-vote-upcoming text-vote-upcoming hover:bg-vote-upcoming/10 w-full"
+                    >
+                        View Profile
+                    </Button>
+                );
+            case 'started':
+                return (
+                    <Button
+                        className="bg-vote-started hover:bg-vote-started/80 w-full"
+                    >
+                        Cast Your Vote
+                    </Button>
+                );
+            case 'ended':
+                return (
+                    <Button
+                        variant="outline"
+                        className="border-vote-ended text-vote-ended hover:bg-vote-ended/10 w-full"
+                    >
+                        View Results
+                    </Button>
+                );
+            default:
+                return null;
+        }
+    };
+
+    // Get a banner image based on session status
+    const getBannerImage = () => {
+        switch (session.status) {
+            case 'nominations':
+                return 'https://images.unsplash.com/photo-1605810230434-7631ac76ec81?auto=format&fit=crop&w=800&h=200';
+            case 'upcoming':
+                return 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?auto=format&fit=crop&w=800&h=200';
+            case 'started':
+                return 'https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7?auto=format&fit=crop&w=800&h=200';
+            case 'ended':
+                return 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=800&h=200';
+            default:
+                return 'https://images.unsplash.com/photo-1470813740244-df37b8c1edcb?auto=format&fit=crop&w=800&h=200';
+        }
+    };
 
     return (
-        <Card className={`h-full overflow-hidden border-l-4 ${accentClass} hover:shadow-md transition-shadow`}>
-            <div className="relative aspect-video overflow-hidden">
-                <img
-                    src={bannerUrl}
-                    alt={title}
-                    className="h-full w-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
-                <Badge className={`absolute right-3 top-3 ${colorClass}`}>
-                    {label}
-                </Badge>
-            </div>
-
-            <CardContent className="p-4">
-                <h3 className="text-xl font-semibold mb-2">{title}</h3>
-                <p className="line-clamp-2 text-sm text-muted-foreground">
-                    {description}
-                </p>
-            </CardContent>
-
-            <CardFooter className="flex flex-wrap gap-2 p-4 pt-0 justify-between">
-                {/* Primary action button based on status */}
-                <div>
-                    {status === "nomination" && !hasAppliedAsCandidate && onJoinAsCandidate && (
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            className="gap-2"
-                            onClick={onJoinAsCandidate}
-                        >
-                            <Award className="h-4 w-4" />
-                            Join as Candidate
-                        </Button>
-                    )}
-
-                    {status === "nomination" && hasAppliedAsCandidate && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                            disabled
-                        >
-                            <Award className="h-4 w-4" />
-                            Application Submitted
-                        </Button>
-                    )}
-
-                    {status === "started" && onVote && (
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            className="gap-2"
-                            onClick={onVote}
-                        >
-                            <VoteIcon className="h-4 w-4" />
-                            Vote Now
-                        </Button>
-                    )}
-
-                    {status === "ended" && onShowResults && (
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            className="gap-2"
-                            onClick={onShowResults}
-                        >
-                            <ChartBar className="h-4 w-4" />
-                            View Results
-                        </Button>
-                    )}
-
-                    {status === "upcoming" && (
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            className="gap-2"
-                            onClick={onViewSession}
-                        >
-                            <Calendar className="h-4 w-4" />
-                            View Details
-                        </Button>
-                    )}
+        <>
+            <Card
+                className="relative overflow-hidden transition-all duration-300 hover:shadow-lg border-2 flex flex-col h-full"
+                onMouseEnter={() => setShowActionButton(true)}
+                onMouseLeave={() => setShowActionButton(false)}
+            >
+                {/* Banner Image */}
+                <div className="w-full h-40 overflow-hidden">
+                    <img
+                        src={getBannerImage()}
+                        alt={session.title}
+                        className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                    />
                 </div>
 
-                {/* Always show view details button */}
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-2"
-                    onClick={onViewSession}
-                >
-                    <Eye className="h-4 w-4" />
-                    Details
-                </Button>
-            </CardFooter>
-        </Card>
+                {/* View Profile button that appears on hover */}
+                {showActionButton && (
+                    <div className="absolute top-2 right-2 z-10 opacity-0 transition-opacity duration-300"
+                         style={{ opacity: showActionButton ? 1 : 0 }}>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="bg-white/80 backdrop-blur-sm hover:bg-white flex items-center gap-1 rounded-full"
+                        >
+                            <span className="text-xs">View</span>
+                            <Eye className="h-3 w-3" />
+                        </Button>
+                    </div>
+                )}
+
+                <div className="p-5 space-y-4 flex-grow flex flex-col">
+                    {/* Badges */}
+                    <div className="flex flex-wrap gap-2">
+                        <BadgeLabel type="voting" value={session.votingType} />
+                        <BadgeLabel type="status" value={session.status} />
+                    </div>
+
+                    {/* Title and Description */}
+                    <div className="flex-grow">
+                        <h3 className="text-lg font-bold line-clamp-2">{session.title}</h3>
+                        <p className="text-sm text-muted-foreground mt-2">
+                            {truncateDescription(session.description)}
+                        </p>
+                    </div>
+
+                    {/* Action Button - fixed at bottom */}
+                    <div className="pt-2">
+                        {getActionButton()}
+                    </div>
+                </div>
+            </Card>
+
+            {/* Candidate Form Dialog */}
+            <CandidateFormDialog
+                open={isDialogOpen}
+                onOpenChange={setIsDialogOpen}
+                sessionId={session.id}
+                sessionTitle={session.title}
+            />
+        </>
     );
-}
+};
+
+export default VoteSessionCard;

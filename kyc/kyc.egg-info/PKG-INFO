@@ -1,0 +1,16 @@
+Metadata-Version: 2.1
+Name: kyc
+Version: 0.1.0
+Summary: AI-powered KYC verification system
+Author: Vote System Team
+Requires-Python: >=3.10
+Requires-Dist: Flask>=3.1.0
+Requires-Dist: Werkzeug>=3.1.3
+Requires-Dist: requests
+Requires-Dist: python-dotenv
+Requires-Dist: pillow>=11.1.0
+Requires-Dist: opencv-python>=4.11.0.86
+Requires-Dist: scikit-image>=0.25.1
+Requires-Dist: numpy>=2.0.2
+Requires-Dist: matplotlib>=3.10.0
+Requires-Dist: deepface>=0.0.93

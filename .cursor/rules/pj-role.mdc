@@ -1,6 +1,29 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
-U r forbidden to edit or make changes in server folders @server 
+# Project
+
+RULES : 
+- U r forbidden to edit or make changes in server folders @server 
+
+Overview : 
+- This project is for blockchain vote system it includes 4 layers : (Frontend , backend under server direcroty , blockchain under blockchain directory and kyc under kyc direcotry )
+- the system have 4 user :
+    - Team leader: who is the high user , he is reposnible for create/manage vote session create/manage team members
+    - Team memeber : who is joned on the team by team leader request he is responsible to help leader to manage sessions and provide support for users 
+    - Candidate :  who is a normal user sees the session is on nomination and request to be a canidate to vote for him 
+    - voter : who is the defual user he is the user who can sess the sessions and cas there vote 
+- the kyc have its documenetaion under [README.md](mdc:kyc/README.md)
+- the blockchin have its doxumenetaion under [README-BLOCKCHAIN.md](mdc:server/README-BLOCKCHAIN.md) [README.md](mdc:blockchain/README.md)](mdc:blockchain/README.md)
+- the tech stack used in the server is Express and socket and node js 
+- the tecj stack used in front is nextjs and shadcn ui components as main compoenets 
+
+- the team leader and team member have there own dashbord under app/team-leader and app/team-memeber with differnt tabs based on the role
+- the voter have voter portal page wher all session existd in systemis displayed , he canchoose on  and cast is vote on it based on yc result if its on .
+- the candidate first e is a nomral voter selects and session wher nominatios is active and fill the form of acppectence , then he notifed the team reponse of joning the session .
+
+- all users have landing page before they login or signup.
+
+

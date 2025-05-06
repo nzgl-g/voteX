@@ -1,0 +1,24 @@
+# Web Framework
+Flask~=3.1.0
+Werkzeug~=3.1.3
+
+# HTTP and API
+requests
+python-dotenv
+
+# Image Processing
+pillow~=11.1.0
+opencv-python~=4.11.0.86
+scikit-image~=0.25.1
+
+# Data Analysis
+numpy~=2.0.2
+matplotlib~=3.10.0
+
+# AI Models
+#ollama~=0.4.7
+deepface~=0.0.93
+
+# Development Tools
+pytest>=7.4.0
+black>=23.9.1

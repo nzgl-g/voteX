@@ -6,7 +6,7 @@ const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
 const { startAgenda } = require("./lib/agenda");
-const logger = require("./lib/logger");
+const { initializeBridge } = require("./bridge");
 let io;
 
 const connectDB = async () => {
@@ -35,11 +35,12 @@ app.use(express.json());
 
 // Import routes
 const routes = require("./startup/routes");
-const bridgeRoutes = require("./bridge/routes");
 
 // Use routes
 routes(app);
-app.use("/votex/api/bridge", bridgeRoutes);
+
+// Initialize blockchain bridge
+initializeBridge(app);
 
 io = new Server(server, {
     cors: {
@@ -88,46 +89,13 @@ const startServer = async () => {
     });
 };
 
-// Initialize blockchain bridge
-const initBlockchainBridge = async () => {
-    try {
-        const contractService = require("./bridge/contractService");
-        
-        // Check if required environment variables are set
-        const requiredEnvVars = [
-            'BLOCKCHAIN_NETWORK',
-            'BLOCKCHAIN_RPC_URL',
-            'CONTRACT_ADDRESS',
-            'PRIVATE_KEY'
-        ];
-
-        const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
-        if (missingVars.length > 0) {
-            throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
-        }
-
-        // Initialize contract connection
-        const isInitialized = await contractService.initialize();
-        if (!isInitialized) {
-            throw new Error('Failed to initialize contract connection');
-        }
-
-        logger.info('Blockchain bridge initialized successfully');
-        return true;
-    } catch (error) {
-        logger.error('Failed to initialize blockchain bridge:', error);
-        throw error;
-    }
-};
 
 // Start the application
 const startApp = async () => {
     try {
         // Connect to MongoDB
         await connectDB();
-        
-        // Initialize blockchain bridge
-        await initBlockchainBridge();
+
         
         // Start Agenda
         await startAgenda();
@@ -135,9 +103,7 @@ const startApp = async () => {
         // Start server
         await startServer();
         
-        logger.info('Application started successfully');
     } catch (error) {
-        logger.error('Failed to start application:', error);
         process.exit(1);
     }
 };

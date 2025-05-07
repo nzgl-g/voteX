@@ -1,125 +1,51 @@
-const express = require('express');
-const router = express.Router();
-const contractService = require('./contractService');
-const { validate, schemas } = require('./validation');
-const logger = require('../lib/logger');
+/**
+ * Blockchain Bridge Routes
+ * API routes for the blockchain bridge
+ */
 
-// Initialize contract connection
-router.get('/initialize', async (req, res) => {
-    try {
-        const isInitialized = await contractService.initialize();
-        res.json({ 
-            success: true, 
-            message: 'Contract initialized successfully',
-            isInitialized 
-        });
-    } catch (error) {
-        logger.error('Contract initialization failed:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Contract initialization failed',
-            details: error.message 
-        });
-    }
-});
+const express = require("express");
+const controllers = require("./controllers");
+
+const router = express.Router();
+
+// Initialize blockchain connection
+// GET /blockchain/initialize
+router.get("/initialize", controllers.initialize);
 
 // Create a new voting session
-router.post('/session/start', validate(schemas.createSession), async (req, res) => {
-    try {
-        const { sessionId, choices, voteMode } = req.body;
-        const txHash = await contractService.createSession(sessionId, choices, voteMode);
-        res.json({ 
-            success: true, 
-            message: 'Session created successfully',
-            txHash 
-        });
-    } catch (error) {
-        logger.error('Session creation failed:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Session creation failed',
-            details: error.message 
-        });
-    }
-});
+// POST /blockchain/create-session
+router.post("/create-session", controllers.createSession);
 
-// End a voting session
-router.post('/session/end', validate(schemas.endSession), async (req, res) => {
-    try {
-        const { sessionId } = req.body;
-        const txHash = await contractService.endSession(sessionId);
-        res.json({ 
-            success: true, 
-            message: 'Session ended successfully',
-            txHash 
-        });
-    } catch (error) {
-        logger.error('Session end failed:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Session end failed',
-            details: error.message 
-        });
-    }
-});
+// Get session status
+// GET /blockchain/session/:address/status
+router.get("/session/:address/status", controllers.getSessionStatus);
 
-// Get session status and results
-router.get('/session/:sessionId', async (req, res) => {
-    try {
-        const { sessionId } = req.params;
-        const sessionStatus = await contractService.getSessionStatus(sessionId);
-        res.json({ 
-            success: true, 
-            data: sessionStatus 
-        });
-    } catch (error) {
-        logger.error('Session status retrieval failed:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Session status retrieval failed',
-            details: error.message 
-        });
-    }
-});
+// Get session details
+// GET /blockchain/session/:address/details
+router.get("/session/:address/details", controllers.getSessionDetails);
 
-// Cast a vote (SINGLE or MULTIPLE mode)
-router.post('/vote', validate(schemas.castVote), async (req, res) => {
-    try {
-        const { sessionId, choiceIds } = req.body;
-        const txHash = await contractService.castVote(sessionId, choiceIds);
-        res.json({ 
-            success: true, 
-            message: 'Vote cast successfully',
-            txHash 
-        });
-    } catch (error) {
-        logger.error('Vote casting failed:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Vote casting failed',
-            details: error.message 
-        });
-    }
-});
+// Get session votes/results
+// GET /blockchain/session/:address/votes
+router.get("/session/:address/votes", controllers.getSessionVotes);
 
-// Cast a ranked vote
-router.post('/vote/ranked', validate(schemas.castRankedVote), async (req, res) => {
-    try {
-        const { sessionId, rankedChoices } = req.body;
-        const txHash = await contractService.castRankedVote(sessionId, rankedChoices);
-        res.json({ 
-            success: true, 
-            message: 'Ranked vote cast successfully',
-            txHash 
-        });
-    } catch (error) {
-        logger.error('Ranked vote casting failed:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Ranked vote casting failed',
-            details: error.message 
-        });
-    }
-});
+// Start a session
+// POST /blockchain/session/:address/start
+router.post("/session/:address/start", controllers.startSession);
+
+// End a session
+// POST /blockchain/session/:address/end
+router.post("/session/:address/end", controllers.endSession);
+
+// Cast a vote
+// POST /blockchain/session/:address/vote
+router.post("/session/:address/vote", controllers.castVote);
+
+// Check if a voter has already voted
+// GET /blockchain/session/:address/has-voted/:voter
+router.get("/session/:address/has-voted/:voter", controllers.hasVoted);
+
+// Get all sessions for a team leader
+// GET /blockchain/team-leader/:address/sessions
+router.get("/team-leader/:address/sessions", controllers.getTeamLeaderSessions);
 
 module.exports = router; 

@@ -1,20 +1,31 @@
 {
-  "name": "vote-system-blockchain",
+  "name": "blockchain-voting-system",
   "version": "1.0.0",
-  "description": "Blockchain smart contracts for voting system",
+  "description": "A decentralized blockchain voting system",
   "main": "index.js",
   "scripts": {
     "test": "hardhat test",
     "compile": "hardhat compile",
-    "deploy": "hardhat run scripts/deploy.js",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost",
+    "deploy:testnet": "hardhat run scripts/deploy.js --network sepolia",
     "node": "hardhat node"
   },
-  "dependencies": {
-    "@openzeppelin/contracts": "^4.9.3",
-    "dotenv": "^16.3.1"
-  },
+  "keywords": [
+    "blockchain",
+    "voting",
+    "ethereum",
+    "smart-contracts",
+    "decentralized"
+  ],
+  "author": "",
+  "license": "MIT",
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^3.0.0",
-    "hardhat": "^2.17.1"
+    "@nomicfoundation/hardhat-toolbox": "^2.0.2",
+    "@nomiclabs/hardhat-ethers": "^2.2.3",
+    "@nomiclabs/hardhat-waffle": "^2.0.6",
+    "chai": "^4.3.7",
+    "ethereum-waffle": "^4.0.10",
+    "ethers": "^5.7.2",
+    "hardhat": "^2.17.0"
   }
 } 

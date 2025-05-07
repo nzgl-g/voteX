@@ -1,8 +1,3 @@
-//input details
-//verify details
-//find user with email
-//check if password is correct
-//get token and put in header
 const express = require("express");
 const User = require("../models/User");
 const bcrypt = require("bcrypt");

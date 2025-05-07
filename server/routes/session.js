@@ -2,19 +2,18 @@ const mongoose = require("mongoose");
 const { isValidObjectId } = require("mongoose");
 const express = require("express");
 const Session = require("../models/Sessions");
-const CandidateRequest = require("../models/CandidateRequest");
 const SessionParticipant = require("../models/SessionParticipants");
 const SessionEditRequest = require("../models/SessionEditRequest");
 const Team = require("../models/Team");
 const auth = require("../middleware/auth");
-const isTeamLeader = require("../middleware/isTeamLeader");
+const sendNotification = require("../helpers/sendNotification");
 const router = express.Router();
 router.get("/", async (req, res) => {
   try {
     const sessions = await Session.find({})
-        .populate("team")
-        .populate("createdBy")
-        .exec();
+      .populate("team")
+      .populate("createdBy")
+      .exec();
 
     res.status(200).json(sessions);
   } catch (err) {
@@ -28,17 +27,17 @@ router.get("/my-sessions", auth, async (req, res) => {
     const userId = req.user._id;
     console.log(userId);
     const sessions = await Session.find({ createdBy: userId })
-        .populate("team")
-        .populate("createdBy", "username email")
-        .populate({
-          path: "participants",
-          select: "userId",
-        })
-        .populate({
-          path: "assignedReviewer",
-          select: "username",
-        })
-        .exec();
+      .populate("team")
+      .populate("createdBy", "username email")
+      .populate({
+        path: "participants",
+        select: "userId",
+      })
+      .populate({
+        path: "assignedReviewer",
+        select: "username",
+      })
+      .exec();
 
     res.status(200).json(sessions);
   } catch (err) {
@@ -90,8 +89,8 @@ router.get("/by-phrase/:phrase", auth, async (req, res) => {
 
     if (!session) {
       return res
-          .status(404)
-          .json({ message: "Session not found or invalid phrase" });
+        .status(404)
+        .json({ message: "Session not found or invalid phrase" });
     }
     res.json(session);
   } catch (err) {
@@ -106,14 +105,14 @@ router.get("/:sessionId", auth, async (req, res) => {
       return res.status(400).json({ error: "Invalid session ID" });
     }
     const session = await Session.findById(req.params.sessionId)
-        .populate("team")
-        .populate("createdBy", "username email")
-        .populate({
-          path: "participants",
-          select: "userId",
-        })
-        .populate("assignedReviewer", "username")
-        .exec();
+      .populate("team")
+      .populate("createdBy", "username email")
+      .populate({
+        path: "participants",
+        select: "userId",
+      })
+      .populate("assignedReviewer", "username")
+      .exec();
     if (!session) {
       return res.status(404).json({ message: "Session not found" });
     }
@@ -133,8 +132,8 @@ router.get("/:sessionId", auth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res
-        .status(500)
-        .json({ message: "Failed to fetch session", error: err.message });
+      .status(500)
+      .json({ message: "Failed to fetch session", error: err.message });
   }
 });
 router.delete("/:sessionId", auth, async (req, res) => {
@@ -147,8 +146,8 @@ router.delete("/:sessionId", auth, async (req, res) => {
 
     if (!team.leader.equals(req.user._id)) {
       return res
-          .status(403)
-          .send("Access denied. Not authorized as team leader");
+        .status(403)
+        .send("Access denied. Not authorized as team leader");
     }
     await SessionParticipant.deleteMany({ _id: { $in: session.participants } });
     await Team.findByIdAndDelete(team._id);
@@ -186,8 +185,8 @@ router.post("/", auth, async (req, res) => {
       const existingSession = await Session.findOne({ secretPhrase });
       if (existingSession) {
         return res
-            .status(400)
-            .json({ message: "This secret phrase is already in use." });
+          .status(400)
+          .json({ message: "This secret phrase is already in use." });
       }
     }
     const creator = req.user._id;
@@ -250,7 +249,7 @@ router.post("/", auth, async (req, res) => {
     await session.save();
     await session.populate({
       path: "participants",
-      select: "userId role", // Only fetch userId and role to avoid unnecessary data
+      select: "userId role",
     });
 
     res.status(201).json(session);
@@ -269,7 +268,7 @@ router.patch("/:sessionId/edit-request", auth, async (req, res) => {
     if (!session) return res.status(404).json({ error: "Session not found" });
     await session.populate({
       path: "team",
-      select: "leader members", // Only populate these fields
+      select: "leader members",
     });
     if (session.team.leader.equals(userId)) {
       await session.updateOne({ $set: updates });
@@ -278,8 +277,8 @@ router.patch("/:sessionId/edit-request", auth, async (req, res) => {
     if (session.allowDirectEdit) {
       if (!session.team.members.some((m) => m.equals(userId))) {
         return res
-            .status(403)
-            .json({ error: "Only team members can propose edits" });
+          .status(403)
+          .json({ error: "Only team members can propose edits" });
       }
       await session.updateOne({ $set: updates });
       return res.status(200).json({ message: "Session updated successfully" });
@@ -292,12 +291,20 @@ router.patch("/:sessionId/edit-request", auth, async (req, res) => {
     });
 
     await editRequest.save();
+    await sendNotification(req, {
+      recipients: [session.team.leader],
+      type: "session-edit-request",
+      message: `${req.user._id} has requested to edit the session.`,
+      link: `/sessions/${sessionId}`,
+      targetType: "user",
+    });
+
     res.status(201).json({ message: "Edit request submitted.", editRequest });
   } catch (err) {
     console.error("Submit edit request error:", err);
     res
-        .status(500)
-        .json({ error: "Failed to submit edit request", details: err.message });
+      .status(500)
+      .json({ error: "Failed to submit edit request", details: err.message });
   }
 });
 
@@ -307,19 +314,19 @@ router.patch("/edit-requests/:requestId/approve", auth, async (req, res) => {
     const userId = req.user._id;
 
     const editRequest = await SessionEditRequest.findById(requestId).populate(
-        "session"
+      "session"
     );
     if (!editRequest || editRequest.status !== "pending") {
       return res
-          .status(404)
-          .json({ error: "Valid edit request not found or not pending" });
+        .status(404)
+        .json({ error: "Valid edit request not found or not pending" });
     }
 
     const team = await Team.findOne({ session: editRequest.session._id });
     if (!team || !team.leader.equals(userId)) {
       return res
-          .status(403)
-          .json({ error: "Only the team leader can approve edits" });
+        .status(403)
+        .json({ error: "Only the team leader can approve edits" });
     }
 
     const updates = editRequest.updates;
@@ -343,22 +350,29 @@ router.patch("/edit-requests/:requestId/approve", auth, async (req, res) => {
     }, {});
 
     const updatedSession = await Session.findByIdAndUpdate(
-        editRequest.session._id,
-        { $set: filteredUpdates },
-        { new: true, runValidators: true }
+      editRequest.session._id,
+      { $set: filteredUpdates },
+      { new: true, runValidators: true }
     );
 
     editRequest.status = "approved";
     await editRequest.save();
+    await sendNotification(req, {
+      recipients: [editRequest.proposedBy],
+      type: "session-edit-approved",
+      message: "Your edit request has been approved by the team leader.",
+      link: `/sessions/${editRequest.session._id}`,
+      targetType: "user",
+    });
 
     res
-        .status(200)
-        .json({ message: "Edit approved and applied", updatedSession });
+      .status(200)
+      .json({ message: "Edit approved and applied", updatedSession });
   } catch (err) {
     console.error("Approve edit error:", err);
     res
-        .status(500)
-        .json({ error: "Failed to approve edit", details: err.message });
+      .status(500)
+      .json({ error: "Failed to approve edit", details: err.message });
   }
 });
 

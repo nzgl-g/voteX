@@ -1,4 +1,5 @@
 const express = require("express");
+const sendNotification = require("../helpers/sendNotification");
 const Session = require("../models/Sessions");
 const CandidateRequest = require("../models/CandidateRequest");
 const CandidateInvitation = require("../models/CandidateInvitation");
@@ -6,7 +7,7 @@ const SessionParticipant = require("../models/SessionParticipants");
 const User = require("../models/User");
 const auth = require("../middleware/auth");
 const router = express.Router({ mergeParams: true });
-// get all candidates
+
 router.get("/", auth, async (req, res) => {
   try {
     const session = await Session.findById(req.params.sessionId)
@@ -45,7 +46,7 @@ router.get("/", auth, async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 });
-// get all requests
+
 router.get("/candidate-requests", auth, async (req, res) => {
   try {
     const sessionId = req.params.sessionId;
@@ -60,7 +61,7 @@ router.get("/candidate-requests", auth, async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 });
-// apply to be a candidate
+
 router.post("/apply", auth, async (req, res) => {
   const userId = req.user._id;
   const sessionId = req.params.sessionId;
@@ -296,7 +297,13 @@ router.post("/invite/:userId", auth, async (req, res) => {
     });
 
     await invitation.save();
-
+    await sendNotification(req, {
+      recipients: [userId],
+      type: "candidate-invite",
+      message: "You've been invited to be a candidate in a session.",
+      link: `/sessions/${sessionId}`,
+      targetType: "user",
+    });
     res.status(201).json({ message: "Invitation sent" });
   } catch (err) {
     console.error(err);

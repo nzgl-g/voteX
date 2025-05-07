@@ -6,7 +6,7 @@ module.exports = function (req, res, next) {
     return res.send("no token provided");
   }
   try {
-    const decoded = jwt.verify(token, "hello");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     next();
   } catch (ex) {

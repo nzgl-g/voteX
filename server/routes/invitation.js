@@ -3,7 +3,7 @@ const express = require("express");
 const auth = require("../middleware/auth");
 const Invitation = require("../models/Invitation");
 const Team = require("../models/Team");
-
+const sendNotification = require("../helpers/sendNotification");
 const router = express.Router();
 // Accept an invitation
 router.post("/:invitationId/accept", auth, async (req, res) => {
@@ -32,7 +32,13 @@ router.post("/:invitationId/accept", auth, async (req, res) => {
     invitation.status = "accepted";
 
     await Promise.all([team.save(), invitation.save()]);
-
+    await sendNotification(req, {
+      recipients: [team.createdBy],
+      type: "team-member-accepted",
+      message: `${req.user._id} accepted your team invitation.`,
+      link: `/teams/${team._id}`,
+      targetType: "user",
+    });
     res.status(200).send({ message: "Successfully joined team", team });
   } catch (err) {
     res.status(500).send(err.message);
@@ -55,7 +61,16 @@ router.post("/:invitationId/decline", auth, async (req, res) => {
 
     invitation.status = "declined";
     await invitation.save();
-
+    const team = await Team.findById(invitation.teamId);
+    if (team) {
+      await sendNotification(req, {
+        recipients: [team.createdBy],
+        type: "team-member-declined",
+        message: `${req.user.username} declined your team invitation.`,
+        link: `/teams/${team._id}`,
+        targetType: "user",
+      });
+    }
     res.status(200).send({ message: "Invitation declined" });
   } catch (err) {
     res.status(500).send(err.message);

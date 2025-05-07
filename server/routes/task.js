@@ -2,6 +2,7 @@ const express = require("express");
 const isTeamLeader = require("../middleware/isTeamLeader");
 const auth = require("../middleware/auth");
 const Task = require("../models/Task");
+const sendNotification = require("../helpers/sendNotification");
 
 const router = express.Router();
 
@@ -29,6 +30,14 @@ router.post("/", auth, isTeamLeader, async (req, res) => {
     });
 
     await task.save();
+    await sendNotification(req, {
+      recipients: assignedMembers,
+      type: "task-assigned",
+      message: `You have been assigned a new task: ${task.title}`,
+      link: `/tasks/${task._id}`,
+      targetType: "user",
+    });
+
     res.status(201).json(task);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -123,7 +132,13 @@ router.patch("/:taskId/complete", auth, async (req, res) => {
 
     task.status = "completed";
     await task.save();
-
+    await sendNotification(req, {
+      recipients: [team.leader],
+      type: "task-completed",
+      message: `A member has completed the task "${task.title}".`,
+      link: `/tasks/${task._id}`,
+      targetType: "team-leader",
+    });
     res.json({ message: "Task marked as completed", task });
   } catch (err) {
     console.error("Error updating task:", err);

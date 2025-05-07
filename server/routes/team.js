@@ -121,16 +121,7 @@ router.post("/:teamId/invite", auth, isTeamLeader, async (req, res) => {
       link: `/teams/${teamId}`, // update this later when front is ready
       targetType: "user",
     });
-    // const notification = new Notification({
-    //   recipients: [user._id],
-    //   type: "team-invite",
-    //   message: `You've been invited to join the team of "${team.sessionName}"`,
-    //   link: `/teams/${teamId}`, //idk kifh rak dayr f front . gotta check laater
-    //   targetType: "user",
-    // });
 
-    // await notification.save();
-    // io.to(user._id.toString()).emit("new-notification", notification);
     res.status(201).json({
       message: "Invitation sent successfully",
       invitationId: invitation._id,
@@ -171,7 +162,13 @@ router.delete(
       // Filter using ObjectId comparison
       team.members = team.members.filter((id) => !id.equals(memberObjectId));
       await team.save();
-
+      await sendNotification(req, {
+        recipients: [memberId],
+        type: "team-member-removed",
+        message: `You have been removed from the team.`,
+        link: `/teams/${teamId}`,
+        targetType: "user",
+      });
       res.status(200).json({
         success: true,
         message: "Member removed successfully",

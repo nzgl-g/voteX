@@ -9,7 +9,6 @@ const notificationSchema = new mongoose.Schema({
     default: "user",
   },
   teamId: {
-    // Optional field for team-based notifications
     type: mongoose.Schema.Types.ObjectId,
     ref: "Team",
     required: function () {
@@ -35,6 +34,12 @@ const notificationSchema = new mongoose.Schema({
     required: true,
   },
   message: { type: String, required: true },
+  category: {
+    type: String,
+    enum: ["Alert", "Interaction"],
+    required: true,
+    default: "Alert",
+  },
   link: { type: String, required: true },
   timestamp: { type: Date, default: Date.now },
 });

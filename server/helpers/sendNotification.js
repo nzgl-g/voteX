@@ -1,17 +1,26 @@
 const Notification = require("../models/Notification");
+const Team = require("../models/Team");
 
 const sendNotification = async (
-    req,
-    { recipients, type, message, link, targetType, teamId }
+  req,
+  { recipients, type, message, link, targetType, teamId }
 ) => {
   const io = req.app.get("io");
-
+  const interactionTypes = [
+    "team-invite",
+    "candidate-invite",
+    "session-edit-request",
+    "task-assigned",
+  ];
+  const category = interactionTypes.includes(type) ? "Interaction" : "Alert";
   const notification = new Notification({
     recipients,
     type,
     message,
     link,
     targetType,
+    category,
+    teamId: targetType === "team" ? teamId : undefined,
     createdAt: new Date(),
   });
   if (targetType === "team" && !teamId) {
@@ -23,6 +32,7 @@ const sendNotification = async (
     message,
     link,
     targetType,
+    category,
     createdAt: notification.createdAt,
   };
   if (targetType === "all") {

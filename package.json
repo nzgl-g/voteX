@@ -13,8 +13,8 @@
     "frontend:build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "backend:start": "nodemon server/index.js",
-    "server": "node server/index.js",
+    "backend:start": "cd server && nodemon index.js",
+    "server": "cd server && node index.js",
     "kyc:setup": "cd kyc && pip install -e .",
     "kyc:start": "cd kyc && python run.py",
     "kyc:dev": "cd kyc && python app.py"

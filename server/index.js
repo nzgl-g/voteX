@@ -80,6 +80,36 @@ const startServer = async () => {
       });
   });
 };
+
+// Initialize and start the blockchain bridge
+const initBlockchainBridge = async () => {
+  try {
+    const bridgeRouter = require("../blockchain/bridge");
+    const { utils } = require("../blockchain/bridge");
+    
+    // Register blockchain bridge routes
+    app.use("/votex/api/blockchain", bridgeRouter);
+    
+    // Initialize blockchain connection if environment variables are set
+    const { BLOCKCHAIN_PRIVATE_KEY, CONTRACT_ADDRESS, PROVIDER_URL } = process.env;
+    
+    if (BLOCKCHAIN_PRIVATE_KEY) {
+      await utils.blockchainConnector.initialize({
+        privateKey: BLOCKCHAIN_PRIVATE_KEY,
+        contractAddress: CONTRACT_ADDRESS,
+        providerUrl: PROVIDER_URL
+      });
+      console.log("Blockchain connection initialized successfully");
+    } else {
+      console.log("Blockchain private key not found, blockchain bridge is in limited mode");
+    }
+    
+    console.log("Blockchain bridge integrated successfully");
+  } catch (error) {
+    console.error("Failed to initialize blockchain bridge:", error);
+  }
+};
+
 connectDB()
   .then(() => {
     require("./models/Sessions");
@@ -89,4 +119,8 @@ connectDB()
     console.error("Failed to start Agenda:", err);
     process.exit(1);
   })
-  .then(() => startServer(process.env.PORT || 2000));
+  .then(() => startServer(process.env.PORT || 2000))
+  .then(() => initBlockchainBridge())
+  .catch((err) => {
+    console.error("Failed to initialize blockchain bridge:", err);
+  });

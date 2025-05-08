@@ -3,7 +3,7 @@ const Team = require("../models/Team");
 
 const sendNotification = async (
   req,
-  { recipients, type, message, link, targetType, teamId }
+  { recipients, type, message, link, targetType, teamId, extraData = {} }
 ) => {
   const io = req.app.get("io");
   const interactionTypes = [
@@ -34,6 +34,7 @@ const sendNotification = async (
     targetType,
     category,
     createdAt: notification.createdAt,
+    ...extraData,
   };
   if (targetType === "all") {
     io.emit("new-notification", payload);

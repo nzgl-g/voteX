@@ -2,7 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const User = require("../models/User");
 const auth = require("../middleware/auth");
-const isTeamLeader = require("../middleware/isTeamLeader");
+const SessionParticipant = require("../models/SessionParticipants");
 
 const router = express.Router();
 /**  Log out */
@@ -29,6 +29,29 @@ router.get("/search", auth, async (req, res) => {
   }
 });
 
+router.get("/role", auth, async (req, res) => {
+  const userId = req.user._id;
+  console.log(userId);
+  try {
+    const participant = await SessionParticipant.findOne({
+      userId,
+      role: { $in: ["team_leader", "team_member"] },
+    });
+
+    if (!participant) {
+      return res.status(200).json({ isTeam: false });
+    }
+
+    return res.status(200).json({
+      isTeam: true,
+      role: participant.role,
+      sessionId: participant.sessionId,
+    });
+  } catch (err) {
+    console.error("Error checking team role:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
 /**  Get current user profile */
 
 router.get("/me", auth, async (req, res) => {

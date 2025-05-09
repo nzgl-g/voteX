@@ -125,7 +125,7 @@ router.patch("/:taskId/complete", auth, async (req, res) => {
     }
 
     const wasCompleted = task.status === "completed";
-    task.status = wasCompleted ? "incomplete" : "completed";
+    task.status = wasCompleted ? "pending" : "completed";
     await task.save();
 
     if (!wasCompleted) {

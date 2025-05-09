@@ -17,15 +17,30 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { format } from "date-fns"
-import { CalendarIcon, Clock, Loader2 } from "lucide-react"
+import { format, set } from "date-fns"
+import { CalendarIcon, Clock, Loader2, CheckCircle2 } from "lucide-react"
 import { teamService, TeamMember as ApiTeamMember } from "@/api/team-service"
 import { sessionService } from "@/api/session-service"
-import { taskService } from "@/api/task-service"
+import { taskService, Task } from "@/api/task-service"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+// Predefined productive colors
+const TASK_COLORS = [
+  { name: "Blue", value: "#2563eb", bg: "bg-blue-100" },
+  { name: "Purple", value: "#7c3aed", bg: "bg-purple-100" },
+  { name: "Pink", value: "#db2777", bg: "bg-pink-100" },
+  { name: "Red", value: "#dc2626", bg: "bg-red-100" },
+  { name: "Orange", value: "#ea580c", bg: "bg-orange-100" },
+  { name: "Amber", value: "#d97706", bg: "bg-amber-100" },
+  { name: "Green", value: "#16a34a", bg: "bg-green-100" },
+  { name: "Teal", value: "#0d9488", bg: "bg-teal-100" },
+  { name: "Cyan", value: "#0891b2", bg: "bg-cyan-100" },
+  { name: "Indigo", value: "#4f46e5", bg: "bg-indigo-100" },
+]
 
 interface TeamMember {
   _id: string
@@ -41,27 +56,54 @@ interface TaskDialogProps {
   onClose: () => void
   selectedMembers: string[]
   sessionId: string
+  taskToEdit?: Task
 }
 
-export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId }: TaskDialogProps) {
+export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId, taskToEdit }: TaskDialogProps) {
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
-  const [color, setColor] = useState("#4f46e5")
+  const [color, setColor] = useState(TASK_COLORS[9].value) // Default to Indigo
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium")
   const [date, setDate] = useState<Date | undefined>(new Date())
+  const [time, setTime] = useState<{ hours: string; minutes: string }>({ hours: "12", minutes: "00" })
   const [assignedMembers, setAssignedMembers] = useState<string[]>(selectedMembers)
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const isEditMode = !!taskToEdit
 
   useEffect(() => {
     if (isOpen && sessionId) {
       fetchTeamMembers()
+      
+      // If in edit mode, populate form with task data
+      if (taskToEdit) {
+        setTitle(taskToEdit.title)
+        setDescription(taskToEdit.description || "")
+        setColor(taskToEdit.color || TASK_COLORS[9].value)
+        setPriority(taskToEdit.priority)
+        
+        // Set date and time if dueDate exists
+        if (taskToEdit.dueDate) {
+          const dueDate = new Date(taskToEdit.dueDate)
+          setDate(dueDate)
+          setTime({
+            hours: dueDate.getHours().toString().padStart(2, '0'),
+            minutes: dueDate.getMinutes().toString().padStart(2, '0')
+          })
+        } else {
+          setDate(undefined)
+          setTime({ hours: "12", minutes: "00" })
+        }
+        
+        // Set assigned members
+        setAssignedMembers(taskToEdit.assignedMembers)
+      } else {
+        // Reset form for create mode
+        resetForm()
+        setAssignedMembers(selectedMembers)
+      }
     }
-  }, [isOpen, sessionId])
-
-  useEffect(() => {
-    setAssignedMembers(selectedMembers)
-  }, [selectedMembers])
+  }, [isOpen, sessionId, taskToEdit, selectedMembers])
 
   const fetchTeamMembers = async () => {
     if (!sessionId) return
@@ -111,10 +153,8 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
       setTeamMembers(processedMembers)
     } catch (err) {
       console.error("Failed to fetch team members:", err)
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Failed to load team members. Some functionality may be limited.",
-        variant: "destructive",
       })
     } finally {
       setIsLoading(false)
@@ -123,48 +163,89 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validate that at least one member is selected
+    if (assignedMembers.length === 0) {
+      toast.error("Member Required", {
+        description: "Please select at least one team member to assign this task to.",
+      });
+      return;
+    }
+    
     setIsLoading(true)
+    
+    // Combine date with time
+    let dueDateTime = date ? new Date(date) : undefined
+    if (dueDateTime && time.hours && time.minutes) {
+      dueDateTime = set(dueDateTime, {
+        hours: parseInt(time.hours, 10),
+        minutes: parseInt(time.minutes, 10),
+        seconds: 0
+      })
+    }
     
     const taskData = {
       title,
       description,
       priority,
-      dueDate: date ? date.toISOString() : undefined,
+      dueDate: dueDateTime ? dueDateTime.toISOString() : undefined,
       assignedMembers,
-      session: sessionId,
       color,
     }
     
-    taskService.createTask(taskData)
-      .then(createdTask => {
-        toast({
-          title: "Task created",
-          description: `Task "${title}" has been created and assigned to ${
-            assignedMembers.length
-          } member${assignedMembers.length !== 1 ? "s" : ""}.`,
+    if (isEditMode && taskToEdit) {
+      // Update existing task
+      taskService.updateTask(taskToEdit._id, taskData)
+        .then(updatedTask => {
+          toast.success("Task updated", {
+            description: `Task "${title}" has been updated successfully.`,
+          })
+          resetForm()
+          onClose()
         })
-        resetForm()
-        onClose()
-      })
-      .catch(error => {
-        console.error("Error creating task:", error)
-        toast({
-          title: "Error",
-          description: "Failed to create task. Please try again.",
-          variant: "destructive",
+        .catch(error => {
+          console.error("Error updating task:", error)
+          toast.error("Error", {
+            description: "Failed to update task. Please try again.",
+          })
         })
+        .finally(() => {
+          setIsLoading(false)
+        })
+    } else {
+      // Create new task
+      taskService.createTask({
+        ...taskData,
+        session: sessionId
       })
-      .finally(() => {
-        setIsLoading(false)
-      })
+        .then(createdTask => {
+          toast.success("Task created", {
+            description: `Task "${title}" has been created and assigned to ${
+              assignedMembers.length
+            } member${assignedMembers.length !== 1 ? "s" : ""}.`,
+          })
+          resetForm()
+          onClose()
+        })
+        .catch(error => {
+          console.error("Error creating task:", error)
+          toast.error("Error", {
+            description: "Failed to create task. Please try again.",
+          })
+        })
+        .finally(() => {
+          setIsLoading(false)
+        })
+    }
   }
 
   const resetForm = () => {
     setTitle("")
     setDescription("")
-    setColor("#4f46e5")
+    setColor(TASK_COLORS[9].value)
     setPriority("medium")
     setDate(new Date())
+    setTime({ hours: "12", minutes: "00" })
   }
 
   const handleRemoveMember = (memberId: string) => {
@@ -177,15 +258,33 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
     }
   }
 
+  const handleTimeChange = (field: 'hours' | 'minutes', value: string) => {
+    // Validate input
+    let numValue = parseInt(value, 10);
+    if (isNaN(numValue)) return;
+    
+    if (field === 'hours') {
+      numValue = Math.max(0, Math.min(23, numValue));
+      setTime({ ...time, hours: numValue.toString().padStart(2, '0') });
+    } else {
+      numValue = Math.max(0, Math.min(59, numValue));
+      setTime({ ...time, minutes: numValue.toString().padStart(2, '0') });
+    }
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Create New Task</DialogTitle>
-          <DialogDescription>Create a new task and assign it to team members.</DialogDescription>
+          <DialogTitle>{isEditMode ? "Edit Task" : "Create New Task"}</DialogTitle>
+          <DialogDescription>
+            {isEditMode 
+              ? "Update task details and assignments." 
+              : "Create a new task and assign it to team members."}
+          </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 py-4">
+        <form onSubmit={handleSubmit} className="space-y-6 py-4">
           <div className="space-y-2">
             <Label htmlFor="title">Task Title</Label>
             <Input
@@ -194,6 +293,7 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
+              className="w-full"
             />
           </div>
 
@@ -205,71 +305,62 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
+              className="resize-none"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Color Selection */}
             <div className="space-y-2">
-              <Label htmlFor="color">Color</Label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  id="color"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="h-10 w-10 rounded border p-1"
-                />
-                <Input
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="font-mono"
-                  maxLength={7}
-                />
+              <Label>Task Color</Label>
+              <div className="grid grid-cols-5 gap-2">
+                {TASK_COLORS.map((taskColor) => (
+                  <button
+                    key={taskColor.value}
+                    type="button"
+                    className={cn(
+                      "h-8 w-8 rounded-full border-2 transition-all",
+                      color === taskColor.value ? "border-primary ring-2 ring-primary/20" : "border-transparent"
+                    )}
+                    style={{ backgroundColor: taskColor.value }}
+                    onClick={() => setColor(taskColor.value)}
+                    title={taskColor.name}
+                  >
+                    {color === taskColor.value && (
+                      <CheckCircle2 className="h-4 w-4 text-white mx-auto" />
+                    )}
+                  </button>
+                ))}
               </div>
             </div>
 
+            {/* Priority Selection */}
             <div className="space-y-2">
               <Label htmlFor="priority">Priority</Label>
-              <Select 
+              <Tabs 
                 defaultValue={priority} 
-                onValueChange={(value: "low" | "medium" | "high") => setPriority(value)}
+                onValueChange={(value) => setPriority(value as "low" | "medium" | "high")}
+                className="w-full"
               >
-                <SelectTrigger id="priority">
-                  <SelectValue placeholder="Select priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">
-                    <div className="flex items-center">
-                      <Badge variant="outline" className="mr-2 bg-green-100">
-                        Low
-                      </Badge>
-                      <span>Low Priority</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="medium">
-                    <div className="flex items-center">
-                      <Badge variant="outline" className="mr-2 bg-yellow-100">
-                        Medium
-                      </Badge>
-                      <span>Medium Priority</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="high">
-                    <div className="flex items-center">
-                      <Badge variant="outline" className="mr-2 bg-red-100">
-                        High
-                      </Badge>
-                      <span>High Priority</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+                <TabsList className="grid grid-cols-3 w-full">
+                  <TabsTrigger value="low" className="data-[state=active]:bg-green-100 data-[state=active]:text-green-900">
+                    Low
+                  </TabsTrigger>
+                  <TabsTrigger value="medium" className="data-[state=active]:bg-amber-100 data-[state=active]:text-amber-900">
+                    Medium
+                  </TabsTrigger>
+                  <TabsTrigger value="high" className="data-[state=active]:bg-red-100 data-[state=active]:text-red-900">
+                    High
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
           </div>
 
+          {/* Due Date & Time */}
           <div className="space-y-2">
-            <Label>Due Date</Label>
-            <div className="flex gap-2">
+            <Label>Due Date & Time</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -285,26 +376,32 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
                 </PopoverContent>
               </Popover>
 
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline">
-                    <Clock className="mr-2 h-4 w-4" />
-                    Set Time
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="hours">Hours</Label>
-                    <Input id="hours" type="number" min="0" max="23" placeholder="HH" />
-                    <Label htmlFor="minutes">Minutes</Label>
-                    <Input id="minutes" type="number" min="0" max="59" placeholder="MM" />
-                    <Button className="mt-2">Set Time</Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
+              <div className="flex items-center gap-2">
+                <div className="relative flex items-center">
+                  <Clock className="absolute left-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    value={time.hours}
+                    onChange={(e) => handleTimeChange('hours', e.target.value)}
+                    className="pl-9 pr-3 w-20 text-center"
+                    placeholder="HH"
+                  />
+                </div>
+                <span className="text-xl font-medium">:</span>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={time.minutes}
+                  onChange={(e) => handleTimeChange('minutes', e.target.value)}
+                  className="w-20 text-center"
+                  placeholder="MM"
+                />
+              </div>
             </div>
           </div>
 
+          {/* Assigned Members */}
           <div className="space-y-2">
             <Label>Assigned Members</Label>
             {isLoading ? (
@@ -314,7 +411,7 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
               </div>
             ) : (
               <>
-                <div className="flex flex-wrap gap-2 mb-2">
+                <div className="flex flex-wrap gap-2 mb-3 min-h-10 p-2 border rounded-md bg-muted/20">
                   {assignedMembers.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No members assigned</p>
                   ) : (
@@ -322,7 +419,7 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
                       const member = teamMembers.find((m) => m._id === memberId)
                       return (
                         member && (
-                          <Badge key={member._id} variant="secondary" className="flex items-center gap-1">
+                          <Badge key={member._id} variant="secondary" className="flex items-center gap-1 px-3 py-1.5">
                             {member.fullName || member.username}
                             <button
                               type="button"
@@ -347,7 +444,14 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
                       .filter((member) => !assignedMembers.includes(member._id))
                       .map((member) => (
                         <SelectItem key={member._id} value={member._id}>
-                          {member.fullName || member.username}
+                          <div className="flex items-center gap-2">
+                            <span>{member.fullName || member.username}</span>
+                            {member.role && (
+                              <Badge variant="outline" className="text-xs">
+                                {member.role}
+                              </Badge>
+                            )}
+                          </div>
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -357,10 +461,19 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
           </div>
 
           <DialogFooter className="pt-4">
-            <Button variant="outline" onClick={onClose} type="button">
+            <Button variant="outline" onClick={onClose} type="button" disabled={isLoading}>
               Cancel
             </Button>
-            <Button type="submit">Create Task</Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isEditMode ? "Updating..." : "Creating..."}
+                </>
+              ) : (
+                isEditMode ? "Update Task" : "Create Task"
+              )}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

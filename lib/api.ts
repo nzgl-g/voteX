@@ -31,13 +31,43 @@ api.interceptors.response.use(
       // Check if the response is HTML instead of JSON
       const isHtmlResponse = typeof responseData === 'string' && responseData.includes('<!DOCTYPE');
       
-      console.error('API Error Response:', {
-        status: error.response.status,
-        statusText: error.response.statusText,
-        isHtmlResponse,
-        data: isHtmlResponse ? 'HTML Response (not JSON)' : error.response.data,
-        url: error.config?.url
+      // Log request details to help with debugging
+      console.error('API Request Details:', {
+        method: error.config?.method?.toUpperCase(),
+        url: error.config?.url,
+        data: error.config?.data ? JSON.parse(error.config.data) : null,
+        headers: error.config?.headers
       });
+      
+      // Handle empty response data
+      if (!responseData || Object.keys(responseData).length === 0) {
+        console.error('API Error Response: Empty response data', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          url: error.config?.url
+        });
+        
+        // Add a default message based on status code
+        if (error.response.status === 500) {
+          error.response.data = { message: "Internal server error" };
+        } else if (error.response.status === 404) {
+          error.response.data = { message: "Resource not found" };
+        } else if (error.response.status === 403) {
+          error.response.data = { message: "Not authorized to perform this action" };
+        } else if (error.response.status === 400) {
+          error.response.data = { message: "Bad request - invalid data provided" };
+        } else {
+          error.response.data = { message: `Error: ${error.response.statusText}` };
+        }
+      } else {
+        console.error('API Error Response:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          isHtmlResponse,
+          data: isHtmlResponse ? 'HTML Response (not JSON)' : error.response.data,
+          url: error.config?.url
+        });
+      }
       
       // If we got HTML instead of JSON, provide a more helpful error
       if (isHtmlResponse) {

@@ -102,7 +102,7 @@ router.post("/apply", auth, async (req, res) => {
     if (existingRequest) {
       if (existingRequest.status === "approved") {
         return res
-          .status(400)
+          .status(200)
           .json({ message: "You are already a candidate for this session." });
       } else if (existingRequest.status === "rejected") {
         return res.status(400).json({
@@ -111,7 +111,7 @@ router.post("/apply", auth, async (req, res) => {
         });
       } else {
         return res
-          .status(400)
+          .status(200)
           .json({ message: "Your application is still pending." });
       }
     }
@@ -159,12 +159,12 @@ router.post("/accept/:requestId", auth, async (req, res) => {
     }
     if (candidateRequest.status === "approved") {
       return res
-        .status(400)
+        .status(200)
         .json({ message: "This request has already been approved." });
     }
     if (candidateRequest.status === "rejected") {
       return res
-        .status(400)
+        .status(200)
         .json({ message: "This request has already been rejected." });
     }
     if (!session.createdBy.equals(userId)) {
@@ -217,12 +217,12 @@ router.post("/reject/:requestId", auth, async (req, res) => {
     }
     if (candidateRequest.status === "approved") {
       return res
-        .status(400)
+        .status(200)
         .json({ message: "This request has already been approved." });
     }
     if (candidateRequest.status === "rejected") {
       return res
-        .status(400)
+        .status(200)
         .json({ message: "This request has already been rejected." });
     }
     const session = candidateRequest.session;
@@ -265,7 +265,7 @@ router.post("/invite/:userId", auth, async (req, res) => {
 
     if (alreadyCandidate) {
       return res
-        .status(400)
+        .status(200)
         .json({ message: "User is already a candidate in this session" });
     }
     const existingInvite = await CandidateInvitation.findOne({
@@ -274,18 +274,18 @@ router.post("/invite/:userId", auth, async (req, res) => {
     });
     if (existingInvite) {
       if (existingInvite.status === "pending") {
-        return res.status(400).json({
+        return res.status(200).json({
           message: "User has already been invited and hasn't responded yet",
         });
       }
       if (existingInvite.status === "declined") {
         return res
-          .status(400)
+          .status(200)
           .json({ message: "User previously declined the invitation" });
       }
       if (existingInvite.status === "accepted") {
         return res
-          .status(400)
+          .status(200)
           .json({ message: "User already accepted the invitation " });
       }
     }
@@ -334,13 +334,13 @@ router.post("/invite/:inviteId/accept", auth, async (req, res) => {
 
     if (invitation.status === "accepted") {
       return res
-        .status(400)
+        .status(200)
         .json({ message: "You have already accepted the invitation" });
     }
 
     if (invitation.status === "declined") {
       return res
-        .status(400)
+        .status(200)
         .json({ message: "You have already declined this invitation" });
     }
 
@@ -358,7 +358,7 @@ router.post("/invite/:inviteId/accept", auth, async (req, res) => {
 
     if (alreadyCandidate) {
       return res
-        .status(400)
+        .status(200)
         .json({ message: "User is already a candidate in this session" });
     }
 
@@ -410,13 +410,13 @@ router.post("/invite/:inviteId/reject", auth, async (req, res) => {
 
     if (invitation.status === "accepted") {
       return res
-        .status(400)
+        .status(200)
         .json({ message: "You have already accepted the invitation" });
     }
 
     if (invitation.status === "declined") {
       return res
-        .status(400)
+        .status(200)
         .json({ message: "You have already declined this invitation" });
     }
 

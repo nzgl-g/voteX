@@ -106,7 +106,6 @@ router.patch("/:taskId/assign", auth, isTeamLeader, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-
 router.patch("/:taskId/complete", auth, async (req, res) => {
   try {
     const task = await Task.findById(req.params.taskId);
@@ -124,25 +123,29 @@ router.patch("/:taskId/complete", auth, async (req, res) => {
         .status(403)
         .json({ message: "You are not assigned to this task" });
     }
-    if (task.status === "completed") {
-      return res
-        .status(400)
-        .json({ message: "Task is already marked as completed" });
+
+    const wasCompleted = task.status === "completed";
+    task.status = wasCompleted ? "incomplete" : "completed";
+    await task.save();
+
+    if (!wasCompleted) {
+      await sendNotification(req, {
+        recipients: [team.leader],
+        type: "task-completed",
+        message: `A member has completed the task "${task.title}".`,
+        link: `/tasks/${task._id}`,
+        targetType: "team-leader",
+      });
     }
 
-    task.status = "completed";
-    await task.save();
-    await sendNotification(req, {
-      recipients: [team.leader],
-      type: "task-completed",
-      message: `A member has completed the task "${task.title}".`,
-      link: `/tasks/${task._id}`,
-      targetType: "team-leader",
+    res.status(200).json({
+      message: `Task marked as ${task.status}`,
+      task,
     });
-    res.json({ message: "Task marked as completed", task });
   } catch (err) {
-    console.error("Error updating task:", err);
+    console.error("Error toggling task status:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
 module.exports = router;

@@ -16,7 +16,7 @@ router.post("/:invitationId/accept", auth, async (req, res) => {
       return res.status(403).send("Not authorized");
     }
     if (invitation.status !== "pending") {
-      return res.status(400).send("Invitation already processed");
+      return res.status(200).send("Invitation already processed");
     }
 
     // Add user to team
@@ -24,7 +24,7 @@ router.post("/:invitationId/accept", auth, async (req, res) => {
     if (!team) return res.status(404).send("Team not found");
 
     if (team.members.includes(req.user._id)) {
-      return res.status(400).send("User already in team");
+      return res.status(200).send("User already in team");
     }
 
     // Update team and invitation
@@ -56,7 +56,7 @@ router.post("/:invitationId/decline", auth, async (req, res) => {
       return res.status(403).send("Not authorized to decline this invitation");
     }
     if (invitation.status !== "pending") {
-      return res.status(400).send("Invitation already processed");
+      return res.status(200).send("Invitation already processed");
     }
 
     invitation.status = "declined";

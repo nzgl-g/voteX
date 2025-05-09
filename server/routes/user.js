@@ -107,7 +107,7 @@ router.put("/me", auth, async (req, res) => {
     if (updates.username && updates.username !== req.user.username) {
       const existingUser = await User.findOne({ username: updates.username });
       if (existingUser) {
-        return res.status(400).send({
+        return res.status(200).send({
           message: "Username already taken. Please choose another one.",
         });
       }
@@ -117,7 +117,7 @@ router.put("/me", auth, async (req, res) => {
     if (updates.email && updates.email !== req.user.email) {
       const existingUser = await User.findOne({ email: updates.email });
       if (existingUser) {
-        return res.status(400).send({
+        return res.status(200).send({
           message: "Email already in use. Please use another email address.",
         });
       }
@@ -150,7 +150,7 @@ router.put("/link-wallet", auth, async (req, res) => {
     });
     if (existing && existing._id.toString() !== req.user._id.toString()) {
       return res
-        .status(400)
+        .status(200)
         .json({ message: "Wallet already linked to another account" });
     }
 
@@ -171,7 +171,7 @@ router.put("/link-wallet", auth, async (req, res) => {
     const now = Date.now();
     const cooldownPeriod = 30 * 24 * 60 * 60 * 1000;
     if (now - user.walletChangeTimestamp < cooldownPeriod) {
-      return res.status(400).json({
+      return res.status(200).json({
         message: "You can only change your wallet once a month.",
       });
     }

@@ -91,7 +91,7 @@ router.post("/:teamId/invite", auth, isTeamLeader, async (req, res) => {
     const isLeader = team.leader.equals(user._id);
 
     if (isMember || isLeader) {
-      return res.status(409).send("User is already part of the team");
+      return res.status(200).send("User is already part of the team");
     }
 
     // Check for existing pending invitation
@@ -102,7 +102,7 @@ router.post("/:teamId/invite", auth, isTeamLeader, async (req, res) => {
     });
 
     if (existingInvite) {
-      return res.status(409).send("Pending invitation already exists");
+      return res.status(200).send("Pending invitation already exists");
     }
 
     // Create and save invitation
@@ -150,7 +150,7 @@ router.delete(
       // Check if member exists in team (using ObjectId comparison)
       const isMember = team.members.some((id) => id.equals(memberObjectId));
       if (!isMember) {
-        return res.status(400).json({ error: "User is not in the team" });
+        return res.status(200).json({ error: "User is not in the team" });
       }
 
       // Prevent leader self-removal (using ObjectId comparison)
@@ -173,7 +173,7 @@ router.delete(
       res.status(200).json({
         success: true,
         message: "Member removed successfully",
-        team: await Team.findById(teamId).populate("members"), // Return fresh data
+        team: await Team.findById(teamId).populate("members"),
       });
     } catch (err) {
       console.error("Remove member error:", err);

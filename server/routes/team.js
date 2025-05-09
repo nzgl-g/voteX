@@ -91,7 +91,7 @@ router.post("/:teamId/invite", auth, isTeamLeader, async (req, res) => {
     const isLeader = team.leader.equals(user._id);
 
     if (isMember || isLeader) {
-      return res.status(400).send("User is already part of the team");
+      return res.status(409).send("User is already part of the team");
     }
 
     // Check for existing pending invitation
@@ -102,7 +102,7 @@ router.post("/:teamId/invite", auth, isTeamLeader, async (req, res) => {
     });
 
     if (existingInvite) {
-      return res.status(400).send("Pending invitation already exists");
+      return res.status(409).send("Pending invitation already exists");
     }
 
     // Create and save invitation

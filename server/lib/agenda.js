@@ -1,7 +1,7 @@
 const Agenda = require("agenda");
 const mongoose = require("mongoose");
 const Session = require("../models/Sessions");
-
+const deploySessionToBlockchain = require("../bridge/controllers");
 const agenda = new Agenda({
   db: {
     address: process.env.MONGO_URI,
@@ -31,7 +31,7 @@ agenda.define("check and push session", async () => {
         $set: { "sessionLifecycle.startedAt": new Date() },
       });
       //hna code ta3k
-      //call function that connects session with chain . rani jayb session id . cha lazm other properties
+      await deploySessionToBlockchain(session._id);
       console.log(`Pushed session ${session._id} to the blockchain.`);
     }
   } catch (error) {

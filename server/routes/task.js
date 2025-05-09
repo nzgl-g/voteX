@@ -44,7 +44,7 @@ router.post("/", auth, isTeamLeader, async (req, res) => {
   }
 });
 
-router.get("/session/:sessionId", async (req, res) => {
+router.get("/session/:sessionId", auth, async (req, res) => {
   try {
     const tasks = await Task.find({ session: req.params.sessionId });
     res.json(tasks);
@@ -54,7 +54,7 @@ router.get("/session/:sessionId", async (req, res) => {
 });
 
 // Get a single task
-router.get("/:taskId", async (req, res) => {
+router.get("/:taskId", auth, async (req, res) => {
   try {
     const task = await Task.findById(req.params.taskId);
     if (!task) return res.status(404).json({ message: "Task not found" });
@@ -65,7 +65,7 @@ router.get("/:taskId", async (req, res) => {
 });
 
 // Update a task (team leader only)
-router.put("/:taskId", isTeamLeader, async (req, res) => {
+router.put("/:taskId", auth, isTeamLeader, async (req, res) => {
   try {
     const updatedTask = await Task.findByIdAndUpdate(
       req.params.taskId,
@@ -81,7 +81,7 @@ router.put("/:taskId", isTeamLeader, async (req, res) => {
 });
 
 // Delete a task (team leader only)
-router.delete("/:taskId", isTeamLeader, async (req, res) => {
+router.delete("/:taskId", auth, isTeamLeader, async (req, res) => {
   try {
     const deleted = await Task.findByIdAndDelete(req.params.taskId);
     if (!deleted) return res.status(404).json({ message: "Task not found" });
@@ -92,7 +92,7 @@ router.delete("/:taskId", isTeamLeader, async (req, res) => {
 });
 
 // Assign/unassign members to a task (team leader only)
-router.patch("/:taskId/assign", isTeamLeader, async (req, res) => {
+router.patch("/:taskId/assign", auth, isTeamLeader, async (req, res) => {
   try {
     const { assignedMembers } = req.body;
     const task = await Task.findByIdAndUpdate(

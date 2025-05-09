@@ -10,14 +10,14 @@ const { initializeBridge } = require("./bridge");
 let io;
 
 const connectDB = async () => {
-    try {
-        const conn = await mongoose.connect(process.env.MONGO_URI);
-        console.log(`MongoDB Connected: ${conn.connection.host}`);
-    } catch (error) {
-        console.error(`Error: ${error.message}`);
-        console.log("Please make sure MongoDB is installed and running.");
-        process.exit(1);
-    }
+  try {
+    const conn = await mongoose.connect(process.env.MONGO_URI);
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
+  } catch (error) {
+    console.error(`Error: ${error.message}`);
+    console.log("Please make sure MongoDB is installed and running.");
+    process.exit(1);
+  }
 };
 
 const app = express();
@@ -25,12 +25,11 @@ const server = http.createServer(app);
 
 // Enable CORS with more permissive settings for development
 app.use(
-    cors({
-        origin: ["http://localhost:3000", "http://127.0.0.1:3000"], // Next.js default ports
-        credentials: true, // Allow credentials (cookies, authorization headers)
-        methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
-    })
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
 );
 app.use(express.json());
 
@@ -44,70 +43,66 @@ routes(app);
 initializeBridge(app);
 
 io = new Server(server, {
-    cors: {
-        origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
-        credentials: true,
-        methods: ["GET", "POST"],
-    },
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
 });
 app.set("io", io);
 
 io.on("connection", (socket) => {
-    console.log("A user connected:", socket.id);
+  console.log("A user connected:", socket.id);
 
-    socket.on("authenticate", (userId) => {
-        if (userId) {
-            socket.join(userId.toString());
-            console.log(`User ${userId} joined their room`);
-        }
-    });
+  socket.on("authenticate", (userId) => {
+    if (userId) {
+      socket.join(userId.toString());
+      console.log(`User ${userId} joined their room`);
+    }
+  });
 
-    socket.on("disconnect", () => {
-        console.log("User disconnected:", socket.id);
-    });
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
+  });
 });
 
 // Start server function
 const startServer = async () => {
-    const port = process.env.PORT || 2000;
-    return new Promise((resolve, reject) => {
-        server
-            .listen(port)
-            .once("listening", () => {
-                console.log(`Server listening at port ${port}`);
-                resolve(server);
-            })
-            .once("error", (err) => {
-                if (err.code === "EADDRINUSE") {
-                    console.log(`Port ${port} is in use, trying port ${port + 1}`);
-                    startServer(port + 1)
-                        .then(resolve)
-                        .catch(reject);
-                } else {
-                    console.error("Error starting server:", err);
-                    reject(err);
-                }
-            });
-    });
+  const port = process.env.PORT || 2000;
+  return new Promise((resolve, reject) => {
+    server
+      .listen(port)
+      .once("listening", () => {
+        console.log(`Server listening at port ${port}`);
+        resolve(server);
+      })
+      .once("error", (err) => {
+        if (err.code === "EADDRINUSE") {
+          console.log(`Port ${port} is in use, trying port ${port + 1}`);
+          startServer(port + 1)
+            .then(resolve)
+            .catch(reject);
+        } else {
+          console.error("Error starting server:", err);
+          reject(err);
+        }
+      });
+  });
 };
-
 
 // Start the application
 const startApp = async () => {
-    try {
-        // Connect to MongoDB
-        await connectDB();
+  try {
+    // Connect to MongoDB
+    await connectDB();
 
-        
-        // Start Agenda
-        await startAgenda();
-        
-        // Start server
-        await startServer();
-        
-    } catch (error) {
-        process.exit(1);
-    }
+    // Start Agenda
+    await startAgenda();
+
+    // Start server
+    await startServer();
+  } catch (error) {
+    process.exit(1);
+  }
 };
 
 // Start the application

@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const User = require("../models/User");
 const auth = require("../middleware/auth");
 const SessionParticipant = require("../models/SessionParticipants");
-
+const { ethers } = require("ethers");
 const router = express.Router();
 /**  Log out */
 router.post("/logout", auth, (req, res) => {
@@ -133,7 +133,95 @@ router.put("/me", auth, async (req, res) => {
     res.status(500).send({ message: err.message });
   }
 });
+router.put("/link-wallet", auth, async (req, res) => {
+  try {
+    const { walletAddress, chainId, networkName, balance, signature, message } =
+      req.body;
 
+    if (!walletAddress || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+      return res.status(400).json({ message: "Invalid wallet address" });
+    }
+
+    if (!signature || !message) {
+      return res.status(400).json({ message: "Missing signature or message" });
+    }
+    const existing = await User.findOne({
+      "wallet.walletAddress": walletAddress,
+    });
+    if (existing && existing._id.toString() !== req.user._id.toString()) {
+      return res
+        .status(400)
+        .json({ message: "Wallet already linked to another account" });
+    }
+
+    let recoveredAddress;
+    try {
+      recoveredAddress = ethers.utils.verifyMessage(message, signature);
+    } catch (e) {
+      return res.status(400).json({ message: "Invalid signature format" });
+    }
+
+    if (recoveredAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+      return res
+        .status(401)
+        .json({ message: "Signature does not match wallet address" });
+    }
+    const user = await User.findById(req.user._id);
+
+    const now = Date.now();
+    const cooldownPeriod = 30 * 24 * 60 * 60 * 1000;
+    if (now - user.walletChangeTimestamp < cooldownPeriod) {
+      return res.status(400).json({
+        message: "You can only change your wallet once a month.",
+      });
+    }
+
+    user.wallet = {
+      walletAddress,
+      chainId,
+      networkName,
+      balance,
+      signature: signature || "",
+    };
+    user.walletChangeTimestamp = now;
+
+    await user.save();
+
+    res
+      .status(200)
+      .json({ message: "Wallet linked successfully", wallet: user.wallet });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error linking wallet" });
+  }
+});
+
+router.get("/verify-wallet", auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select(
+      "wallet walletChangeTimestamp"
+    );
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const wallet = user.wallet || {};
+    const isLinked = !!wallet.walletAddress;
+
+    const now = Date.now();
+    const cooldownPeriod = 30 * 24 * 60 * 60 * 1000;
+    const canChangeWallet = now - user.walletChangeTimestamp >= cooldownPeriod;
+
+    res.status(200).json({
+      isLinked,
+      wallet: isLinked ? wallet : null,
+      canChangeWallet,
+    });
+  } catch (err) {
+    console.error("Error verifying wallet:", err);
+    res.status(500).json({ message: "Server error verifying wallet" });
+  }
+});
 /**  Delete user account */
 router.delete("/me", auth, async (req, res) => {
   try {

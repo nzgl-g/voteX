@@ -1,5 +1,34 @@
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
+const walletSchema = new mongoose.Schema(
+  {
+    walletAddress: {
+      type: String,
+      default: "",
+      validate: {
+        validator: (v) => v === "" || /^0x[a-fA-F0-9]{40}$/.test(v),
+        message: "Invalid Ethereum wallet address",
+      },
+    },
+    chainId: {
+      type: String,
+      default: "",
+    },
+    networkName: {
+      type: String,
+      default: "",
+    },
+    balance: {
+      type: String,
+      default: "0",
+    },
+    signature: {
+      type: String,
+      default: "",
+    },
+  },
+  { _id: false }
+);
 
 const userSchema = new mongoose.Schema({
   username: {
@@ -29,14 +58,13 @@ const userSchema = new mongoose.Schema({
     enum: ["Male", "Female", "Prefer not to say"],
     required: true,
   },
-  walletAddress: {
-    type: String,
-    required: false,
-    default: "",
-    validate: {
-      validator: (v) => v === "" || /^0x[a-fA-F0-9]{40}$/.test(v),
-      message: "Invalid Ethereum wallet address",
-    },
+  wallet: {
+    type: walletSchema,
+    default: () => ({}),
+  },
+  walletChangeTimestamp: {
+    type: Date,
+    default: Date.now,
   },
   profilePic: {
     type: String,

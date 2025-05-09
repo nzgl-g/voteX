@@ -247,10 +247,16 @@ router.post("/", auth, async (req, res) => {
     const savedTeam = await team.save();
     session.team = savedTeam._id;
     await session.save();
-    await session.populate({
-      path: "participants",
-      select: "userId role",
-    });
+    await session.populate([
+      {
+        path: "participants",
+        select: "userId role",
+      },
+      {
+        path: "createdBy",
+        select: "username email wallet",
+      },
+    ]);
 
     res.status(201).json(session);
   } catch (err) {

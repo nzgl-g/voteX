@@ -1,7 +1,7 @@
 "use client"
 
 import type { SessionFormState } from "@/components/setup-form/vote-session-form"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn-ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChart, Clock, Check } from "lucide-react"
 
 interface ResultsDisplayStepProps {

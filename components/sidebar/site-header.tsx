@@ -1,15 +1,15 @@
 "use client"
 
 import { useState } from "react";
-import { SidebarTrigger } from "@/components/shadcn-ui/sidebar";
-import { Separator } from "@/components/shadcn-ui/separator";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
 import {
     Breadcrumb,
     BreadcrumbItem,
     BreadcrumbList,
     BreadcrumbPage,
-} from "@/components/shadcn-ui/breadcrumb";
-import { ThemeToggle } from "@/components/shadcn-ui/theme-toggle";
+} from "@/components/ui/breadcrumb";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Bell } from "lucide-react";
 import {
     Sheet,
@@ -17,9 +17,9 @@ import {
     SheetHeader,
     SheetTitle,
     SheetTrigger,
-} from "@/components/shadcn-ui/sheet";
+} from "@/components/ui/sheet";
 import useNotification, { NotificationPayload } from "@/hooks/use-notification";
-import { Badge } from "@/components/shadcn-ui/badge";
+import { Badge } from "@/components/ui/badge";
 
 type SiteHeaderProps = {
     title: string;

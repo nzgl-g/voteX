@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Progress } from "@/components/shadcn-ui/progress"
-import { Button } from "@/components/shadcn-ui/button"
+import { Progress } from "@/components/ui/progress"
+import { Button } from "@/components/ui/button"
 import { BasicInformationStep } from "@/components/setup-form/steps/basic-information-step"
 import { VoteTypeStep } from "@/components/setup-form/steps/vote-type-step"
 import LifecycleStep from "@/components/setup-form/steps/lifecycle-step"
@@ -14,7 +14,7 @@ import { SetupConfigurationStep } from "@/components/setup-form/steps/setup-conf
 import SummaryStep from "@/components/setup-form/steps/summary-step"
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
-import { Toaster } from "@/components/shadcn-ui/toaster"
+import { Toaster } from "@/components/ui/toaster"
 import apiClient, { authApi } from "@/lib/api"
 
 // Define the session state interface based on the provided types
@@ -103,7 +103,7 @@ export function VoteSessionForm({ plan, onComplete }: VoteSessionFormProps) {
     requirePapers: false,
     candidates: null,
     options: [],
-    secretPhrase: null,
+    secretPhrase: "",
     subscription: {
       name: plan || "free",
     },
@@ -414,7 +414,8 @@ export function VoteSessionForm({ plan, onComplete }: VoteSessionFormProps) {
         candidateStep: formState.candidateStep,
         requirePapers: formState.requirePapers,
         subscription: prepareSubscription(),
-        secretPhrase: formState.securityMethod === "secret phrase" ? formState.secretPhrase : null,
+        // Only include secretPhrase when security method is "secret phrase" AND it has a non-null value
+        ...(formState.securityMethod === "secret phrase" && formState.secretPhrase ? { secretPhrase: formState.secretPhrase } : {}),
         // Add type-specific fields
         ...(formState.type === 'election' && { candidates: prepareCandidates() }),
         ...(formState.type === 'poll' && { options: prepareOptions() }),

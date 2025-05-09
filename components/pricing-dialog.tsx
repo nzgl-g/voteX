@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Check } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { Button } from "@/components/shadcn-ui/button"
+import { Button } from "@/components/ui/button"
 import {
     Dialog,
     DialogContent,
@@ -11,7 +11,7 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from "@/components/shadcn-ui/dialog"
+} from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 
 type PricingPlan = {

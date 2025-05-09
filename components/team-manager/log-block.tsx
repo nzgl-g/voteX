@@ -1,8 +1,8 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/shadcn-ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { UserPlus, UserMinus, Edit, CheckCircle, AlertCircle, Clock } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/shadcn-ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 // Mock data for activity logs
 const activityLogs = [

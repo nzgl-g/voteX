@@ -122,11 +122,21 @@ export const sessionService = {
    */
   async getAllSessions(): Promise<Session[]> {
     try {
+      console.log("Fetching all sessions...");
       const response = await api.get("/sessions");
+      
+      if (!response.data) {
+        console.error("No data returned from sessions API");
+        return [];
+      }
+      
+      console.log(`Successfully fetched ${response.data.length} sessions`);
       return response.data;
     } catch (error: any) {
       console.error("Failed to fetch all sessions:", error);
-      throw new Error(error.response?.data?.message || "Failed to fetch all sessions");
+      const errorMessage = error.response?.data?.message || "Failed to fetch all sessions";
+      console.error(`Error details: ${errorMessage}`);
+      throw new Error(errorMessage);
     }
   },
   
@@ -423,5 +433,45 @@ export const sessionService = {
       console.error("Update session error details:", errorMessage);
       throw new Error(errorMessage);
     }
-  }
+  },
+
+  /**
+   * Get all available sessions with improved error handling and debugging
+   * @returns Array of all sessions
+   */
+  async getAvailableSessions(): Promise<Session[]> {
+    try {
+      console.log("Fetching available sessions with improved method...");
+      const response = await api.get("/sessions");
+      
+      if (!response.data) {
+        console.error("No data returned from sessions API");
+        return [];
+      }
+      
+      // Log the raw response data for debugging
+      console.log("Raw session data from API:", JSON.stringify(response.data).substring(0, 200) + "...");
+      
+      // Validate and transform the data
+      const sessions = Array.isArray(response.data) ? response.data : [];
+      
+      // Log session count and basic info
+      console.log(`Successfully fetched ${sessions.length} sessions`);
+      if (sessions.length > 0) {
+        console.log("First session sample:", {
+          id: sessions[0]._id,
+          name: sessions[0].name,
+          type: sessions[0].type,
+          lifecycle: sessions[0].sessionLifecycle
+        });
+      }
+      
+      return sessions;
+    } catch (error: any) {
+      console.error("Failed to fetch available sessions:", error);
+      const errorMessage = error.response?.data?.message || "Failed to fetch available sessions";
+      console.error(`Error details: ${errorMessage}`);
+      throw new Error(errorMessage);
+    }
+  },
 };

@@ -1,11 +1,11 @@
 "use client"
 
 import type { SessionFormState } from "@/components/setup-form/vote-session-form"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn-ui/card"
-import { RadioGroup, RadioGroupItem } from "@/components/shadcn-ui/radio-group"
-import { Label } from "@/components/shadcn-ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Label } from "@/components/ui/label"
 import { BarChart2, Award, Trophy, Crown, Check, Users, ListFilter } from "lucide-react"
-import { ProFeatureBadge } from "@/components/shadcn-ui/pro-feature-badge"
+import { ProFeatureBadge } from "@/components/ui/pro-feature-badge"
 
 interface VoteTypeStepProps {
   formState: SessionFormState

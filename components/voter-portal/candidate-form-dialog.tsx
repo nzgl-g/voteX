@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/shadcn-ui/dialog';
-import { Button } from '@/components/shadcn-ui/button';
-import { Input } from '@/components/shadcn-ui/input';
-import { Label } from '@/components/shadcn-ui/label';
-import { Textarea } from '@/components/shadcn-ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Calendar } from '@/components/shadcn-ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/shadcn-ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CalendarIcon, Upload } from 'lucide-react';
@@ -29,14 +29,15 @@ interface FormData {
     experience: string;
     partyName: string;
     officialPaper: File | null;
+    paperBase64: string | null;
 }
 
 const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
-                                                                     open,
-                                                                     onOpenChange,
-                                                                     sessionId,
-                                                                     sessionTitle
-                                                                 }) => {
+    open,
+    onOpenChange,
+    sessionId,
+    sessionTitle
+}) => {
     const [formData, setFormData] = useState<FormData>({
         fullName: '',
         dateOfBirth: undefined,
@@ -47,6 +48,7 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
         experience: '',
         partyName: '',
         officialPaper: null,
+        paperBase64: null,
     });
 
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -63,9 +65,45 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
         setFormData((prev) => ({ ...prev, dateOfBirth: date }));
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Convert file to base64
+    const fileToBase64 = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => {
+                if (typeof reader.result === 'string') {
+                    // Remove the data URL prefix (e.g., "data:image/jpeg;base64,")
+                    const base64String = reader.result.split(',')[1];
+                    resolve(base64String);
+                } else {
+                    reject(new Error('Failed to convert file to base64'));
+                }
+            };
+            reader.onerror = error => reject(error);
+        });
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            setFormData((prev) => ({ ...prev, officialPaper: e.target.files![0] }));
+            const file = e.target.files[0];
+            
+            // Check file size (5MB limit)
+            if (file.size > 5 * 1024 * 1024) {
+                toast.error("File size exceeds 5MB limit");
+                return;
+            }
+            
+            try {
+                const base64String = await fileToBase64(file);
+                setFormData(prev => ({
+                    ...prev,
+                    officialPaper: file,
+                    paperBase64: base64String
+                }));
+            } catch (error) {
+                console.error("Error converting file to base64:", error);
+                toast.error("Failed to process file");
+            }
         }
     };
 
@@ -79,12 +117,30 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
         setIsDragging(false);
     };
 
-    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         setIsDragging(false);
 
         if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            setFormData((prev) => ({ ...prev, officialPaper: e.dataTransfer.files[0] }));
+            const file = e.dataTransfer.files[0];
+            
+            // Check file size (5MB limit)
+            if (file.size > 5 * 1024 * 1024) {
+                toast.error("File size exceeds 5MB limit");
+                return;
+            }
+            
+            try {
+                const base64String = await fileToBase64(file);
+                setFormData(prev => ({
+                    ...prev,
+                    officialPaper: file,
+                    paperBase64: base64String
+                }));
+            } catch (error) {
+                console.error("Error converting file to base64:", error);
+                toast.error("Failed to process file");
+            }
         }
     };
 
@@ -93,17 +149,28 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
         setIsSubmitting(true);
 
         try {
-            // Create an application data object from the form
+            if (!formData.dateOfBirth) {
+                toast.error("Please select your date of birth");
+                setIsSubmitting(false);
+                return;
+            }
+
+            // Create an application data object that matches the backend model
             const applicationData = {
                 fullName: formData.fullName,
                 biography: formData.biography,
                 experience: formData.experience,
                 nationalities: formData.nationalities.split(',').map(n => n.trim()),
-                dobPob: `${formData.dateOfBirth ? format(formData.dateOfBirth, 'PPP') : ''}, ${formData.placeOfBirth}`,
+                dobPob: formData.dateOfBirth ? 
+                    `${format(formData.dateOfBirth, 'yyyy-MM-dd')}, ${formData.placeOfBirth}` : 
+                    `Unknown, ${formData.placeOfBirth}`,
                 promises: formData.promises,
                 partyName: formData.partyName,
-                // The actual file upload would need to be handled separately in a real implementation
-                // Here we're just demonstrating the API connection
+                paper: formData.paperBase64 && formData.officialPaper ? 
+                    [{ 
+                        name: formData.officialPaper.name,
+                        url: formData.paperBase64
+                    }] : undefined
             };
 
             // Submit the application using the candidate service
@@ -214,10 +281,11 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
                             name="promises"
                             value={formData.promises}
                             onChange={handleInputChange}
-                            placeholder="Describe your key promises and goals if elected"
+                            placeholder="Describe your key promises and goals if elected (one per line)"
                             required
                             className="h-24"
                         />
+                        <p className="text-xs text-muted-foreground">Enter each promise on a new line</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -249,18 +317,19 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="partyName">Party Name</Label>
+                        <Label htmlFor="partyName">Party Name <span className="text-red-500">*</span></Label>
                         <Input
                             id="partyName"
                             name="partyName"
                             value={formData.partyName}
                             onChange={handleInputChange}
-                            placeholder="Enter your party name (if applicable)"
+                            placeholder="Enter your party name"
+                            required
                         />
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="officialPaper">Upload Official Paper <span className="text-red-500">*</span></Label>
+                        <Label htmlFor="officialPaper">Upload Official Papers <span className="text-red-500">*</span></Label>
                         <div
                             className={cn(
                                 "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors",
@@ -277,6 +346,7 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
                                 type="file"
                                 className="hidden"
                                 onChange={handleFileChange}
+                                accept=".pdf,.jpg,.jpeg,.png"
                                 required={!formData.officialPaper}
                             />
                             <div className="flex flex-col items-center justify-center gap-2">

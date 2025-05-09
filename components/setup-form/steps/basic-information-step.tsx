@@ -3,12 +3,12 @@
 import type React from "react"
 
 import { useState } from "react"
-import { Input } from "@/components/shadcn-ui/input"
-import { Label } from "@/components/shadcn-ui/label"
-import { Textarea } from "@/components/shadcn-ui/textarea"
-import { Card, CardContent } from "@/components/shadcn-ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent } from "@/components/ui/card"
 import type { SessionFormState } from "@/components/setup-form/vote-session-form"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn-ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ImageIcon, Upload } from "lucide-react"
 
 // Update the BasicInformationStep props interface to include errors

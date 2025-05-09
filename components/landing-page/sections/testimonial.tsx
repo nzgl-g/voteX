@@ -1,19 +1,19 @@
 "use client";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/shadcn-ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/shadcn-ui/card";
+} from "@/components/ui/card";
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
-} from "@/components/shadcn-ui/carousel";
+} from "@/components/ui/carousel";
 import { Star } from "lucide-react";
 
 interface ReviewProps {

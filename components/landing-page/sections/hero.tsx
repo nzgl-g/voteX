@@ -1,6 +1,6 @@
 "use client";
-import { Badge } from "@/components/shadcn-ui/badge";
-import { Button } from "@/components/shadcn-ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { useTheme } from "next-themes";
 import Image from "next/image";
@@ -33,8 +33,30 @@ export const HeroSection = () => {
     // Mark as mounted
     setMounted(true);
     // Check authentication status on component mount
-    checkAuth();
-  }, []);
+    const isAuth = checkAuth();
+    
+    // If user is authenticated, redirect to the appropriate dashboard
+    if (isAuth) {
+      // Get user role from localStorage
+      const user = authApi.getCurrentUser();
+      if (user && user.role) {
+        switch (user.role.toLowerCase()) {
+          case 'team-leader':
+            router.push('/team-leader/monitoring/default');
+            break;
+          case 'team-member':
+            router.push('/team-member/monitoring/default');
+            break;
+          default:
+            router.push('/voter');
+            break;
+        }
+      } else {
+        // Default to voter portal if role is not available
+        router.push('/voter');
+      }
+    }
+  }, [router]);
   
   // Handle theme changes in a separate effect to avoid hydration mismatch
   useEffect(() => {

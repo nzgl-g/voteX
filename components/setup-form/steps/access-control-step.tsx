@@ -3,14 +3,14 @@
 import type React from "react"
 
 import type { SessionFormState } from "@/components/setup-form/vote-session-form"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn-ui/card"
-import { Label } from "@/components/shadcn-ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/shadcn-ui/radio-group"
-import { Input } from "@/components/shadcn-ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Input } from "@/components/ui/input"
 import { Globe, Lock, Key, FileText, Check } from "lucide-react"
-import { ProFeatureBadge } from "@/components/shadcn-ui/pro-feature-badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn-ui/tabs"
-import { Button } from "@/components/shadcn-ui/button"
+import { ProFeatureBadge } from "@/components/ui/pro-feature-badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
 
 interface AccessControlStepProps {
   formState: SessionFormState
@@ -29,7 +29,10 @@ export function AccessControlStep({ formState, updateFormState, errors = {} }: A
   }
 
   const handleSecurityMethodChange = (value: "secret phrase" | "csv") => {
-    updateFormState({ securityMethod: value })
+    updateFormState({ 
+      securityMethod: value,
+      ...(value === "secret phrase" ? { secretPhrase: "" } : {})
+    })
   }
 
   const handleSecretPhraseChange = (e: React.ChangeEvent<HTMLInputElement>) => {

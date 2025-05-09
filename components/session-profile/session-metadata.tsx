@@ -2,19 +2,19 @@
 
 import { useState } from "react"
 import type { SessionData, SessionType, VotingMode } from "./vote-session-management"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/shadcn-ui/card"
-import { Input } from "@/components/shadcn-ui/input"
-import { Label } from "@/components/shadcn-ui/label"
-import { Textarea } from "@/components/shadcn-ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/shadcn-ui/select"
-import { Button } from "@/components/shadcn-ui/button"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
 import {
   Calendar, Edit, Save, X, Award, Users, BarChart3, Clock, CheckCircle2,
   TimerOff, Timer, Building, Info, Settings, Calendar as CalendarIcon, Check
 } from "lucide-react"
-import { Badge } from "@/components/shadcn-ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn-ui/tabs"
-import { Separator } from "@/components/shadcn-ui/separator"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Separator } from "@/components/ui/separator"
 
 interface SessionMetadataProps {
   sessionData: SessionData

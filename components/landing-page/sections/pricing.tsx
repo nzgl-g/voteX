@@ -1,4 +1,4 @@
-import { Button } from "@/components/shadcn-ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -6,7 +6,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/shadcn-ui/card";
+} from "@/components/ui/card";
 import { Check } from "lucide-react";
 import Link from "next/link";
 

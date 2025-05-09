@@ -29,7 +29,17 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
         >
-            <Toaster position="top-right" />
+            <Toaster 
+              position="bottom-center"
+              toastOptions={{
+                style: {
+                  background: 'var(--background)',
+                  color: 'var(--foreground)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                },
+              }}
+            />
             {children}
         </ThemeProvider>
         </body>

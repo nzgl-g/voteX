@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/shadcn-ui/button"
+import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,7 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/shadcn-ui/alert-dialog"
+} from "@/components/ui/alert-dialog"
 import { Play, Square, Trash } from "lucide-react"
 import type { SessionType } from "./vote-session-management"
 import { toast } from "@/hooks/use-toast"

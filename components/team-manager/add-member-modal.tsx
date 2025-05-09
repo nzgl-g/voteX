@@ -10,13 +10,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/shadcn-ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn-ui/tabs"
-import { Button } from "@/components/shadcn-ui/button"
-import { Input } from "@/components/shadcn-ui/input"
-import { Label } from "@/components/shadcn-ui/label"
-import { Textarea } from "@/components/shadcn-ui/textarea"
-import { toast } from "@/components/shadcn-ui/use-toast"
+} from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { toast } from "@/components/ui/use-toast"
 import { Search, Mail, User, Check } from "lucide-react"
 import { teamService } from "@/api/team-service"
 import { sessionService } from "@/api/session-service"

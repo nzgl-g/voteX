@@ -1,7 +1,7 @@
 "use client"
 
 import { VoteIcon } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn-ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface TotalVotesCardProps {
   totalVotes: number

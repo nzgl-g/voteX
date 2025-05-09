@@ -9,8 +9,8 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@/components/shadcn-ui/sheet";
-import { Separator } from "@/components/shadcn-ui/separator";
+} from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -18,11 +18,11 @@ import {
   NavigationMenuLink,
   NavigationMenuList,
   NavigationMenuTrigger,
-} from "@/components/shadcn-ui/navigation-menu";
-import { Button } from "@/components/shadcn-ui/button";
+} from "@/components/ui/navigation-menu";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
-import { ThemeToggle } from "@/components/shadcn-ui/theme-toggle";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { AuthButton } from "@/components/auth";
 
 interface RouteProps {

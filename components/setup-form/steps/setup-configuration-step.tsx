@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from "react"
 import type { SessionFormState, Option, Candidate } from "@/components/setup-form/vote-session-form"
-import { Label } from "@/components/shadcn-ui/label"
-import { Input } from "@/components/shadcn-ui/input"
-import { Textarea } from "@/components/shadcn-ui/textarea"
-import { Button } from "@/components/shadcn-ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/shadcn-ui/card"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Plus, Trash2, GripVertical, User, AlertCircle, UserPlus, Users } from "lucide-react"
 import { v4 as uuidv4 } from "uuid"
-import { Alert, AlertDescription, AlertTitle } from "@/components/shadcn-ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { cn } from "@/lib/utils"
 
 interface SetupConfigurationStepProps {

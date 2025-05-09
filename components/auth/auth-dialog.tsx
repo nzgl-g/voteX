@@ -13,16 +13,16 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogClose,
-} from "@/components/shadcn-ui/dialog"
+} from "@/components/ui/dialog"
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "@/components/shadcn-ui/tabs"
-import { Button } from "@/components/shadcn-ui/button"
-import { Input } from "@/components/shadcn-ui/input"
-import { Label } from "@/components/shadcn-ui/label"
+} from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { sessionService } from "@/api/session-service"
 
 // Login form types

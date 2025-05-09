@@ -6,7 +6,7 @@ import {
     SidebarContent,
     SidebarHeader,
     SidebarRail,
-} from "@/components/shadcn-ui/sidebar"
+} from "@/components/ui/sidebar"
 
 import { NavMain } from "@/components/sidebar/nav-main"
 import { NavSecondary } from "@/components/sidebar/nav-secondary"

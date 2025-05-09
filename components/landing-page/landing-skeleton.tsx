@@ -1,6 +1,6 @@
 "use client"
 
-import { Skeleton } from "@/components/shadcn-ui/skeleton"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export function LandingSkeleton() {
   return (

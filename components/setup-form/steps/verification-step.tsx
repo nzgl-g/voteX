@@ -1,9 +1,9 @@
 "use client"
 
 import type { SessionFormState } from "@/components/setup-form/vote-session-form"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn-ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Mail, Shield, Check } from "lucide-react"
-import { ProFeatureBadge } from "@/components/shadcn-ui/pro-feature-badge"
+import { ProFeatureBadge } from "@/components/ui/pro-feature-badge"
 
 interface VerificationStepProps {
   formState: SessionFormState

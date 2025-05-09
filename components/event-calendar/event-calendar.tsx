@@ -36,14 +36,14 @@ import {
   WeekView,
 } from "@/components/event-calendar";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/shadcn-ui/button";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
-} from "@/components/shadcn-ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 import Participants from "@/components/event-calendar/participants";
 
 export interface EventCalendarProps {

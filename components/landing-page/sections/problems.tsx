@@ -1,5 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/shadcn-ui/card";
-import { Icon } from "@/components/shadcn-ui/icon";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Icon } from "@/components/ui/icon";
 import { icons } from "lucide-react";
 
 interface ProblemProps {

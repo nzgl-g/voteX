@@ -2,10 +2,10 @@
 
 import { useState } from "react"
 import type { SessionData } from "./vote-session-management"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/shadcn-ui/card"
-import { Input } from "@/components/shadcn-ui/input"
-import { Label } from "@/components/shadcn-ui/label"
-import { Button } from "@/components/shadcn-ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
 import { Eye, EyeOff, RefreshCw, Edit, Save, X, Upload } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 

@@ -18,7 +18,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/shadcn-ui/popover";
+} from "@/components/ui/popover";
 import {
   DraggableEvent,
   DroppableCell,

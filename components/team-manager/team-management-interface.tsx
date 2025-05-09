@@ -1,13 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn-ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import TeamMembersTable from "@/components/team-manager/team-members-table"
 import TaskBlock from "@/components/team-manager/task-block"
 import LogBlock from "@/components/team-manager/log-block"
 import AddMemberModal from "@/components/team-manager/add-member-modal"
 import TaskDialog from "@/components/team-manager/task-dialog"
-import { Button } from "@/components/shadcn-ui/button"
+import { Button } from "@/components/ui/button"
 import { PlusCircle } from "lucide-react"
 import { useParams } from "next/navigation"
 

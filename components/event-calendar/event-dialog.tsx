@@ -7,9 +7,9 @@ import { format, isBefore } from "date-fns";
 import type { CalendarEvent, EventColor } from "@/components/event-calendar";
 import { colorOptions } from "@/lib/colors";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/shadcn-ui/button";
-import { Calendar } from "@/components/shadcn-ui/calendar";
-import { Checkbox } from "@/components/shadcn-ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -17,23 +17,23 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/shadcn-ui/dialog";
-import { Input } from "@/components/shadcn-ui/input";
-import { Label } from "@/components/shadcn-ui/label";
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/shadcn-ui/popover";
-import { RadioGroup, RadioGroupItem } from "@/components/shadcn-ui/radio-group";
+} from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/shadcn-ui/select";
-import { Textarea } from "@/components/shadcn-ui/textarea";
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   StartHour,
   EndHour,

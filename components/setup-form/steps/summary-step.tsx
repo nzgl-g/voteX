@@ -1,10 +1,10 @@
 import { useState } from "react"
 import { Check, Edit, Globe, Lock, Calendar, Clock, Users, BarChart2, Award, Trophy, Shield } from "lucide-react"
 import { format } from "date-fns"
-import { Button } from "@/components/shadcn-ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/shadcn-ui/card"
-import { Badge } from "@/components/shadcn-ui/badge"
-import { Separator } from "@/components/shadcn-ui/separator"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
 import type { SessionFormState } from "@/components/setup-form/vote-session-form"
 
 interface SummaryStepProps {

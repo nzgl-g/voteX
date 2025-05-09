@@ -2,12 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@/components/shadcn-ui/button";
 import { VoteSessionForm } from "@/components/setup-form/vote-session-form";
-import { ArrowLeft } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { ThemeToggle } from "@/components/shadcn-ui/theme-toggle";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { UserProfile } from "@/components/shared/user-profile";
 import { authApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -72,14 +70,6 @@ export default function SessionSetupPage() {
             </Link>
           </div>
           <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => router.push("/voter")}
-              className="mr-2 flex items-center gap-1"
-            >
-              <ArrowLeft className="h-4 w-4" /> Back to Sessions
-            </Button>
             <ThemeToggle />
             <UserProfile 
               userName={userData.name}

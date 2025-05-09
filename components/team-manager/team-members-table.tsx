@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/shadcn-ui/table"
-import { Button } from "@/components/shadcn-ui/button"
-import { Checkbox } from "@/components/shadcn-ui/checkbox"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/shadcn-ui/dropdown-menu"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
   Dialog,
   DialogContent,
@@ -12,12 +12,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/shadcn-ui/dialog"
-import { Badge } from "@/components/shadcn-ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/shadcn-ui/avatar"
-import { Input } from "@/components/shadcn-ui/input"
+} from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Input } from "@/components/ui/input"
 import { Edit, Filter, MoreHorizontal, Search, Trash2, ClipboardCopy, CheckCircle2, Loader2 } from "lucide-react"
-import { toast } from "@/components/shadcn-ui/use-toast"
+import { toast } from "@/components/ui/use-toast"
 // Import the new team service
 import { teamService } from "@/api/team-service"
 import { sessionService } from "@/api/session-service"

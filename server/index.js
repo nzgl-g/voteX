@@ -23,10 +23,11 @@ const connectDB = async () => {
 const app = express();
 const server = http.createServer(app);
 
-// Enable CORS
+// Enable CORS with more permissive settings for development
 app.use(
     cors({
-        origin: "*",
+        origin: ["http://localhost:3000", "http://127.0.0.1:3000"], // Next.js default ports
+        credentials: true, // Allow credentials (cookies, authorization headers)
         methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
     })
@@ -44,7 +45,8 @@ initializeBridge(app);
 
 io = new Server(server, {
     cors: {
-        origin: "*",
+        origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
+        credentials: true,
         methods: ["GET", "POST"],
     },
 });

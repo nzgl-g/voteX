@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { Clock, Calendar, AlertTriangle } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn-ui/card"
-import { Badge } from "@/components/shadcn-ui/badge"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 
 interface CountdownTimerProps {
   sessionLifecycle: {

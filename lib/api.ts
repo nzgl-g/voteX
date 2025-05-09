@@ -70,6 +70,17 @@ export const sessionApi = {
 
 // Auth API methods
 export const authApi = {
+  // Helper method to set cookies
+  _setCookie(name: string, value: string, days: number = 7) {
+    const expires = new Date(Date.now() + days * 864e5).toUTCString();
+    document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+  },
+
+  // Helper method to delete cookies
+  _deleteCookie(name: string) {
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`;
+  },
+
   // Login method
   async login(email: string, password: string) {
     try {
@@ -79,6 +90,11 @@ export const authApi = {
         // Store token and user data in localStorage
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
+        
+        // Also store token and user data in cookies for middleware access
+        this._setCookie('token', response.data.token);
+        this._setCookie('user', JSON.stringify(response.data.user));
+        
         return response.data;
       } else {
         throw new Error('Authentication failed');
@@ -112,6 +128,11 @@ export const authApi = {
         // Store token and user data in localStorage
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
+        
+        // Also store token and user data in cookies for middleware access
+        this._setCookie('token', response.data.token);
+        this._setCookie('user', JSON.stringify(response.data.user));
+        
         return response.data;
       } else {
         throw new Error('Registration failed');
@@ -128,6 +149,10 @@ export const authApi = {
   logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    
+    // Also remove the token and user cookies
+    this._deleteCookie('token');
+    this._deleteCookie('user');
   },
 
   // Check if user is authenticated
@@ -152,9 +177,14 @@ export const authApi = {
           name: user.fullName || user.name || user.username || "User",
           email: user.email,
           avatar: user.profilePic || user.avatar || undefined,
+          role: user.role || 'voter', // Ensure role is included
           ...user // keep all other fields for settings, etc.
         };
         localStorage.setItem('user', JSON.stringify(mappedUser));
+        
+        // Also store user data in cookies for middleware access
+        this._setCookie('user', JSON.stringify(mappedUser));
+        
         return mappedUser;
       }
       throw new Error('Failed to fetch user profile');
@@ -193,6 +223,10 @@ export const authApi = {
       if (response.data) {
         // Update the user data in localStorage with the response from server
         localStorage.setItem('user', JSON.stringify(response.data));
+        
+        // Also update the user data in cookies
+        this._setCookie('user', JSON.stringify(response.data));
+        
         return response.data;
       } else {
         throw new Error('Failed to update profile');

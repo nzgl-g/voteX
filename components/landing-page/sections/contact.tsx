@@ -5,7 +5,7 @@ import {
   CardContent,
   CardFooter,
   CardHeader,
-} from "@/components/shadcn-ui/card";
+} from "@/components/ui/card";
 import { Building2, Clock, Mail, Phone } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -17,17 +17,17 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/shadcn-ui/form";
-import { Input } from "@/components/shadcn-ui/input";
-import { Button } from "@/components/shadcn-ui/button";
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/shadcn-ui/select";
-import { Textarea } from "@/components/shadcn-ui/textarea";
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 const formSchema = z.object({
   firstName: z.string().min(2).max(255),

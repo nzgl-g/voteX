@@ -18,7 +18,6 @@ agenda.define("check and push session", async () => {
     }).select("_id sessionLifecycle.scheduledAt");
     //just to debug . chof biha ila kayn sessions t9dr tdirlhm push doka
     if (sessions.length === 0) {
-      console.log("No sessions ready for the blockchain.");
       return;
     }
 

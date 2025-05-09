@@ -1,4 +1,3 @@
-
 export type VotingType = 'poll' | 'election' | 'tournament';
 export type SessionLifecycle = 'nominations' | 'upcoming' | 'started' | 'ended';
 
@@ -26,4 +25,50 @@ export interface Candidate {
     partyName: string;
     officialPaper?: File | null;
     imageUrl?: string;
+}
+
+// Session card lifecycle status
+export interface SessionLifecycleStatus {
+    status: string;
+    label: string;
+    color: string;
+}
+
+// Props for SessionCard component
+export interface SessionCardProps {
+    session: {
+        _id: string;
+        name: string;
+        description?: string | null;
+        organizationName?: string | null;
+        banner?: string | null;
+        type: 'election' | 'poll' | 'tournament';
+        subtype: 'single' | 'multiple' | 'ranked' | 'single elimination' | 'double elimination';
+        securityMethod?: string | null;
+        secretPhrase?: string;
+        verificationMethod?: string | null;
+        sessionLifecycle?: {
+            createdAt?: string;
+            scheduledAt?: {
+                start?: string | null;
+                end?: string | null;
+            };
+            startedAt?: string | null;
+            endedAt?: string | null;
+        };
+        candidates?: any[];
+        options?: any[];
+    };
+    onJoinAsCandidate: (session: any) => void;
+    onCastVote: (session: any) => void;
+    onShowResults: (session: any) => void;
+    onViewProfile: (session: any) => void;
+}
+
+// Props for SecretPhraseDialog component
+export interface SecretPhraseDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onSubmit: (phrase: string) => Promise<void>;
+    isSubmitting: boolean;
 }

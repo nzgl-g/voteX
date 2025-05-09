@@ -18,12 +18,12 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
   DropdownMenuGroup,
-} from "@/components/shadcn-ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu"
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/shadcn-ui/sidebar"
+} from "@/components/ui/sidebar"
 import {
   Dialog,
   DialogContent,
@@ -31,9 +31,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/shadcn-ui/dialog"
-import { Button } from "@/components/shadcn-ui/button"
-import { Badge } from "@/components/shadcn-ui/badge"
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 
 // Define session type for the team switcher
 interface SessionItem {

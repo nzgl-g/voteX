@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/shadcn-ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -9,9 +9,9 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
     DropdownMenuLabel,
-} from "@/components/shadcn-ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 import { Settings, LogOut, User, LayoutDashboard, Vote } from "lucide-react";
-import { SettingsDialog } from "@/components/user-settngs/settings-dialog";
+import { SettingsDialog } from "@/components/user-settings/settings-dialog";
 import { authApi, sessionApi } from "@/lib/api";
 import { useRouter, usePathname } from "next/navigation";
 
@@ -77,6 +77,7 @@ export function UserProfile({
     const navigateToDashboard = () => {
         if (sessionId) {
             router.push(`/team-leader/monitoring/${sessionId}`);
+            console.log('Navigating to team leader dashboard with session ID');
         }
     };
 

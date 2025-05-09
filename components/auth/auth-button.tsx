@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/shadcn-ui/button"
+import { Button } from "@/components/ui/button"
 import { AuthDialog } from "./auth-dialog"
 import { VariantProps } from "class-variance-authority"
 import React from "react"

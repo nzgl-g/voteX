@@ -3,17 +3,17 @@
 import { useState, useEffect } from "react"
 import { CalendarDays, ChevronDown, FileText, AlertTriangle } from "lucide-react"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/shadcn-ui/card"
-import { Button } from "@/components/shadcn-ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/shadcn-ui/dropdown-menu"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { VotesOverTimeChart } from "./votes-over-time-chart"
 import { VoteDistributionChart } from "./vote-distribution-chart"
 import { CountdownTimer } from "./countdown-timer"
 import { TotalVotesCard } from "./total-votes-card"
-import { Alert, AlertDescription, AlertTitle } from "@/components/shadcn-ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Loader2 } from "lucide-react"
 import apiClient from "@/lib/api"
-import { Badge } from "@/components/shadcn-ui/badge"
+import { Badge } from "@/components/ui/badge"
 
 // Mock data - in a real app, this would come from an API
 import { mockSession, mockVotesData, generateMockVotesOverTime } from "@/lib/mock"

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { CheckCircle, XCircle } from "lucide-react"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 
 // Mock data for change requests
 const changeRequests = [
@@ -43,15 +43,13 @@ const changeRequests = [
 
 export default function ChangesRequestedBlock() {
   const handleApprove = (id: string) => {
-    toast({
-      title: "Change request approved",
+    toast.success("Change request approved", {
       description: "The change request has been approved.",
     })
   }
 
   const handleReject = (id: string) => {
-    toast({
-      title: "Change request rejected",
+    toast.error("Change request rejected", {
       description: "The change request has been rejected.",
     })
   }

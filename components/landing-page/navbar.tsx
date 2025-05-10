@@ -24,6 +24,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { AuthButton } from "@/components/auth";
+import { motion } from "framer-motion";
 
 interface RouteProps {
   href: string;
@@ -88,9 +89,16 @@ export const Navbar = React.forwardRef<HTMLDivElement>((props, ref) => {
   }, [resolvedTheme, mounted]);
   
   return (
-    <header ref={ref} className="shadow-inner bg-opacity-15 w-[90%] md:w-[70%] lg:w-[75%] lg:max-w-screen-xl top-5 mx-auto sticky border border-secondary z-40 rounded-2xl flex justify-between items-center p-2 bg-card">
+    <motion.header
+      ref={ref}
+      initial={{ y: -32, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ type: "spring", stiffness: 120, damping: 16 }}
+      className="sticky top-0 z-50 mx-auto w-full max-w-3xl sm:max-w-4xl lg:max-w-5xl rounded-full bg-background/80 shadow-lg backdrop-blur-md flex items-center justify-between px-4 py-2 border border-border transition-all"
+      style={{ boxShadow: '0 4px 24px 0 rgba(0,0,0,0.04)' }}
+    >
       <Link href="/public" className="font-bold text-lg flex items-center">
-        <Image src="/logo/expended.png" alt="Vote System Logo" width={120} height={40} className="mr-2" priority />
+        <Image src={logoSrc} alt="Vote System Logo" width={128} height={32} className="object-contain select-none" priority />
       </Link>
       {/* <!-- Mobile --> */}
       <div className="flex items-center lg:hidden">
@@ -134,8 +142,8 @@ export const Navbar = React.forwardRef<HTMLDivElement>((props, ref) => {
               <Separator className="mb-2" />
 
               <div className="flex items-center gap-2 w-full">
-                <ThemeToggle />
-                <AuthButton className="w-full" />
+                <ThemeToggle className="rounded-full bg-background hover:bg-accent hover:text-accent-foreground transition-colors !shadow-none !border-0" />
+                <AuthButton className="rounded-full bg-background hover:bg-accent hover:text-accent-foreground transition-colors !shadow-none !border-0 w-full" />
               </div>
             </SheetFooter>
           </SheetContent>
@@ -182,10 +190,10 @@ export const Navbar = React.forwardRef<HTMLDivElement>((props, ref) => {
         </NavigationMenuList>
       </NavigationMenu>
 
-      <div className="hidden lg:flex items-center space-x-2">
-        <ThemeToggle />
-        <AuthButton />
+      <div className="hidden lg:flex items-center gap-2 bg-muted/40 rounded-full px-2 py-1 transition-all">
+        <ThemeToggle className="!rounded-full !bg-transparent !shadow-none !border-0" />
+        <AuthButton className="!rounded-full !bg-transparent !shadow-none !border-0" />
       </div>
-    </header>
+    </motion.header>
   );
 });

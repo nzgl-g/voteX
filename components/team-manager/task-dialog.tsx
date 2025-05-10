@@ -103,6 +103,13 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
         setAssignedMembers(selectedMembers)
       }
     }
+    
+    // Clean up when dialog closes
+    return () => {
+      if (!isOpen) {
+        resetForm()
+      }
+    }
   }, [isOpen, sessionId, taskToEdit, selectedMembers])
 
   const fetchTeamMembers = async () => {
@@ -272,8 +279,15 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
     }
   }
 
+  const handleClose = () => {
+    // First reset the form to prevent stale data
+    resetForm()
+    // Then call the parent's onClose function
+    onClose()
+  }
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Edit Task" : "Create New Task"}</DialogTitle>
@@ -461,7 +475,7 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
           </div>
 
           <DialogFooter className="pt-4">
-            <Button variant="outline" onClick={onClose} type="button" disabled={isLoading}>
+            <Button variant="outline" onClick={handleClose} type="button" disabled={isLoading}>
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading}>

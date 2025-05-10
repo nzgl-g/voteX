@@ -1,18 +1,151 @@
-import { useState } from "react"
-import { Check, Edit, Globe, Lock, Calendar, Clock, Users, BarChart2, Award, Trophy, Shield } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Check, Edit, Globe, Lock, Calendar, Clock, Users, BarChart2, Award, Trophy, Shield, Wallet, AlertCircle } from "lucide-react"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import type { SessionFormState } from "@/components/setup-form/vote-session-form"
+import { useToast } from "@/hooks/use-toast"
+import { userService } from "@/api/user-service"
+import { formatEther } from 'ethers'
+import { requestMetaMaskPermissions, getCurrentWalletData } from "@/lib/metamask"
+
+interface WalletInfo {
+  isLinked: boolean;
+  wallet: {
+    walletAddress: string;
+    chainId: string;
+    networkName: string;
+    balance: string;
+    signature: string;
+  } | null;
+  canChangeWallet: boolean;
+}
 
 interface SummaryStepProps {
   formState: SessionFormState
   jumpToStep: (step: number) => void
 }
 
-export default function SummaryStep({ formState, jumpToStep }: SummaryStepProps) {
+export function SummaryStep({ formState, jumpToStep }: SummaryStepProps) {
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
+  const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
+
+  // Direct MetaMask interaction
+  const connectToMetaMask = async () => {
+    console.log('=== DIRECT META MASK CONNECTION ===');
+    
+    try {
+      // Use the new MetaMask provider
+      const walletData = await requestMetaMaskPermissions();
+      console.log('MetaMask connection successful:', walletData);
+
+      // Get network name based on chain ID
+      const networkName = walletData.chainId === '1' ? 'Ethereum Mainnet' : 
+                         walletData.chainId === '137' ? 'Polygon Mainnet' : 
+                         walletData.chainId === '80001' ? 'Mumbai Testnet' : 'Unknown Network';
+
+      // Get balance
+      const balance = await walletData.provider.getBalance(walletData.address);
+      const formattedBalance = formatEther(balance);
+
+      // Create message for signing
+      const message = `Connect wallet to Vote System\nAddress: ${walletData.address}\nNetwork: ${networkName}\nTimestamp: ${Date.now()}`;
+      
+      // Sign message
+      const signature = await walletData.signer.signMessage(message);
+
+      // Prepare wallet data for backend
+      const walletInfo = {
+        walletAddress: walletData.address,
+        chainId: walletData.chainId,
+        networkName,
+        balance: formattedBalance,
+        signature,
+        message
+      };
+
+      return walletInfo;
+    } catch (error: any) {
+      console.error('MetaMask connection error:', {
+        code: error.code,
+        message: error.message,
+        data: error.data
+      });
+      throw error;
+    }
+  };
+
+  const connectWallet = async () => {
+    try {
+      console.log('=== WALLET CONNECTION START ===');
+      
+      // 1. Connect to MetaMask using the new provider
+      const walletData = await connectToMetaMask();
+      console.log('MetaMask connection successful:', walletData);
+
+      // 2. Send data to backend using userService
+      console.log('Sending data to backend...');
+      const result = await userService.linkWallet(walletData);
+      console.log('Backend response:', result);
+
+      // 3. Update UI state
+      if (result.wallet) {
+        const newWalletInfo: WalletInfo = {
+          isLinked: true,
+          wallet: result.wallet,
+          canChangeWallet: false
+        };
+        console.log('Updating UI with new wallet info:', newWalletInfo);
+        setWalletInfo(newWalletInfo);
+      }
+
+      toast({
+        title: "Success",
+        description: "Wallet connected successfully",
+      });
+    } catch (error: any) {
+      console.error('Wallet connection error:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to connect wallet",
+        variant: "destructive",
+      });
+    }
+  };
+
+  useEffect(() => {
+    console.log('=== FETCHING INITIAL WALLET INFO ===');
+    const fetchWalletInfo = async () => {
+      setIsLoading(true);
+      try {
+        // Use userService to verify wallet
+        const data = await userService.verifyWallet();
+        console.log('Wallet info received:', data);
+        setWalletInfo(data);
+      } catch (error: any) {
+        console.error('Error fetching wallet info:', error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to fetch wallet info",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchWalletInfo();
+  }, []);
+
+  // Log wallet info changes
+  useEffect(() => {
+    console.log('Wallet info updated:', walletInfo);
+  }, [walletInfo]);
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Not set"
     try {
@@ -214,6 +347,100 @@ export default function SummaryStep({ formState, jumpToStep }: SummaryStepProps)
           </div>
         </CardContent>
       </Card>
+
+      {/* Wallet Connection */}
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+          <CardTitle className="text-base font-medium">Wallet Connection</CardTitle>
+          {walletInfo?.isLinked && (
+            <Button variant="ghost" size="sm" onClick={connectWallet}>
+              <Edit className="h-4 w-4 mr-1" />
+              Change Wallet
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium leading-none">Status</p>
+                  <div className="flex items-center">
+                    {isLoading ? (
+                      <p className="text-sm text-muted-foreground">Loading...</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        {walletInfo?.isLinked ? "Connected" : "Not Connected"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {!isLoading && !walletInfo?.isLinked && (
+                <Button 
+                  onClick={connectWallet} 
+                  variant="outline"
+                >
+                  Connect Wallet
+                </Button>
+              )}
+              {!isLoading && walletInfo?.isLinked && walletInfo.wallet && (
+                <div className="text-right">
+                  <p className="text-xs font-medium">Network: {walletInfo.wallet.networkName}</p>
+                  <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                    {walletInfo.wallet.walletAddress}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Balance: {walletInfo.wallet.balance} ETH
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+          {!isLoading && !walletInfo?.isLinked && (
+            <Alert className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Please connect your wallet to continue
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Update Tournament section to show maxRounds */}
+      {formState.type === "tournament" && (
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+            <CardTitle className="text-base font-medium">Tournament Settings</CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => jumpToStep(1)}>
+              <Edit className="h-4 w-4 mr-1" />
+              Edit
+            </Button>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-muted/30 p-3 rounded-md">
+                <div className="flex items-center">
+                  <Trophy className="h-5 w-5 text-blue-600 mr-2" />
+                  <div>
+                    <h4 className="text-sm font-medium">Tournament Type</h4>
+                    <p className="text-sm text-muted-foreground capitalize">{formState.tournamentType}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-muted/30 p-3 rounded-md">
+                <div className="flex items-center">
+                  <div>
+                    <h4 className="text-sm font-medium">Max Rounds</h4>
+                    <p className="text-sm text-muted-foreground">{formState.maxRounds}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Results Display */}
       <Card>

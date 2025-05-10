@@ -6,12 +6,12 @@ import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { BasicInformationStep } from "@/components/setup-form/steps/basic-information-step"
 import { VoteTypeStep } from "@/components/setup-form/steps/vote-type-step"
-import LifecycleStep from "@/components/setup-form/steps/lifecycle-step"
+import { LifecycleStep } from "@/components/setup-form/steps/lifecycle-step"
 import { AccessControlStep } from "@/components/setup-form/steps/access-control-step"
 import { VerificationStep } from "@/components/setup-form/steps/verification-step"
 import { ResultsDisplayStep } from "@/components/setup-form/steps/results-display-step"
 import { SetupConfigurationStep } from "@/components/setup-form/steps/setup-configuration-step"
-import SummaryStep from "@/components/setup-form/steps/summary-step"
+import { SummaryStep } from "@/components/setup-form/steps/summary-step"
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
@@ -49,6 +49,8 @@ export interface SessionFormState {
     price?: number
   }
   resultsDisplay: "real-time" | "post-completion"
+  maxRounds?: number
+  maxChoices?: number
 }
 
 export interface Candidate {
@@ -108,6 +110,8 @@ export function VoteSessionForm({ plan, onComplete }: VoteSessionFormProps) {
       name: plan || "free",
     },
     resultsDisplay: "real-time",
+    maxRounds: 1,
+    maxChoices: 1
   })
 
   // Ensure formState.subscription.name is updated when plan prop changes
@@ -414,6 +418,7 @@ export function VoteSessionForm({ plan, onComplete }: VoteSessionFormProps) {
         candidateStep: formState.candidateStep,
         requirePapers: formState.requirePapers,
         subscription: prepareSubscription(),
+        maxChoices: formState.maxChoices,
         // Only include secretPhrase when security method is "secret phrase" AND it has a non-null value
         ...(formState.securityMethod === "secret phrase" && formState.secretPhrase ? { secretPhrase: formState.secretPhrase } : {}),
         // Add type-specific fields
@@ -422,7 +427,7 @@ export function VoteSessionForm({ plan, onComplete }: VoteSessionFormProps) {
         ...(formState.type === 'tournament' && { 
           tournamentType: prepareTournamentType(formState.tournamentType),
           bracket: {},
-          maxRounds: 1
+          maxRounds: formState.maxRounds
         })
       };
 

@@ -13,6 +13,7 @@ interface VotingStepProps {
     selections: string[]
     rankings: Record<string, number>
     maxSelections: number
+    maxChoices: number
     onSelectionChange: (id: string) => void
 }
 
@@ -23,15 +24,16 @@ export function VotingStep({
                                selections,
                                rankings,
                                maxSelections,
+                               maxChoices,
                                onSelectionChange,
                            }: VotingStepProps) {
     const getSelectionText = () => {
         if (voteMode === "single") {
             return "Select one option"
         } else if (voteMode === "multiple") {
-            return `Select up to ${maxSelections} options`
+            return `Select up to ${maxChoices} options`
         } else {
-            return `Rank up to ${maxSelections} options`
+            return `Rank up to ${maxChoices} options`
         }
     }
 
@@ -49,12 +51,12 @@ export function VotingStep({
                 <p className="text-sm text-gray-500">{getSelectionText()}</p>
                 {voteMode === "multiple" && (
                     <p className="text-sm font-medium mt-1">
-                        Selected: {selections.length}/{maxSelections}
+                        Selected: {selections.length}/{maxChoices}
                     </p>
                 )}
                 {voteMode === "ranked" && (
                     <p className="text-sm font-medium mt-1">
-                        Ranked: {Object.keys(rankings).length}/{maxSelections}
+                        Ranked: {Object.keys(rankings).length}/{maxChoices}
                     </p>
                 )}
             </div>

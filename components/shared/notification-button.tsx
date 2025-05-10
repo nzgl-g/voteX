@@ -10,13 +10,13 @@ export function NotificationButton() {
 
   return (
     <Button
-      variant="ghost"
+      variant="outline"
       size="icon"
-      className="relative"
+      className="rounded-full bg-background hover:bg-accent hover:text-accent-foreground transition-colors relative"
       onClick={() => setIsOpen(true)}
       aria-label="Notifications"
     >
-      <Bell className="h-5 w-5" />
+      <Bell className="h-[1.2rem] w-[1.2rem]" />
       {unreadCount > 0 && (
         <Badge
           variant="destructive"

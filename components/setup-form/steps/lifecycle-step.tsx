@@ -22,7 +22,7 @@ interface LifecycleStepProps {
   errors?: Record<string, string>;
 }
 
-export default function LifecycleStep({ formState, updateFormState, errors = {} }: LifecycleStepProps) {
+export function LifecycleStep({ formState, updateFormState, errors = {} }: LifecycleStepProps) {
   // State management
   const [startDate, setStartDate] = useState<Date | undefined>(
       formState.sessionLifecycle.startedAt ? new Date(formState.sessionLifecycle.startedAt) : undefined

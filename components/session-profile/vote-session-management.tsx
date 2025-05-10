@@ -371,19 +371,34 @@ export function VoteSessionManagement() {
         delete updateData.pollOptions;  // Can't change poll options
       }
       
-      // Show loading toast
-      toast({
-        title: "Saving changes...",
-        description: "Please wait while we save your changes.",
-      });
-      
       // Ensure we're only sending fields that have actually changed
       const originalData = { ...sessionData };
       const changedFields = Object.keys(updateData).filter(key => {
         const typedKey = key as keyof SessionData;
-        if (typedKey === 'candidates' || typedKey === 'pollOptions') {
-          return JSON.stringify(updateData[typedKey]) !== JSON.stringify(originalData[typedKey]);
+        
+        // Skip undefined or null values
+        if (updateData[typedKey] === undefined || updateData[typedKey] === null) {
+          return false;
         }
+        
+        // Use deep comparison for arrays like candidates and pollOptions
+        if (typedKey === 'candidates' || typedKey === 'pollOptions') {
+          const currentValue = JSON.stringify(originalData[typedKey] || []);
+          const newValue = JSON.stringify(updateData[typedKey] || []);
+          return currentValue !== newValue;
+        } 
+        // Special handling for dates - compare them as Date objects
+        else if (
+          typedKey === 'nominationStart' || 
+          typedKey === 'nominationEnd' || 
+          typedKey === 'votingStart' || 
+          typedKey === 'votingEnd'
+        ) {
+          const currentDate = originalData[typedKey] ? new Date(originalData[typedKey] as string).getTime() : null;
+          const newDate = updateData[typedKey] ? new Date(updateData[typedKey] as string).getTime() : null;
+          return currentDate !== newDate;
+        }
+        // For other primitive values, do a simple comparison
         return updateData[typedKey] !== originalData[typedKey];
       });
       
@@ -396,6 +411,7 @@ export function VoteSessionManagement() {
       
       // Don't send empty update
       if (Object.keys(cleanUpdateData).length === 0) {
+        console.log('No changes detected, skipping API call');
         toast({
           title: "No changes detected",
           description: "No changes were made to save.",
@@ -404,6 +420,12 @@ export function VoteSessionManagement() {
         return;
       }
       
+      // Show loading toast
+      const loadingToast = toast({
+        title: "Saving changes...",
+        description: "Please wait while we save your changes.",
+      });
+      
       console.log('Sending update with clean data:', cleanUpdateData);
       
       // Map frontend updates to backend format
@@ -411,6 +433,16 @@ export function VoteSessionManagement() {
       
       // Call backend API to update session
       const updatedSession = await sessionService.updateSession(sessionData.id, backendUpdates);
+      
+      // Check if the update needs approval
+      if ((updatedSession as any)._needsApproval) {
+        toast({
+          title: "Edit request submitted",
+          description: "Your changes require approval from the team leader.",
+        });
+        setIsEditing(false);
+        return;
+      }
       
       // Map the updated session back to our format
       const mappedSession = mapSessionToSessionData(updatedSession as Session);
@@ -446,12 +478,31 @@ export function VoteSessionManagement() {
     // Check if any values have changed before updating state
     Object.keys(updatedData).forEach(key => {
       const typedKey = key as keyof SessionData;
+      
       // Use deep comparison for arrays like candidates and pollOptions
       if (typedKey === 'candidates' || typedKey === 'pollOptions') {
-        if (JSON.stringify(updatedData[typedKey]) !== JSON.stringify(editData[typedKey])) {
+        // Check if arrays are different by comparing stringified versions
+        const currentValue = JSON.stringify(editData[typedKey] || []);
+        const newValue = JSON.stringify(updatedData[typedKey] || []);
+        if (currentValue !== newValue) {
           hasChanges = true;
         }
-      } else if (updatedData[typedKey] !== editData[typedKey]) {
+      } 
+      // Special handling for dates - compare them as Date objects
+      else if (
+        typedKey === 'nominationStart' || 
+        typedKey === 'nominationEnd' || 
+        typedKey === 'votingStart' || 
+        typedKey === 'votingEnd'
+      ) {
+        const currentDate = editData[typedKey] ? new Date(editData[typedKey] as string).getTime() : null;
+        const newDate = updatedData[typedKey] ? new Date(updatedData[typedKey] as string).getTime() : null;
+        if (currentDate !== newDate) {
+          hasChanges = true;
+        }
+      }
+      // For other primitive values, do a simple comparison
+      else if (updatedData[typedKey] !== editData[typedKey]) {
         hasChanges = true;
       }
     });
@@ -464,6 +515,8 @@ export function VoteSessionManagement() {
         console.log('Updated edit data', newState);
         return newState;
       });
+    } else {
+      console.log('No changes detected in handleUpdateSession, skipping state update');
     }
   };
 

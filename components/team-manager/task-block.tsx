@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -81,57 +81,84 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
   const params = useParams()
   const sessionId = params.id as string
   
-  // New state for edit and delete functionality
+  // Edit and delete state
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [taskToEdit, setTaskToEdit] = useState<Task | undefined>(undefined)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<Task | undefined>(undefined)
-  const [isDeleting, setIsDeleting] = useState(false)
+  
+  // Auto-refresh reference
+  const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const lastDataRef = useRef<{ tasks: Task[], members: Record<string, TeamMember> }>({ 
+    tasks: [], 
+    members: {} 
+  })
 
-  useEffect(() => {
-    if (sessionId) {
-      fetchTasksAndMembers()
+  // Quiet fetch function that doesn't set loading state
+  const quietFetchData = useCallback(async () => {
+    try {
+      // Fetch tasks for the session
+      const tasksData = await taskService.getSessionTasks(sessionId)
+      
+      // Check if tasks have changed
+      const tasksChanged = JSON.stringify(tasksData) !== JSON.stringify(lastDataRef.current.tasks)
+      
+      if (tasksChanged) {
+        // Update tasks state
+        setTasks(tasksData)
+        lastDataRef.current.tasks = tasksData
+        
+        // Get team ID for the session
+        const teamId = await sessionService.getSessionTeam(sessionId)
+        
+        if (teamId) {
+          // Fetch team members data
+          const teamData = await teamService.getTeamMembers(teamId)
+          
+          // Create a map of member IDs to member data
+          const membersMap: Record<string, TeamMember> = {}
+          
+          // Add leader
+          if (teamData.leader) {
+            membersMap[teamData.leader._id] = {
+              ...teamData.leader,
+              avatar: `/api/avatar?name=${teamData.leader.username}`
+            }
+          }
+          
+          // Add members
+          if (teamData.members && Array.isArray(teamData.members)) {
+            teamData.members.forEach(member => {
+              membersMap[member._id] = {
+                ...member,
+                avatar: `/api/avatar?name=${member.username}`
+              }
+            })
+          }
+          
+          // Check if members have changed
+          const membersChanged = JSON.stringify(membersMap) !== JSON.stringify(lastDataRef.current.members)
+          
+          if (membersChanged) {
+            setTeamMembers(membersMap)
+            lastDataRef.current.members = membersMap
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Auto-refresh failed:", error)
+      // Don't show error toast for quiet refresh
     }
   }, [sessionId])
 
-  useEffect(() => {
-    // Apply filters and sorting
-    let result = [...tasks]
-    
-    // Filter by status
-    if (filter === "pending") {
-      result = result.filter(task => task.status === "pending")
-    } else if (filter === "completed") {
-      result = result.filter(task => task.status === "completed")
-    }
-    
-    // Sort tasks
-    result.sort((a, b) => {
-      if (sortBy === "dueDate") {
-        // Sort by due date (tasks without due dates go to the end)
-        if (!a.dueDate && !b.dueDate) return 0
-        if (!a.dueDate) return 1
-        if (!b.dueDate) return -1
-        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
-      } else if (sortBy === "priority") {
-        // Sort by priority (high > medium > low)
-        const priorityWeight = { high: 3, medium: 2, low: 1 }
-        return priorityWeight[b.priority] - priorityWeight[a.priority]
-      } else {
-        // Sort by creation date (recent first)
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      }
-    })
-    
-    setFilteredTasks(result)
-  }, [tasks, filter, sortBy])
-
-  const fetchTasksAndMembers = async () => {
+  // Memoize the fetchTasksAndMembers function to prevent unnecessary re-renders
+  const fetchTasksAndMembers = useCallback(async () => {
     setIsLoading(true)
     try {
       // Fetch tasks for the session
       const tasksData = await taskService.getSessionTasks(sessionId)
       setTasks(tasksData)
+      lastDataRef.current.tasks = tasksData
       
       // Get unique member IDs from all tasks
       const memberIds = new Set<string>()
@@ -170,6 +197,7 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
         }
         
         setTeamMembers(membersMap)
+        lastDataRef.current.members = membersMap
       }
     } catch (error) {
       console.error("Failed to fetch tasks:", error)
@@ -179,7 +207,65 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [sessionId])
+
+  useEffect(() => {
+    if (sessionId) {
+      fetchTasksAndMembers()
+      
+      // Set up auto-refresh interval
+      autoRefreshIntervalRef.current = setInterval(() => {
+        quietFetchData()
+      }, 15000) // 15 seconds
+    }
+    
+    // Cleanup function
+    return () => {
+      setTasks([])
+      setFilteredTasks([])
+      setTeamMembers({})
+      setUpdating(null)
+      setTaskToEdit(undefined)
+      setTaskToDelete(undefined)
+      
+      // Clear the interval when component unmounts
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current)
+      }
+    }
+  }, [sessionId, fetchTasksAndMembers, quietFetchData])
+
+  useEffect(() => {
+    // Apply filters and sorting
+    let result = [...tasks]
+    
+    // Filter by status
+    if (filter === "pending") {
+      result = result.filter(task => task.status === "pending")
+    } else if (filter === "completed") {
+      result = result.filter(task => task.status === "completed")
+    }
+    
+    // Sort tasks
+    result.sort((a, b) => {
+      if (sortBy === "dueDate") {
+        // Sort by due date (tasks without due dates go to the end)
+        if (!a.dueDate && !b.dueDate) return 0
+        if (!a.dueDate) return 1
+        if (!b.dueDate) return -1
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+      } else if (sortBy === "priority") {
+        // Sort by priority (high > medium > low)
+        const priorityWeight = { high: 3, medium: 2, low: 1 }
+        return priorityWeight[b.priority] - priorityWeight[a.priority]
+      } else {
+        // Sort by creation date (recent first)
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      }
+    })
+    
+    setFilteredTasks(result)
+  }, [tasks, filter, sortBy])
 
   const handleToggleComplete = async (taskId: string) => {
     setUpdating(taskId)
@@ -298,33 +384,67 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
   const confirmDeleteTask = async () => {
     if (!taskToDelete) return
     
-    setIsDeleting(true)
+    const taskId = taskToDelete._id
+    const taskTitle = taskToDelete.title
+    
+    // Immediately close the dialog and clear task to delete state
+    setIsDeleteDialogOpen(false)
+    setTaskToDelete(undefined)
+    
+    // Optimistically update UI first (remove the task from both state arrays)
+    setTasks(prevTasks => prevTasks.filter(task => task._id !== taskId))
+    setFilteredTasks(prevTasks => prevTasks.filter(task => task._id !== taskId))
+    
+    // Show loading toast
+    const loadingToast = toast.loading("Deleting task...")
+    
     try {
-      await taskService.deleteTask(taskToDelete._id)
+      // Then perform the actual delete operation in the background
+      await taskService.deleteTask(taskId)
       
-      // Update local state to remove the deleted task
-      setTasks(prevTasks => prevTasks.filter(task => task._id !== taskToDelete._id))
-      
+      // Dismiss loading toast and show success toast
+      toast.dismiss(loadingToast)
       toast.success("Task deleted", {
-        description: `Task "${taskToDelete.title}" has been deleted successfully.`,
+        description: `Task "${taskTitle}" has been deleted successfully.`,
       })
     } catch (error: any) {
       console.error("Failed to delete task:", error)
+      
+      // Dismiss loading toast
+      toast.dismiss(loadingToast)
+      
+      // Show error toast
       toast.error("Error", {
         description: error.message || "Failed to delete task. Please try again.",
       })
-    } finally {
-      setIsDeleting(false)
-      setIsDeleteDialogOpen(false)
-      setTaskToDelete(undefined)
+      
+      // Refresh tasks to restore the correct state
+      setTimeout(() => {
+        fetchTasksAndMembers()
+      }, 500)
     }
   }
 
   const handleTaskDialogClose = () => {
+    // Close the dialog immediately
     setIsEditDialogOpen(false)
+    
+    // Clear task to edit state
     setTaskToEdit(undefined)
-    // Refresh tasks after edit
-    fetchTasksAndMembers()
+    
+    // Show loading toast
+    const loadingToast = toast.loading("Refreshing tasks...")
+    
+    // Refresh tasks after a short delay
+    setTimeout(() => {
+      fetchTasksAndMembers().then(() => {
+        // Dismiss loading toast when done
+        toast.dismiss(loadingToast)
+      }).catch(() => {
+        // Dismiss loading toast on error
+        toast.dismiss(loadingToast)
+      })
+    }, 300)
   }
 
   // Render loading skeleton
@@ -639,7 +759,13 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
       />
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          // If dialog is being closed, reset state
+          setTaskToDelete(undefined)
+        }
+        setIsDeleteDialogOpen(open)
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure you want to delete this task?</AlertDialogTitle>
@@ -649,20 +775,16 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDeleteTask}
-              disabled={isDeleting}
+              onClick={(e) => {
+                // Prevent default to handle deletion ourselves
+                e.preventDefault()
+                confirmDeleteTask()
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                "Delete"
-              )}
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

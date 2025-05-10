@@ -12,33 +12,53 @@ export function useNotifications() {
 
   // Initialize socket connection
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
+    // Check if we're in the browser
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
 
-    const socketInstance = io('http://localhost:2000', {
-      auth: { token }
-    });
+      const socketInstance = io('http://localhost:2000', {
+        auth: { token },
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        timeout: 10000,
+        transports: ['websocket', 'polling'],
+      });
 
-    socketInstance.on('connect', () => {
-      console.log('Socket connected');
+      socketInstance.on('connect', () => {
+        console.log('Socket connected');
+        
+        // Authenticate with user ID
+        const userId = localStorage.getItem('userId');
+        if (userId) {
+          socketInstance.emit('authenticate', userId);
+        }
+      });
       
-      // Authenticate with user ID
-      const userId = localStorage.getItem('userId');
-      if (userId) {
-        socketInstance.emit('authenticate', userId);
-      }
-    });
+      socketInstance.on('connect_error', (error) => {
+        console.error('Socket connection error:', error.message);
+      });
+      
+      socketInstance.on('error', (error) => {
+        console.error('Socket error:', error);
+      });
 
-    socketInstance.on('new-notification', (notification: NotificationPayload) => {
-      setNotifications(prev => [notification, ...prev]);
-      setUnreadCount(count => count + 1);
-    });
+      socketInstance.on('new-notification', (notification: NotificationPayload) => {
+        setNotifications(prev => [notification, ...prev]);
+        setUnreadCount(count => count + 1);
+      });
 
-    setSocket(socketInstance);
+      setSocket(socketInstance);
 
-    return () => {
-      socketInstance.disconnect();
-    };
+      return () => {
+        socketInstance.disconnect();
+      };
+    } catch (error) {
+      console.error('Failed to connect to socket:', error);
+    }
   }, []);
 
   // Fetch initial notifications

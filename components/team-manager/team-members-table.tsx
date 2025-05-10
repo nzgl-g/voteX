@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -65,26 +65,31 @@ export default function TeamMembersTable({
   const [error, setError] = useState<string | null>(null)
   const [teamId, setTeamId] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  
+  // Auto-refresh reference
+  const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const lastDataRef = useRef<TeamMember[]>([])
 
-  const fetchTeamMembers = async () => {
+  // Quiet fetch function that doesn't set loading state
+  const quietFetchTeamMembers = useCallback(async () => {
     if (!sessionId) return
     
-    setIsLoading(true)
     try {
-      // First, get the team ID associated with the session
-      const fetchedTeamId = await sessionService.getSessionTeam(sessionId);
-      
-      if (!fetchedTeamId || typeof fetchedTeamId !== 'string') {
-        throw new Error(`Invalid team ID received: ${fetchedTeamId}`);
+      // Get the team ID associated with the session if we don't have it yet
+      let currentTeamId = teamId
+      if (!currentTeamId) {
+        currentTeamId = await sessionService.getSessionTeam(sessionId)
+        if (!currentTeamId || typeof currentTeamId !== 'string') {
+          throw new Error(`Invalid team ID received: ${currentTeamId}`)
+        }
+        setTeamId(currentTeamId)
       }
       
-      setTeamId(fetchedTeamId);
-      
       // Use the team service to get team members
-      const teamData = await teamService.getTeamMembers(fetchedTeamId);
+      const teamData = await teamService.getTeamMembers(currentTeamId)
       
       // Process the team data according to the server model structure
-      const processedMembers: TeamMember[] = [];
+      const processedMembers: TeamMember[] = []
       
       // Add the leader with a Leader role
       if (teamData.leader) {
@@ -93,7 +98,7 @@ export default function TeamMembersTable({
           role: 'Leader',
           uniqueId: `leader-${teamData.leader._id}`,
           avatar: `/api/avatar?name=${teamData.leader.username || 'L'}`
-        });
+        })
       }
       
       // Add members with a Member role
@@ -101,7 +106,7 @@ export default function TeamMembersTable({
         teamData.members.forEach((member, index) => {
           // Skip if this member is the same as the leader (prevent duplication)
           if (teamData.leader && member._id === teamData.leader._id) {
-            return;
+            return
           }
           
           processedMembers.push({
@@ -109,36 +114,109 @@ export default function TeamMembersTable({
             role: 'Member',
             uniqueId: `member-${member._id}-${index}`,
             avatar: `/api/avatar?name=${member.username || 'M'}`
-          });
-        });
+          })
+        })
       }
       
-      setTeamMembers(processedMembers);
-      setError(null);
+      // Check if data has changed
+      const dataChanged = JSON.stringify(processedMembers) !== JSON.stringify(lastDataRef.current)
+      
+      if (dataChanged) {
+        setTeamMembers(processedMembers)
+        lastDataRef.current = processedMembers
+      }
+    } catch (err) {
+      console.error("Auto-refresh failed:", err)
+      // Don't show error toast for quiet refresh
+    }
+  }, [sessionId, teamId])
+
+  const fetchTeamMembers = async () => {
+    if (!sessionId) return
+    
+    setIsLoading(true)
+    try {
+      // First, get the team ID associated with the session
+      const fetchedTeamId = await sessionService.getSessionTeam(sessionId)
+      
+      if (!fetchedTeamId || typeof fetchedTeamId !== 'string') {
+        throw new Error(`Invalid team ID received: ${fetchedTeamId}`)
+      }
+      
+      setTeamId(fetchedTeamId)
+      
+      // Use the team service to get team members
+      const teamData = await teamService.getTeamMembers(fetchedTeamId)
+      
+      // Process the team data according to the server model structure
+      const processedMembers: TeamMember[] = []
+      
+      // Add the leader with a Leader role
+      if (teamData.leader) {
+        processedMembers.push({
+          ...teamData.leader,
+          role: 'Leader',
+          uniqueId: `leader-${teamData.leader._id}`,
+          avatar: `/api/avatar?name=${teamData.leader.username || 'L'}`
+        })
+      }
+      
+      // Add members with a Member role
+      if (teamData.members && Array.isArray(teamData.members)) {
+        teamData.members.forEach((member, index) => {
+          // Skip if this member is the same as the leader (prevent duplication)
+          if (teamData.leader && member._id === teamData.leader._id) {
+            return
+          }
+          
+          processedMembers.push({
+            ...member,
+            role: 'Member',
+            uniqueId: `member-${member._id}-${index}`,
+            avatar: `/api/avatar?name=${member.username || 'M'}`
+          })
+        })
+      }
+      
+      setTeamMembers(processedMembers)
+      lastDataRef.current = processedMembers
+      setError(null)
     } catch (err: any) {
-      console.error("Failed to fetch team members:", err);
+      console.error("Failed to fetch team members:", err)
       
       // Enhanced error reporting
-      let errorMessage = "Failed to load team members. Please try again.";
+      let errorMessage = "Failed to load team members. Please try again."
       if (err.response) {
-        errorMessage += ` (Status: ${err.response.status})`;
+        errorMessage += ` (Status: ${err.response.status})`
       } else if (err.message) {
-        errorMessage = err.message;
+        errorMessage = err.message
       }
       
-      setError(errorMessage);
+      setError(errorMessage)
       toast.error("Error loading team members", {
         description: errorMessage,
-      });
+      })
     } finally {
-      setIsLoading(false);
-      setRefreshing(false);
+      setIsLoading(false)
+      setRefreshing(false)
     }
-  };
+  }
 
   useEffect(() => {
-    fetchTeamMembers();
-  }, [sessionId])
+    fetchTeamMembers()
+    
+    // Set up auto-refresh interval
+    autoRefreshIntervalRef.current = setInterval(() => {
+      quietFetchTeamMembers()
+    }, 15000) // 15 seconds
+    
+    // Cleanup function
+    return () => {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current)
+      }
+    }
+  }, [sessionId, quietFetchTeamMembers])
 
   const handleRefresh = () => {
     setRefreshing(true);

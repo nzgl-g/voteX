@@ -3,6 +3,7 @@
 import {ReactNode} from "react"
 import {ThemeProvider} from "@/components/theme-provider"
 import {Toaster} from "@/components/ui/sonner"
+import { NotificationProvider } from "@/components/shared/notification-provider"
 
 import {SidebarLeft} from "@/components/sidebar/sidebar-left"
 import ChatBubble from "@/components/chat-bubble"
@@ -42,22 +43,24 @@ const data = {
 export default function Layout({children}: { children: ReactNode }) {
     return (
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-            <SidebarProvider style={{
-                // Using string type assertion to avoid TypeScript errors with custom CSS properties
-                "--sidebar-width": "16rem",
-                "--sidebar-width-mobile": "15rem",
-            } as React.CSSProperties}>
-                <SidebarLeft variant={"inset"}
-                    sessions={data.teams}
-                    navMain={data.navMain}
-                    navSecondary={data.navSecondary}
-                />
-                <SidebarInset>
-                    {children}
-                </SidebarInset>
-            </SidebarProvider>
-            <ChatBubble/>
-            <Toaster position="bottom-center"/>
+            <NotificationProvider>
+                <SidebarProvider style={{
+                    // Using string type assertion to avoid TypeScript errors with custom CSS properties
+                    "--sidebar-width": "16rem",
+                    "--sidebar-width-mobile": "15rem",
+                } as React.CSSProperties}>
+                    <SidebarLeft variant={"inset"}
+                        sessions={data.teams}
+                        navMain={data.navMain}
+                        navSecondary={data.navSecondary}
+                    />
+                    <SidebarInset>
+                        {children}
+                    </SidebarInset>
+                </SidebarProvider>
+                <ChatBubble/>
+                <Toaster position="bottom-center"/>
+            </NotificationProvider>
         </ThemeProvider>
     )
 } 

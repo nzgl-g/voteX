@@ -57,7 +57,7 @@ export function ThemeToggle({ className }: { className?: string }) {
             <Button
                 variant="outline"
                 size="icon"
-                className={`rounded-full bg-background hover:bg-accent hover:text-accent-foreground ${className}`}
+                className={`rounded-full bg-background hover:bg-accent hover:text-accent-foreground transition-colors !shadow-none !border-0 ${className}`}
                 aria-label="Toggle theme"
             >
                 <Sun className="h-[1.2rem] w-[1.2rem]" />
@@ -71,11 +71,11 @@ export function ThemeToggle({ className }: { className?: string }) {
             onClick={TOGGLE_THEME}
             variant="outline"
             size="icon"
-            className={`rounded-full bg-background hover:bg-accent hover:text-accent-foreground ${className}`}
+            className={`rounded-full bg-background hover:bg-accent hover:text-accent-foreground transition-colors !shadow-none !border-0 ${className}`}
             aria-label="Toggle theme"
         >
-            <Sun className="rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <Sun className="rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 h-[1.2rem] w-[1.2rem]" />
+            <Moon className="absolute rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 h-[1.2rem] w-[1.2rem]" />
             <span className="sr-only">Toggle theme</span>
         </Button>
     );

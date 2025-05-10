@@ -25,6 +25,16 @@ export interface SessionCandidate {
   partyName: string;
   totalVotes: number;
   requiresReview: boolean;
+  paper?: string | null;
+  fullName: string;
+  biography: string;
+  experience: string;
+  nationalities: string[];
+  dobPob: {
+    dateOfBirth: string;
+    placeOfBirth: string;
+  };
+  promises: string[];
 }
 
 export interface SessionOption {
@@ -70,6 +80,7 @@ export interface Session {
   verificationMethod: 'KYC' | 'CVC' | null;
   candidateRequests: string[];
   participants: string[] | SessionParticipant[];
+  allowDirectEdit: boolean;
   // Election specific fields
   candidates?: SessionCandidate[];
   // Poll specific fields
@@ -146,6 +157,8 @@ export const sessionService = {
    */
   getCurrentUserId(): string | null {
     try {
+      if (typeof window === 'undefined') return null;
+      
       const user = localStorage.getItem('user');
       if (user) {
         const userData = JSON.parse(user);
@@ -403,14 +416,50 @@ export const sessionService = {
         throw new Error("Invalid update data: empty object");
       }
       
+      // Filter out any null, undefined or empty object values
+      const cleanUpdateData = Object.entries(updateData).reduce((acc: any, [key, value]) => {
+        // Skip null or undefined values
+        if (value === null || value === undefined) return acc;
+        
+        // Skip empty objects
+        if (typeof value === 'object' && Object.keys(value).length === 0) return acc;
+        
+        // Include valid values
+        acc[key] = value;
+        return acc;
+      }, {});
+      
+      // Check if there are any actual changes after cleaning
+      if (Object.keys(cleanUpdateData).length === 0) {
+        console.log("No valid update data after filtering, skipping API call");
+        // Return the current session without making an API call
+        return await this.getSessionById(sessionId) as Session;
+      }
+      
       // Log the update data for debugging
-      console.log(`Updating session with ID: ${sessionId}`, JSON.stringify(updateData, null, 2));
+      console.log(`Updating session with ID: ${sessionId}`, JSON.stringify(cleanUpdateData, null, 2));
       
       // Make sure to use the right endpoint
-      const response = await api.patch(`/sessions/${sessionId}/edit-request`, updateData);
+      const response = await api.patch(`/sessions/${sessionId}/edit-request`, cleanUpdateData);
       
-      console.log("Session update successful:", response.status);
-      return response.data;
+      console.log("Session update response:", response.data);
+      
+      // Check if the update was direct or needs approval
+      if (response.data.needsApproval) {
+        // Return the session with a flag indicating it needs approval
+        return {
+          ...await this.getSessionById(sessionId) as Session,
+          _needsApproval: true
+        } as Session;
+      }
+      
+      // If the response contains the updated session, use it
+      if (response.data._id) {
+        return response.data;
+      }
+      
+      // Otherwise fetch the updated session
+      return await this.getSessionById(sessionId) as Session;
     } catch (error: any) {
       console.error(`Failed to update session with ID ${sessionId}:`, error);
       
@@ -431,6 +480,46 @@ export const sessionService = {
       }
       
       console.error("Update session error details:", errorMessage);
+      throw new Error(errorMessage);
+    }
+  },
+
+  /**
+   * Approve a session edit request
+   * @param requestId ID of the edit request to approve
+   * @param sessionId ID of the session
+   * @returns Updated session object
+   */
+  async approveEditRequest(requestId: string, sessionId: string): Promise<Session> {
+    try {
+      if (!requestId || !sessionId) {
+        throw new Error("Request ID and Session ID are required");
+      }
+      
+      console.log(`Approving edit request ${requestId} for session ${sessionId}`);
+      const response = await api.patch(`/sessions/edit-requests/${requestId}/approve`);
+      
+      // If the response contains the updated session, use it
+      if (response.data.session && response.data.session._id) {
+        return response.data.session;
+      }
+      
+      // Otherwise fetch the updated session
+      return await this.getSessionById(sessionId) as Session;
+    } catch (error: any) {
+      console.error(`Failed to approve edit request ${requestId}:`, error);
+      
+      // Provide detailed error messages
+      let errorMessage = "Failed to approve edit request";
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       throw new Error(errorMessage);
     }
   },

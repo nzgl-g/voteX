@@ -24,7 +24,6 @@ export default function VoterPage() {
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [showCandidateForm, setShowCandidateForm] = useState(false);
-  const [notificationOpen, setNotificationOpen] = useState(false);
   const [showPricingDialog, setShowPricingDialog] = useState(false);
   const [showSecretPhraseDialog, setShowSecretPhraseDialog] = useState(false);
   const [isSubmittingPhrase, setIsSubmittingPhrase] = useState(false);
@@ -32,10 +31,7 @@ export default function VoterPage() {
   const [error, setError] = useState<string | null>(null);
   
   // Get the current user ID for notifications
-  const user = authApi.getCurrentUser();
-  const userId = user?._id || "current-user-id";
-  const { notifications, markAsRead } = useNotification(userId);
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const [userId, setUserId] = useState<string>("anonymous");
 
   // Function to validate session data
   const isValidSession = (session: any): boolean => {
@@ -190,13 +186,6 @@ export default function VoterPage() {
     // Implementation would depend on your app's navigation/routing
   };
 
-  // Handle notification click
-  const handleNotificationClick = (notification: any) => {
-    if (!notification.read) {
-      markAsRead(notification.id);
-    }
-  };
-
   // Handle secret phrase submission
   const handleSecretPhraseSubmit = async (secretPhrase: string) => {
     if (!secretPhrase.trim()) {
@@ -257,13 +246,7 @@ export default function VoterPage() {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Header */}
-      <VoterHeader
-        notifications={notifications}
-        onNotificationClick={handleNotificationClick}
-        unreadCount={unreadCount}
-        notificationOpen={notificationOpen}
-        setNotificationOpen={setNotificationOpen}
-      />
+      <VoterHeader />
 
       {/* Main Content */}
       <main className="flex-1 container mx-auto py-8 px-4">

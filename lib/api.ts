@@ -187,11 +187,13 @@ export const authApi = {
 
   // Check if user is authenticated
   isAuthenticated() {
+    if (typeof window === 'undefined') return false;
     return !!localStorage.getItem('token');
   },
 
   // Get current user
   getCurrentUser() {
+    if (typeof window === 'undefined') return null;
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
   },

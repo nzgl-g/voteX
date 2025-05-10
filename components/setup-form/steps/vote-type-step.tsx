@@ -6,6 +6,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { BarChart2, Award, Trophy, Crown, Check, Users, ListFilter } from "lucide-react"
 import { ProFeatureBadge } from "@/components/ui/pro-feature-badge"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Info } from "lucide-react"
 
 interface VoteTypeStepProps {
   formState: SessionFormState
@@ -13,7 +17,7 @@ interface VoteTypeStepProps {
   errors?: Record<string, string>
 }
 
-export function VoteTypeStep({ formState, updateFormState, errors }: VoteTypeStepProps) {
+export function VoteTypeStep({ formState, updateFormState, errors = {} }: VoteTypeStepProps) {
   const handleTypeChange = (value: "poll" | "election" | "tournament") => {
     // Reset subtype when changing type
     let newSubtype: any = "Single"
@@ -35,242 +39,207 @@ export function VoteTypeStep({ formState, updateFormState, errors }: VoteTypeSte
   const isPro = formState.subscription.name === "pro" || formState.subscription.name === "enterprise"
 
   return (
-    <div className="space-y-8">
-      {errors?.type && (
-        <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md border border-destructive/30">
-          {errors.type}
-        </div>
-      )}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium">Vote Type</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Poll Type */}
-          <Card
-            className={`cursor-pointer transition-all hover:border-primary ${
-              formState.type === "poll" ? "border-2 border-primary" : ""
-            }`}
-            onClick={() => handleTypeChange("poll")}
-          >
-            <CardHeader className="pb-2 p-4">
-              <div className="flex flex-row sm:flex-col items-center sm:items-start gap-3 sm:gap-0">
-                <BarChart2 className="h-6 w-6 sm:h-8 sm:w-8 text-primary sm:mb-2" />
-                <div>
-                  <CardTitle className="text-base sm:text-lg">Poll</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">Simple voting mechanism</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0 p-4">
-              {formState.type === "poll" && (
-                <div className="h-6 flex items-center justify-end">
-                  <Check className="h-5 w-5 text-primary" />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Election Type */}
-          <Card
-            className={`cursor-pointer transition-all hover:border-primary relative ${
-              formState.type === "election" ? "border-2 border-primary" : ""
-            } ${!isPro ? "opacity-80" : ""}`}
-            onClick={() => isPro && handleTypeChange("election")}
-          >
-            <CardHeader className="pb-2 p-4">
-              <div className="flex flex-row sm:flex-col items-center sm:items-start gap-3 sm:gap-0">
-                <Award className="h-6 w-6 sm:h-8 sm:w-8 text-primary sm:mb-2" />
-                <div>
-                  <CardTitle className="text-base sm:text-lg">Election</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">Candidate-based voting system</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0 p-4">
-              {!isPro && <ProFeatureBadge />}
-              {formState.type === "election" && (
-                <div className="h-6 flex items-center justify-end">
-                  <Check className="h-5 w-5 text-primary" />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Tournament Type */}
-          <Card
-            className={`cursor-not-allowed transition-all hover:border-none relative bg-muted/30 border border-dashed ${
-              formState.type === "tournament" ? "border-2 border-primary" : ""
-            }`}
-          >
-            <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-yellow-500 text-yellow-950 text-xs font-bold px-3 py-1 rounded-full">
-              Coming Soon
-            </div>
-            <CardHeader className="pb-2 p-4">
-              <div className="flex flex-row sm:flex-col items-center sm:items-start gap-3 sm:gap-0">
-                <Trophy className="h-6 w-6 sm:h-8 sm:w-8 text-primary/60 sm:mb-2" />
-                <div>
-                  <CardTitle className="text-base sm:text-lg text-muted-foreground">Tournament</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">Competitive elimination format</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0 p-4">
-              {formState.type === "tournament" && (
-                <div className="h-6 flex items-center justify-end">
-                  <Check className="h-5 w-5 text-primary" />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+    <div className="space-y-6">
+      <div className="text-center mb-4">
+        <h3 className="text-xl font-semibold mb-2">Choose Vote Type</h3>
+        <p className="text-muted-foreground">Select the type of voting session you want to create.</p>
       </div>
-      {/* Voting Mode Selection */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium">Voting Mode</h3>
 
-        {formState.type === "poll" && (
+      <Card>
+        <CardHeader>
+          <CardTitle>Session Type</CardTitle>
+        </CardHeader>
+        <CardContent>
           <RadioGroup
-            value={formState.subtype}
-            onValueChange={handleSubtypeChange}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-          >
-            <div>
-              <RadioGroupItem value="Single" id="single" className="peer sr-only" />
-              <Label
-                htmlFor="single"
-                className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-              >
-                <Check className="mb-3 h-6 w-6" />
-                <div className="text-center">
-                  <p className="font-medium">Single Choice</p>
-                  <p className="text-sm text-muted-foreground">Voters select one option</p>
-                </div>
-              </Label>
-            </div>
-
-            <div>
-              <RadioGroupItem value="Multiple" id="multiple" className="peer sr-only" />
-              <Label
-                htmlFor="multiple"
-                className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-              >
-                <Users className="mb-3 h-6 w-6" />
-                <div className="text-center">
-                  <p className="font-medium">Multiple Choice</p>
-                  <p className="text-sm text-muted-foreground">Voters select multiple options</p>
-                </div>
-              </Label>
-            </div>
-
-            <div>
-              <RadioGroupItem value="Ranked" id="ranked" className="peer sr-only" />
-              <Label
-                htmlFor="ranked"
-                className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-              >
-                <ListFilter className="mb-3 h-6 w-6" />
-                <div className="text-center">
-                  <p className="font-medium">Ranked Choice</p>
-                  <p className="text-sm text-muted-foreground">Voters rank options by preference</p>
-                </div>
-              </Label>
-            </div>
-          </RadioGroup>
-        )}
-
-        {formState.type === "election" && (
-          <RadioGroup
-            value={formState.subtype}
-            onValueChange={handleSubtypeChange}
+            value={formState.type}
+            onValueChange={(value) => updateFormState({ type: value as SessionFormState["type"] })}
             className="grid grid-cols-1 md:grid-cols-3 gap-4"
           >
             <div>
-              <RadioGroupItem value="Single" id="single-election" className="peer sr-only" />
+              <RadioGroupItem value="poll" id="poll" className="peer sr-only" />
               <Label
-                htmlFor="single-election"
+                htmlFor="poll"
                 className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
               >
-                <Crown className="mb-3 h-6 w-6" />
-                <div className="text-center">
-                  <p className="font-medium">Single Choice</p>
-                  <p className="text-sm text-muted-foreground">Voters select one candidate</p>
-                </div>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mb-3 h-6 w-6"
+                >
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+                Poll
+                <span className="text-sm text-muted-foreground">Simple voting with options</span>
               </Label>
             </div>
 
             <div>
-              <RadioGroupItem value="Multiple" id="multiple-election" className="peer sr-only" />
+              <RadioGroupItem value="election" id="election" className="peer sr-only" />
               <Label
-                htmlFor="multiple-election"
+                htmlFor="election"
                 className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
               >
-                <Users className="mb-3 h-6 w-6" />
-                <div className="text-center">
-                  <p className="font-medium">Multiple Choice</p>
-                  <p className="text-sm text-muted-foreground">Voters select multiple candidates</p>
-                </div>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mb-3 h-6 w-6"
+                >
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                Election
+                <span className="text-sm text-muted-foreground">Vote for candidates</span>
               </Label>
             </div>
 
             <div>
-              <RadioGroupItem value="Ranked" id="ranked-election" className="peer sr-only" />
+              <RadioGroupItem value="tournament" id="tournament" className="peer sr-only" />
               <Label
-                htmlFor="ranked-election"
+                htmlFor="tournament"
                 className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
               >
-                <ListFilter className="mb-3 h-6 w-6" />
-                <div className="text-center">
-                  <p className="font-medium">Ranked Choice</p>
-                  <p className="text-sm text-muted-foreground">Voters rank candidates by preference</p>
-                </div>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mb-3 h-6 w-6"
+                >
+                  <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+                  <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+                  <path d="M4 22h16" />
+                  <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+                  <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+                  <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+                </svg>
+                Tournament
+                <span className="text-sm text-muted-foreground">Competitive voting with rounds</span>
               </Label>
             </div>
           </RadioGroup>
-        )}
+        </CardContent>
+      </Card>
 
-        {formState.type === "tournament" && (
+      <Card>
+        <CardHeader>
+          <CardTitle>Voting Method</CardTitle>
+        </CardHeader>
+        <CardContent>
           <div className="space-y-4">
-            <div className="bg-muted/50 rounded-lg p-4 border border-dashed">
-              <p className="text-center text-muted-foreground">
-                Tournament functionality is coming soon. Please select Poll or Election for now.
-              </p>
-            </div>
-            <RadioGroup
-              value={formState.subtype}
-              onValueChange={handleSubtypeChange}
-              className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-50"
-              disabled
-            >
-              <div>
-                <RadioGroupItem value="Single Elimination" id="single-elim" className="peer sr-only" disabled />
-                <Label
-                  htmlFor="single-elim"
-                  className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 cursor-not-allowed"
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="subtype">Voting Mode</Label>
+                <Select
+                  value={formState.subtype}
+                  onValueChange={(value) => updateFormState({ subtype: value as SessionFormState["subtype"] })}
                 >
-                  <Trophy className="mb-3 h-6 w-6 text-muted-foreground" />
-                  <div className="text-center">
-                    <p className="font-medium text-muted-foreground">Single Elimination</p>
-                    <p className="text-sm text-muted-foreground">Lose once and you're out</p>
-                  </div>
-                </Label>
+                  <SelectTrigger id="subtype">
+                    <SelectValue placeholder="Select voting mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {formState.type === "poll" && (
+                      <>
+                        <SelectItem value="Single">Single Choice</SelectItem>
+                        <SelectItem value="multiple">Multiple Choice</SelectItem>
+                        <SelectItem value="ranked">Ranked Choice</SelectItem>
+                      </>
+                    )}
+                    {formState.type === "election" && (
+                      <>
+                        <SelectItem value="Single">Single Vote</SelectItem>
+                        <SelectItem value="multiple">Multiple Votes</SelectItem>
+                        <SelectItem value="ranked">Ranked Voting</SelectItem>
+                      </>
+                    )}
+                    {formState.type === "tournament" && (
+                      <>
+                        <SelectItem value="single elimination">Single Elimination</SelectItem>
+                        <SelectItem value="double elimination">Double Elimination</SelectItem>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div>
-                <RadioGroupItem value="Double Elimination" id="double-elim" className="peer sr-only" disabled />
-                <Label
-                  htmlFor="double-elim"
-                  className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 cursor-not-allowed"
-                >
-                  <Award className="mb-3 h-6 w-6 text-muted-foreground" />
-                  <div className="text-center">
-                    <p className="font-medium text-muted-foreground">Double Elimination</p>
-                    <p className="text-sm text-muted-foreground">Second chance after first loss</p>
-                  </div>
-                </Label>
+              {formState.type === "tournament" && (
+                <div className="space-y-2">
+                  <Label htmlFor="tournamentType">Tournament Type</Label>
+                  <Select
+                    value={formState.tournamentType || ""}
+                    onValueChange={(value) => updateFormState({ tournamentType: value as SessionFormState["tournamentType"] })}
+                  >
+                    <SelectTrigger id="tournamentType">
+                      <SelectValue placeholder="Select tournament type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="round Robin">Round Robin</SelectItem>
+                      <SelectItem value="knockout">Knockout</SelectItem>
+                      <SelectItem value="swiss">Swiss</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+
+            {/* Add maxChoices input for poll and election types */}
+            {(formState.type === "poll" || formState.type === "election") && (
+              <div className="space-y-2">
+                <Label htmlFor="maxChoices">Maximum Choices</Label>
+                <Input
+                  id="maxChoices"
+                  type="number"
+                  min="1"
+                  value={formState.maxChoices}
+                  onChange={(e) => updateFormState({ maxChoices: parseInt(e.target.value) })}
+                  placeholder="Enter maximum number of choices"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Maximum number of options a voter can select
+                </p>
               </div>
-            </RadioGroup>
+            )}
+
+            {/* Add maxRounds input for tournament type */}
+            {formState.type === "tournament" && (
+              <div className="space-y-2">
+                <Label htmlFor="maxRounds">Maximum Rounds</Label>
+                <Input
+                  id="maxRounds"
+                  type="number"
+                  min="1"
+                  value={formState.maxRounds}
+                  onChange={(e) => updateFormState({ maxRounds: parseInt(e.target.value) })}
+                  placeholder="Enter maximum number of rounds"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Maximum number of rounds in the tournament
+                </p>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </CardContent>
+      </Card>
+
+      {errors.type && (
+        <Alert variant="destructive">
+          <Info className="h-4 w-4" />
+          <AlertDescription>{errors.type}</AlertDescription>
+        </Alert>
+      )}
     </div>
   )
 }

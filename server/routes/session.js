@@ -301,12 +301,16 @@ router.patch("/:sessionId/edit-request", auth, async (req, res) => {
     await sendNotification(req, {
       recipients: [session.team.leader],
       type: "session-edit-request",
-      message: `${req.user._id} has requested to edit the session.`,
+      message: `${req.user.username || req.user._id} has requested to edit the session.`,
       link: `/sessions/${sessionId}`,
       targetType: "user",
     });
 
-    res.status(201).json({ message: "Edit request submitted.", editRequest });
+    res.status(201).json({ 
+      message: "Edit request submitted.", 
+      editRequest,
+      needsApproval: true
+    });
   } catch (err) {
     console.error("Submit edit request error:", err);
     res

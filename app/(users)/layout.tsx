@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api';
+import { NotificationProvider } from '@/components/shared/notification-provider';
 
 export default function UsersLayout({
   children,
@@ -22,5 +23,9 @@ export default function UsersLayout({
   }, [router]);
 
   // We could add a loading state here, but for simplicity, we'll just render the children
-  return <>{children}</>;
+  return (
+    <NotificationProvider>
+        {children}
+    </NotificationProvider>
+  );
 } 

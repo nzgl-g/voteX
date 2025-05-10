@@ -68,6 +68,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
+        timeout: 10000,
+        transports: ['websocket', 'polling'],
       });
 
       socketInstance.on('connect', () => {
@@ -81,6 +83,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
       socketInstance.on('connect_error', (error) => {
         console.error('Socket connection error:', error.message);
+        setIsConnected(false);
+      });
+
+      socketInstance.on('error', (error) => {
+        console.error('Socket error:', error);
         setIsConnected(false);
       });
 

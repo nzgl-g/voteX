@@ -117,7 +117,11 @@ const sessionSchema = new mongoose.Schema({
 sessionSchema.discriminator(
   "Election",
   new mongoose.Schema({
-    // For election type
+    maxChoices: {
+      type: Number,
+      default: null,
+      min: 1,
+    },
   })
 );
 
@@ -125,7 +129,12 @@ sessionSchema.discriminator(
   "Poll",
   new mongoose.Schema({
     // Poll-specific fields
-    options: [optionSchema], // For poll type
+    options: [optionSchema],
+    maxChoices: {
+      type: Number,
+      default: null,
+      min: 1,
+    },
   })
 );
 

@@ -180,6 +180,7 @@ router.post("/", auth, async (req, res) => {
       tournamentType,
       bracket,
       maxRounds,
+      maxChoices,
     } = req.body;
     if (secretPhrase) {
       const existingSession = await Session.findOne({ secretPhrase });
@@ -211,8 +212,8 @@ router.post("/", auth, async (req, res) => {
       verificationMethod,
       createdBy: creator,
       candidateRequests: [],
-      ...(type === "election" && { candidates }),
-      ...(type === "poll" && { options }),
+      ...(type === "election" && { candidates, maxChoices }),
+      ...(type === "poll" && { options, maxChoices }),
       ...(type === "tournament" && { tournamentType, bracket, maxRounds }),
     });
 

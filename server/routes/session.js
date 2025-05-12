@@ -392,34 +392,30 @@ router.patch("/edit-requests/:requestId/approve", auth, async (req, res) => {
 });
 
 //dir ghir contract address f body
-router.patch(
-  "/:sessionId/contract-address",
-  auth,
-  isTeamLeader,
-  async (req, res) => {
-    const sessionId = req.params.sessionId;
-    const { contractAddress } = req.body;
-    if (!/^0x[a-fA-F0-9]{40}$/.test(contractAddress)) {
-      return res
-        .status(400)
-        .json({ message: "Invalid contract address format" });
-    }
-    try {
-      const session = await Session.findByIdAndUpdate(
-        sessionId,
-        { contractAddress },
-        { new: true }
-      );
-      if (!session)
-        return res.status(404).json({ message: "Session not found" });
-
-      res.status(200).json({ message: "Contract address updated", session });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: "Server error" });
-    }
+router.patch("/:sessionId/contract-address", async (req, res) => {
+  const authToken = req.headers["x-auth-token"];
+  if (authToken !== process.env.VOTE_UPDATE_SECRET) {
+    return res.status(403).json({ error: "Forbidden" });
   }
-);
+  const sessionId = req.params.sessionId;
+  const { contractAddress } = req.body;
+  if (!/^0x[a-fA-F0-9]{40}$/.test(contractAddress)) {
+    return res.status(400).json({ message: "Invalid contract address format" });
+  }
+  try {
+    const session = await Session.findByIdAndUpdate(
+      sessionId,
+      { contractAddress },
+      { new: true }
+    );
+    if (!session) return res.status(404).json({ message: "Session not found" });
+
+    res.status(200).json({ message: "Contract address updated", session });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 //body should be like this
 // {
 //   "type": "candidate",

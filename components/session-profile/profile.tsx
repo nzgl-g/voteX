@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRouter } from "next/navigation"
 import {
@@ -53,24 +55,24 @@ export default function Profile({ session: initialSession, onUpdate }: ProfilePr
 
   // Define confirmBlockchainAction *before* the useEffect that uses it
   const confirmBlockchainAction = useCallback(async () => {
-    console.log("▶️ confirmBlockchainAction starting with action type:", actionType);
-    setIsBlockchainLoading(true);
-
+    setIsBlockchainLoading(true)
+    console.log("Starting blockchain action:", actionType)
+    
     try {
-      let contractAddress = null;
-
+      let contractAddress = null
+      
       if (actionType === "start") {
         // Deploy new session on blockchain
-        console.log("✅ Confirm Action: Preparing session parameters...");
+        console.log("Confirm Action: Preparing session parameters...");
         const params = blockchainService.prepareSessionParams(session);
-        console.log("✅ Confirm Action: Session params prepared:", params);
+        console.log("Confirm Action: Session params prepared:", params);
 
-        console.log("🔄 Confirm Action: Deploying session to blockchain...");
+        console.log("Confirm Action: Deploying session to blockchain...");
         contractAddress = await blockchainService.deploySession(params);
-        console.log("✅ Confirm Action: Deployment attempt finished. Contract Address:", contractAddress);
+        console.log("Confirm Action: Deployment attempt finished. Contract Address:", contractAddress);
 
         if (!contractAddress) {
-          console.error("❌ Confirm Action: Failed to deploy session - no contract address returned");
+          console.error("Confirm Action: Failed to deploy session - no contract address returned");
           toast({
             title: "Deployment Failed",
             description: "Failed to deploy session to blockchain. Please try again.",
@@ -80,9 +82,9 @@ export default function Profile({ session: initialSession, onUpdate }: ProfilePr
           setIsBlockchainLoading(false);
           return;
         }
-
+        
         // Update session in database with contract address and start time
-        console.log("✅ Confirm Action: Updating session in database with contract address:", contractAddress);
+        console.log("Confirm Action: Updating session in database with contract address:", contractAddress);
         const updatedData = {
           contractAddress,
           sessionLifecycle: {
@@ -90,24 +92,24 @@ export default function Profile({ session: initialSession, onUpdate }: ProfilePr
             startedAt: new Date().toISOString()
           }
         };
-
-        console.log("✅ Confirm Action: Sending update to backend API:", updatedData);
+        
+        console.log("Confirm Action: Sending update to backend API:", updatedData);
         const result = await sessionService.updateSession(session._id as string, updatedData);
-        console.log("✅ Confirm Action: API update result:", result);
-
+        console.log("Confirm Action: API update result:", result);
+        
         if (result.needsApproval) {
           toast({
             title: "Request Submitted",
             description: "Your request to start the session has been submitted for approval.",
           });
         } else {
-          console.log("✅ Confirm Action: Fetching updated session data...");
+          console.log("Confirm Action: Fetching updated session data...");
           const updatedSession = await sessionService.getSessionById(session._id as string);
-          console.log("✅ Confirm Action: Updated session:", updatedSession);
-
+          console.log("Confirm Action: Updated session:", updatedSession);
+          
           setSession(updatedSession);
           onUpdate(updatedSession);
-
+          
           toast({
             title: "Success",
             description: `Session deployed to blockchain and started successfully. Contract address: ${contractAddress.substring(0, 8)}...`,
@@ -127,11 +129,11 @@ export default function Profile({ session: initialSession, onUpdate }: ProfilePr
           setIsBlockchainLoading(false)
           return
         }
-
+        
         console.log("Ending session with contract address:", session.contractAddress)
         const success = await blockchainService.endSession(session.contractAddress)
         console.log("End session result:", success)
-
+        
         if (!success) {
           console.error("Failed to end session on blockchain")
           toast({
@@ -143,7 +145,7 @@ export default function Profile({ session: initialSession, onUpdate }: ProfilePr
           setIsBlockchainLoading(false)
           return
         }
-
+        
         // Update session in database with end time
         console.log("Updating session end time in database")
         const updatedData = {
@@ -152,11 +154,11 @@ export default function Profile({ session: initialSession, onUpdate }: ProfilePr
             endedAt: new Date().toISOString()
           }
         }
-
+        
         console.log("Sending update to backend API:", updatedData)
         const result = await sessionService.updateSession(session._id as string, updatedData)
         console.log("API update result:", result)
-
+        
         if (result.needsApproval) {
           toast({
             title: "Request Submitted",
@@ -166,10 +168,10 @@ export default function Profile({ session: initialSession, onUpdate }: ProfilePr
           console.log("Fetching updated session data...")
           const updatedSession = await sessionService.getSessionById(session._id as string)
           console.log("Updated session:", updatedSession)
-
+          
           setSession(updatedSession)
           onUpdate(updatedSession)
-
+          
           toast({
             title: "Success",
             description: "Session ended successfully on blockchain and database.",
@@ -178,17 +180,17 @@ export default function Profile({ session: initialSession, onUpdate }: ProfilePr
         }
       }
     } catch (error) {
-      console.error(`❌ Blockchain ${actionType} error:`, error);
+      console.error(`Blockchain ${actionType} error:`, error)
       toast({
         title: "Error",
         description: `Failed to ${actionType} session on blockchain: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive",
-      });
+      })
     } finally {
-      setShowBlockchainDialog(false);
-      setIsBlockchainLoading(false);
+      setShowBlockchainDialog(false)
+      setIsBlockchainLoading(false)
     }
-  }, [actionType, session, onUpdate]);
+  }, [actionType, session, onUpdate])
 
   useEffect(() => {
     setSession(initialSession)
@@ -198,12 +200,30 @@ export default function Profile({ session: initialSession, onUpdate }: ProfilePr
     })
   }, [initialSession])
 
-  // Modified blockchain confirmation dialog with better usability
+  // Effect to add event listener when dialog is shown
   useEffect(() => {
-    if (showBlockchainDialog) {
-      console.log("Blockchain dialog shown with action type:", actionType);
+    const buttonElement = confirmButtonRef.current;
+    
+    // Define the handler inside useEffect or make sure it's stable (useCallback)
+    const handleClick = () => {
+      console.log("Programmatic Confirm button CLICKED!");
+      // No need to check isBlockchainLoading here, the button itself should be disabled
+      confirmBlockchainAction(); 
+    };
+
+    if (showBlockchainDialog && buttonElement) {
+      console.log("Attempting to add click listener to confirm button");
+      buttonElement.addEventListener('click', handleClick);
+
+      // Cleanup listener when dialog is hidden or component unmounts
+      return () => {
+        console.log("Removing click listener from confirm button");
+        if (buttonElement) { // Check if element still exists before removing
+           buttonElement.removeEventListener('click', handleClick);
+        }
+      };
     }
-  }, [showBlockchainDialog, actionType]);
+  }, [showBlockchainDialog, confirmBlockchainAction]); // Use the stable confirmBlockchainAction
 
   const handleStartSession = async () => {
     // First connect to blockchain and get wallet address
@@ -213,7 +233,7 @@ export default function Profile({ session: initialSession, onUpdate }: ProfilePr
       console.log("Attempting to connect to MetaMask...")
       const connected = await blockchainService.connect()
       console.log("Connection result:", connected)
-
+      
       if (!connected) {
         console.error("Failed to connect to blockchain")
         toast({
@@ -224,17 +244,17 @@ export default function Profile({ session: initialSession, onUpdate }: ProfilePr
         setIsBlockchainLoading(false)
         return
       }
-
+      
       console.log("Getting wallet address...")
       const address = await blockchainService.getWalletAddress()
       console.log("Wallet address:", address)
       setWalletAddress(address || "Test Wallet")
-
+      
       // Show blockchain confirmation dialog
       console.log("Setting action type to 'start' and showing blockchain dialog")
       setActionType("start")
       setShowBlockchainDialog(true)
-
+      
     } catch (error) {
       console.error("Blockchain connection error:", error)
       toast({
@@ -260,14 +280,14 @@ export default function Profile({ session: initialSession, onUpdate }: ProfilePr
         setIsBlockchainLoading(false)
         return
       }
-
+      
       const address = await blockchainService.getWalletAddress()
       setWalletAddress(address || "Test Wallet")
-
+      
       // Show blockchain confirmation dialog
       setActionType("end")
       setShowBlockchainDialog(true)
-
+      
     } catch (error) {
       console.error("Blockchain connection error:", error)
       toast({
@@ -765,9 +785,9 @@ export default function Profile({ session: initialSession, onUpdate }: ProfilePr
                 Session Schedule
               </Label>
               <DatePickerWithRange 
-                dateRange={dateRange}
-                setDateRange={(range: DateRange) => setDateRange(range)}
-                disabled={!editMode || getSessionStatus() === "started"}
+                dateRange={dateRange} 
+                setDateRange={(range: DateRange) => setDateRange(range)} 
+                disabled={!editMode || getSessionStatus() === "started"} 
               />
             </div>
           </div>
@@ -1169,7 +1189,7 @@ export default function Profile({ session: initialSession, onUpdate }: ProfilePr
           <div className="py-4">
             <div className="rounded-md bg-slate-50 p-4">
               <p className="text-sm font-medium">Connected Wallet</p>
-              <p className="mt-1 text-xs font-mono break-all">{walletAddress || "Not connected"}</p>
+              <p className="mt-1 text-xs font-mono">{walletAddress || "Not connected"}</p>
 
               {actionType === "start" && (
                 <>
@@ -1179,14 +1199,11 @@ export default function Profile({ session: initialSession, onUpdate }: ProfilePr
                       session.subtype.charAt(0).toUpperCase() + session.subtype.slice(1)
                     })
                   </p>
-                  <div className="mt-4 text-xs text-amber-600 border border-amber-200 bg-amber-50 p-2 rounded">
-                    <p>Testing with Ganache network (chainId: 1337)</p>
-                  </div>
                 </>
               )}
             </div>
           </div>
-          <DialogFooter className="flex gap-3">
+          <DialogFooter>
             <Button 
               variant="outline" 
               onClick={() => setShowBlockchainDialog(false)} 
@@ -1195,14 +1212,13 @@ export default function Profile({ session: initialSession, onUpdate }: ProfilePr
               Cancel
             </Button>
             <Button 
-              variant="default"
               ref={confirmButtonRef}
               onClick={() => {
-                console.log("🔘 Confirm button clicked directly!");
+                console.log("Confirm button clicked directly!");
                 confirmBlockchainAction();
               }}
               disabled={isBlockchainLoading}
-              className="min-w-[100px] bg-primary hover:bg-primary/90"
+              className="min-w-[100px]"
             >
               {isBlockchainLoading ? (
                 <>

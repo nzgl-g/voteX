@@ -141,19 +141,23 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
       
       // Add the leader with a Leader role
       if (teamMembersData.leader) {
-        processedMembers.push({
-          ...teamMembersData.leader,
-          role: 'Leader'
-        })
+        if (typeof teamMembersData.leader === 'object' && teamMembersData.leader !== null) {
+          processedMembers.push({
+            ...teamMembersData.leader,
+            role: 'Leader'
+          })
+        }
       }
       
       // Add members with a Member role
       if (teamMembersData.members && Array.isArray(teamMembersData.members)) {
         teamMembersData.members.forEach((member) => {
-          processedMembers.push({
-            ...member,
-            role: 'Member'
-          })
+          if (typeof member === 'object' && member !== null) {
+            processedMembers.push({
+              ...member,
+              role: 'Member'
+            })
+          }
         })
       }
       
@@ -224,7 +228,7 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
       // Create new task
       taskService.createTask({
         ...taskData,
-        sessionId: sessionId
+        session: sessionId
       })
         .then(createdTask => {
           toast.success("Task created", {

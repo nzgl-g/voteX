@@ -108,7 +108,7 @@ router.patch("/:taskId/assign", auth, isTeamLeader, async (req, res) => {
 });
 router.patch("/:taskId/complete", auth, async (req, res) => {
   try {
-    const task = await Task.findById(req.params.taskId);
+    const task = await Task.findById(req.params.taskId).populate("session");
 
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
@@ -129,6 +129,7 @@ router.patch("/:taskId/complete", auth, async (req, res) => {
     await task.save();
 
     if (!wasCompleted) {
+      const team = await Team.findById(task.session.team);
       await sendNotification(req, {
         recipients: [team.leader],
         type: "task-completed",

@@ -201,6 +201,27 @@ class TeamService {
       throw new Error(errorMessage);
     }
   }
+
+  /**
+   * Get a team by session ID
+   * @param sessionId - The ID of the session to get the team for
+   * @returns Promise resolving to the team if found
+   */
+  async getTeamBySessionId(sessionId: string): Promise<Team> {
+    try {
+      // Import the session service to get the team ID
+      const sessionService = (await import('./session-service')).default;
+      
+      // Get the team ID from the session
+      const teamId = await sessionService.getSessionTeam(sessionId);
+      
+      // Then get the team details using the team ID
+      return this.getTeamById(teamId);
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || `Failed to fetch team for session ${sessionId}`;
+      throw new Error(errorMessage);
+    }
+  }
 }
 
 export const teamService = new TeamService();

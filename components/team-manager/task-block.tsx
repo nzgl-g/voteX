@@ -115,23 +115,21 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
           const membersMap: Record<string, ExtendedTeamMember> = {}
           
           // Add leader
-          if (teamData.leader) {
-            if (typeof teamData.leader !== 'string' && teamData.leader._id) {
-              membersMap[teamData.leader._id] = {
-                ...teamData.leader,
-                avatar: `/api/avatar?name=${teamData.leader.username}`
-              }
-            }
+          if (teamData.leader && typeof teamData.leader !== 'string') {
+            membersMap[teamData.leader._id] = {
+              ...teamData.leader,
+              avatar: `/api/avatar?name=${teamData.leader.username}`
+            } as ExtendedTeamMember
           }
           
           // Add members
           if (teamData.members && Array.isArray(teamData.members)) {
             teamData.members.forEach(member => {
-              if (typeof member !== 'string' && member._id) {
+              if (typeof member !== 'string') {
                 membersMap[member._id] = {
                   ...member,
                   avatar: `/api/avatar?name=${member.username}`
-                }
+                } as ExtendedTeamMember
               }
             })
           }
@@ -179,19 +177,21 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
         const membersMap: Record<string, TeamMember> = {}
         
         // Add leader
-        if (teamData.leader) {
+        if (teamData.leader && typeof teamData.leader !== 'string') {
           membersMap[teamData.leader._id] = {
             ...teamData.leader,
             avatar: `/api/avatar?name=${teamData.leader.username}`
-          }
+          } as ExtendedTeamMember
         }
         
         // Add members
         if (teamData.members && Array.isArray(teamData.members)) {
           teamData.members.forEach(member => {
-            membersMap[member._id] = {
-              ...member,
-              avatar: `/api/avatar?name=${member.username}`
+            if (typeof member !== 'string') {
+              membersMap[member._id] = {
+                ...member,
+                avatar: `/api/avatar?name=${member.username}`
+              } as ExtendedTeamMember
             }
           })
         }
@@ -270,76 +270,28 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
   const handleToggleComplete = async (taskId: string) => {
     setUpdating(taskId)
     try {
-      // Find the task in our current state
-      const taskToUpdate = tasks.find(t => t._id === taskId);
-      if (!taskToUpdate) {
-        throw new Error("Task not found in current state");
-      }
-
-      // Optimistically update UI first for better user experience
-      const newStatus = taskToUpdate.status === "completed" ? "pending" : "completed";
+      // Call the backend to toggle completion
+      const updatedTask = await taskService.toggleTaskCompletion(taskId);
+      // Update the task in state with the server response
       setTasks(prevTasks => 
-        prevTasks.map(task => task._id === taskId ? 
-          {...task, status: newStatus} : task
-        )
+        prevTasks.map(task => task._id === taskId ? updatedTask : task)
       );
-      
-      // Then send request to server - this will also handle sending notifications
-      try {
-        const updatedTask = await taskService.toggleTaskCompletion(taskId);
-        
-        // Update with actual server response
-        setTasks(prevTasks => 
-          prevTasks.map(task => task._id === taskId ? updatedTask : task)
-        );
-        
-        // Show success toast
-        if (updatedTask.status === "completed") {
-          toast.success("Task completed", {
-            description: `You've marked "${updatedTask.title}" as complete.`,
-          });
-        } else {
-          toast.success("Task reopened", {
-            description: `You've reopened "${updatedTask.title}".`,
-          });
-        }
-      } catch (error: any) {
-        console.warn("Error in response, but task was likely updated:", error);
-        
-        // Even if there's an error from the server, we know the DB was updated
-        // So we keep our optimistic UI update and just show a success message
-        toast.success(`Task ${newStatus === "completed" ? "completed" : "reopened"}`, {
-          description: `The task status was updated successfully.`,
+      // Show success toast
+      if (updatedTask.status === "completed") {
+        toast.success("Task completed", {
+          description: `You've marked \"${updatedTask.title}\" as complete.`,
+        });
+      } else {
+        toast.success("Task reopened", {
+          description: `You've reopened \"${updatedTask.title}\".`,
         });
       }
     } catch (error: any) {
       console.error("Failed to toggle task completion:", error);
-      
-      // Revert the optimistic update by refreshing data
       fetchTasksAndMembers();
-      
-      // Extract error message
-      let errorMessage = "Failed to update task status. Please try again.";
-      if (error.message) {
-        errorMessage = error.message;
-      } else if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      }
-      
-      // Check if it's an auth error
-      const isAuthError = errorMessage.toLowerCase().includes("not authorized") || 
-                          errorMessage.toLowerCase().includes("unauthorized") ||
-                          errorMessage.toLowerCase().includes("not assigned");
-      
-      if (isAuthError) {
-        toast.error("Permission Denied", {
-          description: errorMessage,
-        });
-      } else {
-        toast.error("Error", {
-          description: errorMessage,
-        });
-      }
+      toast.error("Error", {
+        description: error.message || "Failed to update task status. Please try again.",
+      });
     } finally {
       setUpdating(null);
     }
@@ -382,48 +334,39 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
   }
 
   const confirmDeleteTask = async () => {
-    if (!taskToDelete) return
-    
-    const taskId = taskToDelete._id
-    const taskTitle = taskToDelete.title
-    
-    // Immediately close the dialog and clear task to delete state
-    setIsDeleteDialogOpen(false)
-    setTaskToDelete(undefined)
-    
-    // Optimistically update UI first (remove the task from both state arrays)
-    setTasks(prevTasks => prevTasks.filter(task => task._id !== taskId))
-    setFilteredTasks(prevTasks => prevTasks.filter(task => task._id !== taskId))
-    
+    if (!taskToDelete) return;
+
+    const taskId = taskToDelete._id;
+    const taskTitle = taskToDelete.title;
+
     // Show loading toast
-    const loadingToast = toast.loading("Deleting task...")
-    
+    const loadingToast = toast.loading("Deleting task...");
+
     try {
-      // Then perform the actual delete operation in the background
-      await taskService.deleteTask(taskId)
-      
-      // Dismiss loading toast and show success toast
-      toast.dismiss(loadingToast)
+      // Perform the actual delete operation
+      await taskService.deleteTask(taskId);
+
+      // Refresh tasks from backend to ensure UI is in sync
+      await fetchTasksAndMembers();
+
       toast.success("Task deleted", {
         description: `Task "${taskTitle}" has been deleted successfully.`,
-      })
+      });
     } catch (error: any) {
-      console.error("Failed to delete task:", error)
-      
-      // Dismiss loading toast
-      toast.dismiss(loadingToast)
-      
-      // Show error toast
+      console.error("Failed to delete task:", error);
       toast.error("Error", {
         description: error.message || "Failed to delete task. Please try again.",
-      })
-      
-      // Refresh tasks to restore the correct state
+      });
+      // Optionally refresh tasks to restore the correct state
       setTimeout(() => {
-        fetchTasksAndMembers()
-      }, 500)
+        fetchTasksAndMembers();
+      }, 500);
+    } finally {
+      toast.dismiss(loadingToast);
+      setIsDeleteDialogOpen(false);
+      setTaskToDelete(undefined);
     }
-  }
+  };
 
   const handleTaskDialogClose = () => {
     // Close the dialog immediately
@@ -577,91 +520,78 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
           {filteredTasks.map((task) => (
             <Card 
               key={task._id} 
+              style={{
+                background: task.color
+                  ? `${task.color}20` // 12.5% opacity in hex
+                  : 'rgba(79,70,229,0.08)', // fallback indigo
+                border: `1.5px solid ${task.color || '#4f46e5'}30`,
+                boxShadow: '0 2px 12px 0 rgba(0,0,0,0.04)',
+                transition: 'box-shadow 0.2s',
+              }}
               className={cn(
-                "overflow-hidden transition-all duration-200 hover:shadow-md",
-                task.status === "completed" ? "opacity-80" : "",
-                isPastDue(task.dueDate) && task.status !== "completed" ? "border-red-200" : ""
+                'rounded-2xl overflow-hidden hover:shadow-lg group flex flex-col min-h-[220px] p-0',
+                task.status === 'completed' ? 'opacity-80' : '',
+                isPastDue(task.dueDate) && task.status !== 'completed' ? 'ring-2 ring-red-200' : ''
               )}
             >
-              {/* Color indicator strip */}
-              <div className="h-1.5 w-full" style={{ backgroundColor: task.color || "#4f46e5" }} />
-              
-              <CardHeader className="p-4 pb-0">
-                <div className="flex justify-between items-start gap-2">
-                  <div className="flex items-center gap-2">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 rounded-full"
-                            onClick={() => handleToggleComplete(task._id)}
-                            disabled={updating === task._id}
-                          >
-                            {updating === task._id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : task.status === "completed" ? (
-                              <CheckCircle className="h-4 w-4 text-green-500 fill-green-500" />
-                            ) : (
-                              <Circle className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          {task.status === "completed" ? "Mark as incomplete" : "Mark as complete"}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    
-                    <CardTitle 
-                      className={cn(
-                        "text-base font-medium line-clamp-1",
-                        task.status === "completed" && "line-through text-muted-foreground"
-                      )}
+              {/* Color accent bar */}
+              <div className="h-1.5 w-full" style={{ backgroundColor: task.color || '#4f46e5' }} />
+              <div className="flex flex-col flex-1 p-5 gap-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 rounded-full border border-muted-foreground/10 bg-white/60 hover:bg-white"
+                      onClick={() => handleToggleComplete(task._id)}
+                      disabled={updating === task._id}
+                      aria-label={task.status === 'completed' ? 'Mark as incomplete' : 'Mark as complete'}
                     >
+                      {updating === task._id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : task.status === 'completed' ? (
+                        <CheckCircle className="h-4 w-4 text-green-500 fill-green-500" />
+                      ) : (
+                        <Circle className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                    <span className={cn(
+                      'text-lg font-bold',
+                      task.status === 'completed' && 'line-through text-muted-foreground'
+                    )}>
                       {task.title}
-                    </CardTitle>
-                  </div>
-                  
-                  <Badge
-                    variant={
-                      task.priority === "high" ? "destructive" : 
-                      task.priority === "medium" ? "default" : "outline"
-                    }
-                    className="capitalize"
-                  >
-                    {task.priority}
-                  </Badge>
-                </div>
-                
-                {task.dueDate && (
-                  <div className="flex items-center text-xs mt-2">
-                    <Clock className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
-                    <span 
-                      className={cn(
-                        "text-xs",
-                        isPastDue(task.dueDate) && task.status !== "completed" 
-                          ? "text-red-500 font-medium" 
-                          : "text-muted-foreground"
-                      )}
-                    >
-                      Due {getTimeUntilDue(task.dueDate)}
                     </span>
                   </div>
-                )}
-              </CardHeader>
-
-              <CardContent className="p-4 pt-3">
+                  <div className="flex flex-col items-end gap-1 min-w-[80px]">
+                    <Badge
+                      variant={
+                        task.priority === 'high' ? 'destructive' :
+                        task.priority === 'medium' ? 'default' : 'outline'
+                      }
+                      className={cn('capitalize text-xs px-2 py-0.5',
+                        task.priority === 'high' && 'bg-red-500/90 text-white',
+                        task.priority === 'medium' && 'bg-amber-400/80 text-amber-900',
+                        task.priority === 'low' && 'bg-green-400/80 text-green-900')}
+                    >
+                      {task.priority}
+                    </Badge>
+                    <span className={cn(
+                      'text-xs font-medium',
+                      isPastDue(task.dueDate) && task.status !== 'completed'
+                        ? 'text-red-500' : 'text-muted-foreground')
+                    }>
+                      {task.dueDate ? `Due ${getTimeUntilDue(task.dueDate)}` : ''}
+                    </span>
+                  </div>
+                </div>
                 {task.description && (
-                  <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                  <p className="text-sm text-muted-foreground line-clamp-2 mb-1">
                     {task.description}
                   </p>
                 )}
-                
                 {/* Assigned members */}
                 {task.assignedMembers.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2 mt-1">
                     <div className="flex -space-x-2">
                       {task.assignedMembers.slice(0, 3).map(memberId => {
                         const member = teamMembers[memberId]
@@ -669,25 +599,24 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
                           <TooltipProvider key={memberId}>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Avatar className="h-8 w-8 border-2 border-background">
+                                <Avatar className="h-8 w-8 border-2 border-background shadow-sm">
                                   <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                                    {member?.username.substring(0, 2).toUpperCase() || "??"}
+                                    {member?.username.substring(0, 2).toUpperCase() || '??'}
                                   </AvatarFallback>
                                 </Avatar>
                               </TooltipTrigger>
                               <TooltipContent side="bottom">
-                                {member?.username || "Unknown Member"}
+                                {member?.username || 'Unknown Member'}
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
                         )
                       })}
-                      
                       {task.assignedMembers.length > 3 && (
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <div className="flex items-center justify-center h-8 w-8 rounded-full bg-muted text-xs font-medium">
+                              <div className="flex items-center justify-center h-8 w-8 rounded-full bg-muted text-xs font-medium border-2 border-background">
                                 +{task.assignedMembers.length - 3}
                               </div>
                             </TooltipTrigger>
@@ -696,7 +625,7 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
                                 const member = teamMembers[memberId]
                                 return (
                                   <div key={memberId}>
-                                    {member?.username || "Unknown Member"}
+                                    {member?.username || 'Unknown Member'}
                                   </div>
                                 )
                               })}
@@ -705,16 +634,15 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
                         </TooltipProvider>
                       )}
                     </div>
-                    
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 ml-1">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleToggleComplete(task._id)}>
-                          {task.status === "completed" ? (
+                          {task.status === 'completed' ? (
                             <>Mark as incomplete</>
                           ) : (
                             <>Mark as complete</>
@@ -736,14 +664,13 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
                     </DropdownMenu>
                   </div>
                 )}
-              </CardContent>
-              
-              {task.status === "completed" && (
-                <CardFooter className="px-4 py-2 bg-muted/50 flex justify-between items-center text-xs text-muted-foreground">
-                  <span>Completed</span>
-                  <span>{task.updatedAt ? format(new Date(task.updatedAt), "MMM d, yyyy") : format(new Date(task.createdAt), "MMM d, yyyy")}</span>
-                </CardFooter>
-              )}
+                {task.status === 'completed' && (
+                  <div className="flex items-center gap-2 mt-2 text-xs text-green-700 font-semibold">
+                    <CheckCircle className="h-4 w-4" />
+                    Completed {task.updatedAt ? format(new Date(task.updatedAt), 'MMM d, yyyy') : format(new Date(task.createdAt), 'MMM d, yyyy')}
+                  </div>
+                )}
+              </div>
             </Card>
           ))}
         </div>
@@ -792,3 +719,4 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
     </div>
   )
 }
+

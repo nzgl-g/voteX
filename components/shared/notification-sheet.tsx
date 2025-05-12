@@ -23,7 +23,6 @@ type NotificationWithUI = Notification & {
 interface NotificationSheetProps {
   notifications: NotificationWithUI[];
   onNotificationClick: (notification: NotificationWithUI) => void;
-  unreadCount: number;
   open: boolean;
   setOpen: (open: boolean) => void;
   triggerClassName?: string;
@@ -35,7 +34,6 @@ interface NotificationSheetProps {
 export function NotificationSheet({
   notifications,
   onNotificationClick,
-  unreadCount,
   open,
   setOpen,
   onAccept,
@@ -54,14 +52,6 @@ export function NotificationSheet({
             aria-label="Notifications"
           >
             <Bell className="h-5 w-5" />
-            {unreadCount > 0 && (
-              <Badge
-                variant="destructive"
-                className="absolute -top-1.5 -right-1.5 h-5 w-5 flex items-center justify-center p-0 text-[10px] rounded-full"
-              >
-                {unreadCount}
-              </Badge>
-            )}
           </button>
         </SheetTrigger>
       )}
@@ -75,9 +65,7 @@ export function NotificationSheet({
             {notifications.map((notification) => (
               <div
                 key={notification._id || notification.id || Math.random().toString()}
-                className={`rounded-lg border p-3 shadow-sm transition-colors ${
-                  notification.read ? "bg-background" : "bg-muted"
-                }`}
+                className={`rounded-lg border p-3 shadow-sm transition-colors`}
               >
                 <div className="flex justify-between items-center mb-2">
                   <Badge

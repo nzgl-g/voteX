@@ -4,25 +4,22 @@ export interface Task {
   _id: string;
   title: string;
   description?: string;
-  assignedTo: string;
-  assignedBy: string;
-  sessionId: string;
-  status: 'pending' | 'in-progress' | 'completed' | 'cancelled';
+  assignedMembers: string[];
+  session: string; // This matches the server model
+  sessionId?: string; // This is for compatibility with frontend components
+  status: 'pending' | 'completed';
   dueDate?: string;
   priority: 'low' | 'medium' | 'high';
   createdAt: string;
-  completedAt?: string;
   color?: string;
-  assignedMembers: string[];
   updatedAt?: string;
 }
 
 export interface CreateTaskData {
   title: string;
   description?: string;
-  assignedTo?: string;
-  assignedMembers?: string[];
-  sessionId: string;
+  assignedMembers: string[];
+  session: string; // This matches the server model
   dueDate?: string;
   priority: 'low' | 'medium' | 'high';
   color?: string;
@@ -134,8 +131,8 @@ class TaskService {
    */
   async toggleTaskCompletion(taskId: string): Promise<Task> {
     try {
-      const response = await baseApi.put<Task>(`/tasks/${taskId}/toggle-completion`);
-      return response.data;
+      const response = await baseApi.patch<{ message: string; task: Task }>(`/tasks/${taskId}/complete`);
+      return response.data.task;
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || 'Failed to toggle task completion';
       throw new Error(errorMessage);

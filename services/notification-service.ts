@@ -6,7 +6,6 @@ export interface Notification {
   title: string;
   message: string;
   type: 'task' | 'invitation' | 'session' | 'candidate' | 'system';
-  read: boolean;
   createdAt: string;
   relatedId?: string;
 }
@@ -21,47 +20,6 @@ class NotificationService {
       return response.data;
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || 'Failed to fetch notifications';
-      throw new Error(errorMessage);
-    }
-  }
-
-  /**
-   * Get unread notifications count
-   */
-  async getUnreadCount(): Promise<{ count: number }> {
-    try {
-      const response = await baseApi.get<{ count: number }>('/notifications/unread/count');
-      return response.data;
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to fetch unread count';
-      throw new Error(errorMessage);
-    }
-  }
-
-  /**
-   * Mark a notification as read
-   */
-  async markAsRead(notificationId: string): Promise<Notification> {
-    try {
-      const response = await baseApi.put<Notification>(`/notifications/${notificationId}`, {
-        read: true
-      });
-      return response.data;
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to mark notification as read';
-      throw new Error(errorMessage);
-    }
-  }
-
-  /**
-   * Mark all notifications as read
-   */
-  async markAllAsRead(): Promise<{ message: string; count: number }> {
-    try {
-      const response = await baseApi.put<{ message: string; count: number }>('/notifications/read-all', {});
-      return response.data;
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to mark all notifications as read';
       throw new Error(errorMessage);
     }
   }

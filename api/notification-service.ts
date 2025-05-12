@@ -8,7 +8,6 @@ export interface NotificationPayload {
   targetType: 'user' | 'team' | 'all';
   category: 'Alert' | 'Interaction';
   timestamp: string;
-  read: boolean;
   createdAt: string;
 }
 
@@ -22,14 +21,6 @@ export const notificationService = {
   async getUserNotifications(limit = 5, skip = 0): Promise<NotificationPayload[]> {
     const response = await api.get(`/notifications?limit=${limit}&skip=${skip}`);
     return response.data;
-  },
-
-  /**
-   * Mark notification as read
-   * @param notificationId ID of the notification to mark as read
-   */
-  async markAsRead(notificationId: string): Promise<void> {
-    await api.patch(`/notifications/${notificationId}/read`);
   },
   
   /**

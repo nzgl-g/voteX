@@ -14,7 +14,6 @@ type NotificationWithUI = Notification & {
 
 type NotificationContextType = {
   notifications: NotificationWithUI[];
-  unreadCount: number;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
   handleNotificationClick: (notification: NotificationWithUI) => void;
@@ -35,7 +34,6 @@ export function useNotificationContext() {
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [notifications, setNotifications] = useState<NotificationWithUI[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
 
@@ -54,7 +52,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     const fetchNotifications = async () => {
       try {
         const notificationsData = await notificationService.getNotifications();
-        
         // Transform to UI format
         const uiNotifications = notificationsData.map(notification => {
           const notificationWithUI: NotificationWithUI = {
@@ -65,17 +62,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           };
           return notificationWithUI;
         });
-        
         setNotifications(uiNotifications);
-        
-        // Get unread count
-        const unreadData = await notificationService.getUnreadCount();
-        setUnreadCount(unreadData.count);
       } catch (error: any) {
         console.error('Failed to fetch notifications:', error.message);
       }
     };
-
     fetchNotifications();
   }, []);
 
@@ -160,7 +151,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         };
         
         setNotifications(prev => [uiNotification, ...prev]);
-        setUnreadCount(count => count + 1);
       });
 
       setSocket(socketInstance);
@@ -182,7 +172,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const notification = event.detail as NotificationWithUI;
       console.log('Mock notification received:', notification);
       setNotifications(prev => [notification, ...prev]);
-      setUnreadCount(count => count + 1);
     };
 
     window.addEventListener('mock-notification', handleMockNotification as EventListener);
@@ -194,76 +183,28 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   // Handle notification click
   const handleNotificationClick = useCallback(async (notification: NotificationWithUI) => {
-    try {
-      // Mark as read on the server
-      if (notification._id && !notification.read) {
-        await notificationService.markAsRead(notification._id);
-      }
-      
-      // Update local state
-      setNotifications(prev => 
-        prev.map(n => n._id === notification._id ? { ...n, read: true } : n)
-      );
-      setUnreadCount(count => Math.max(0, count - 1));
-
-      // Close the notification panel
-      setIsOpen(false);
-    } catch (error: any) {
-      console.error('Error marking notification as read:', error.message);
-    }
+    // Only close the notification panel and navigate, no markAsRead
+    setIsOpen(false);
   }, []);
 
   // Handle accept interaction
   const handleAccept = useCallback(async (notification: NotificationWithUI) => {
+    // Only close the notification panel and log, no markAsRead
+    setIsOpen(false);
     console.log('Accept notification:', notification);
-    
-    try {
-      // Mark as read on the server
-      if (notification._id && !notification.read) {
-        await notificationService.markAsRead(notification._id);
-      }
-      
-      // Update local state
-      setNotifications(prev => 
-        prev.map(n => n._id === notification._id ? { ...n, read: true } : n)
-      );
-      setUnreadCount(count => Math.max(0, count - 1));
-      
-      // TODO: Handle the accept action based on notification type
-      // This would typically involve calling another service method
-    } catch (error: any) {
-      console.error('Error accepting notification:', error.message);
-    }
   }, []);
 
   // Handle decline interaction
   const handleDecline = useCallback(async (notification: NotificationWithUI) => {
+    // Only close the notification panel and log, no markAsRead
+    setIsOpen(false);
     console.log('Decline notification:', notification);
-    
-    try {
-      // Mark as read on the server
-      if (notification._id && !notification.read) {
-        await notificationService.markAsRead(notification._id);
-      }
-      
-      // Update local state
-      setNotifications(prev => 
-        prev.map(n => n._id === notification._id ? { ...n, read: true } : n)
-      );
-      setUnreadCount(count => Math.max(0, count - 1));
-      
-      // TODO: Handle the decline action based on notification type
-      // This would typically involve calling another service method
-    } catch (error: any) {
-      console.error('Error declining notification:', error.message);
-    }
   }, []);
 
   return (
     <NotificationContext.Provider
       value={{
         notifications,
-        unreadCount,
         isOpen,
         setIsOpen,
         handleNotificationClick,
@@ -274,7 +215,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       {children}
       <NotificationSheet
         notifications={notifications}
-        unreadCount={unreadCount}
         open={isOpen}
         setOpen={setIsOpen}
         onNotificationClick={handleNotificationClick}

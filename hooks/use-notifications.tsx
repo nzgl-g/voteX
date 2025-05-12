@@ -6,7 +6,6 @@ import { notificationService, NotificationPayload } from '@/api/notification-ser
 export function useNotifications() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [notifications, setNotifications] = useState<NotificationPayload[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
 
@@ -48,7 +47,6 @@ export function useNotifications() {
 
       socketInstance.on('new-notification', (notification: NotificationPayload) => {
         setNotifications(prev => [notification, ...prev]);
-        setUnreadCount(count => count + 1);
       });
 
       setSocket(socketInstance);
@@ -67,7 +65,6 @@ export function useNotifications() {
       try {
         const data = await notificationService.getUserNotifications(10, 0);
         setNotifications(data);
-        setUnreadCount(data.filter(n => !n.read).length);
       } catch (error) {
         console.error('Failed to fetch notifications:', error);
       }
@@ -78,18 +75,6 @@ export function useNotifications() {
 
   // Handle notification click
   const handleNotificationClick = useCallback((notification: NotificationPayload) => {
-    // Mark as read
-    if (!notification.read) {
-      notificationService.markAsRead(notification.id)
-        .then(() => {
-          setNotifications(prev => 
-            prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
-          );
-          setUnreadCount(count => Math.max(0, count - 1));
-        })
-        .catch(error => console.error('Failed to mark notification as read:', error));
-    }
-
     // Navigate to the link
     if (notification.link) {
       setIsOpen(false);
@@ -101,16 +86,6 @@ export function useNotifications() {
   const handleAccept = useCallback((notification: NotificationPayload) => {
     // Implementation depends on the type of notification
     console.log('Accept notification:', notification);
-    
-    // Mark as read
-    notificationService.markAsRead(notification.id)
-      .then(() => {
-        setNotifications(prev => 
-          prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
-        );
-        setUnreadCount(count => Math.max(0, count - 1));
-      });
-      
     // Navigate to appropriate page based on notification type
     if (notification.link) {
       setIsOpen(false);
@@ -122,20 +97,10 @@ export function useNotifications() {
   const handleDecline = useCallback((notification: NotificationPayload) => {
     // Implementation depends on the type of notification
     console.log('Decline notification:', notification);
-    
-    // Mark as read
-    notificationService.markAsRead(notification.id)
-      .then(() => {
-        setNotifications(prev => 
-          prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
-        );
-        setUnreadCount(count => Math.max(0, count - 1));
-      });
   }, []);
 
   return {
     notifications,
-    unreadCount,
     isOpen,
     setIsOpen,
     handleNotificationClick,

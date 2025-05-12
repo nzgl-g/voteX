@@ -303,8 +303,42 @@ class SessionService {
    */
   async getSessionTeam(sessionId: string): Promise<string> {
     try {
-      const response = await baseApi.get<{ teamId: string }>(`/sessions/${sessionId}/team`);
-      return response.data.teamId;
+      // First, get the session data which includes the team reference
+      const session = await this.getSessionById(sessionId);
+      
+      // Check if the session has a team property
+      if (!session.team) {
+        throw new Error(`No team associated with session ${sessionId}`);
+      }
+      
+      // Make sure we return a string (not an object)
+      let teamId: string;
+      
+      if (typeof session.team === 'string') {
+        teamId = session.team;
+      } else if (session.team && typeof session.team === 'object') {
+        // Define a type guard for objects with _id property
+        const hasIdProperty = (obj: any): obj is { _id: string } => {
+          return obj && typeof obj === 'object' && '_id' in obj && typeof obj._id === 'string';
+        };
+        
+        // Use the type guard to safely access the _id property
+        if (hasIdProperty(session.team)) {
+          teamId = session.team._id;
+        } else {
+          // Last resort, convert to string
+          teamId = String(session.team);
+        }
+      } else {
+        throw new Error(`Team property has invalid format for session ${sessionId}`);
+      }
+      
+      if (!teamId || typeof teamId !== 'string') {
+        throw new Error(`Invalid team ID format for session ${sessionId}`);
+      }
+      
+      // Return the team ID as a string
+      return teamId;
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || `Failed to get team for session ${sessionId}`;
       throw new Error(errorMessage);

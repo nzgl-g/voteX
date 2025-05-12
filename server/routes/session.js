@@ -393,10 +393,10 @@ router.patch("/edit-requests/:requestId/approve", auth, async (req, res) => {
 
 //dir ghir contract address f body
 router.patch("/:sessionId/contract-address", async (req, res) => {
-  const authToken = req.headers["x-auth-token"];
-  if (authToken !== process.env.VOTE_UPDATE_SECRET) {
-    return res.status(403).json({ error: "Forbidden" });
-  }
+  // const authToken = req.headers["x-auth-token"];
+  // if (authToken !== process.env.VOTE_UPDATE_SECRET) {
+  //   return res.status(403).json({ error: "Forbidden" });
+  // }
   const sessionId = req.params.sessionId;
   const { contractAddress } = req.body;
   if (!/^0x[a-fA-F0-9]{40}$/.test(contractAddress)) {
@@ -424,10 +424,10 @@ router.patch("/:sessionId/contract-address", async (req, res) => {
 //   ]
 // }
 router.patch("/:sessionId/vote-counts", async (req, res) => {
-  const authToken = req.headers["x-auth-token"];
-  if (authToken !== process.env.VOTE_UPDATE_SECRET) {
-    return res.status(403).json({ error: "Forbidden" });
-  }
+  // const authToken = req.headers["x-auth-token"];
+  // if (authToken !== process.env.VOTE_UPDATE_SECRET) {
+  //   return res.status(403).json({ error: "Forbidden" });
+  // }
   const { sessionId } = req.params;
   const { type, counts } = req.body;
 

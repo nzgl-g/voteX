@@ -28,6 +28,7 @@ const notificationSchema = new mongoose.Schema({
       "session-edit-approved",
       "task-assigned",
       "task-completed",
+      "task-uncompleted",
       "team-member-removed",
       "support-response",
       "system",

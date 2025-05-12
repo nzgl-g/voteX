@@ -131,8 +131,8 @@ router.patch("/:taskId/complete", auth, async (req, res) => {
     task.status = wasCompleted ? "pending" : "completed";
     await task.save();
 
+    const team = await Team.findById(task.session.team);
     if (!wasCompleted) {
-      const team = await Team.findById(task.session.team);
       await sendNotification(req, {
         recipients: [team.leader],
         type: "task-completed",
@@ -141,7 +141,15 @@ router.patch("/:taskId/complete", auth, async (req, res) => {
         targetType: "user",
       });
     }
-
+    if (wasCompleted) {
+      await sendNotification(req, {
+        recipients: [team.leader],
+        type: "task-uncompleted",
+        message: `A member has marked the task "${task.title}" as not completed.`,
+        link: `/tasks/${task._id}`,
+        targetType: "user",
+      });
+    }
     res.status(200).json({
       message: `Task marked as ${task.status}`,
       task,

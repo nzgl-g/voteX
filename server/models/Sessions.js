@@ -86,7 +86,7 @@ const sessionSchema = new mongoose.Schema({
 
   securityMethod: {
     type: String,
-    enum: ["Secret Phrase", "Area Restriction", null],
+    enum: ["Secret Phrase", "Area Restriction"],
     default: null,
   },
   secretPhrase: {
@@ -96,7 +96,7 @@ const sessionSchema = new mongoose.Schema({
   },
   verificationMethod: {
     type: String,
-    enum: ["KYC", "CVC", null],
+    enum: ["KYC", "CVC"],
     default: null,
   },
   candidateRequests: [

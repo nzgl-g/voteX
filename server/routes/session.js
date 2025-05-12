@@ -7,6 +7,7 @@ const SessionEditRequest = require("../models/SessionEditRequest");
 const Team = require("../models/Team");
 const auth = require("../middleware/auth");
 const sendNotification = require("../helpers/sendNotification");
+const isTeamLeader = require("../middleware/isTeamLeader");
 const router = express.Router();
 router.get("/", async (req, res) => {
   try {
@@ -181,7 +182,6 @@ router.post("/", auth, async (req, res) => {
       bracket,
       maxRounds,
       maxChoices,
-      contractAddress,
     } = req.body;
     if (secretPhrase) {
       const existingSession = await Session.findOne({ secretPhrase });
@@ -216,7 +216,6 @@ router.post("/", auth, async (req, res) => {
       ...(type === "election" && { candidates, maxChoices }),
       ...(type === "poll" && { options, maxChoices }),
       ...(type === "tournament" && { tournamentType, bracket, maxRounds }),
-      contractAddress,
     });
 
     await session.save();
@@ -303,85 +302,23 @@ router.patch("/:sessionId/edit-request", auth, async (req, res) => {
     await sendNotification(req, {
       recipients: [session.team.leader],
       type: "session-edit-request",
-      message: `${req.user.username || req.user._id} has requested to edit the session.`,
+      message: `${
+        req.user.username || req.user._id
+      } has requested to edit the session.`,
       link: `/sessions/${sessionId}`,
       targetType: "user",
     });
 
-    res.status(201).json({ 
-      message: "Edit request submitted.", 
+    res.status(201).json({
+      message: "Edit request submitted.",
       editRequest,
-      needsApproval: true
+      needsApproval: true,
     });
   } catch (err) {
     console.error("Submit edit request error:", err);
     res
       .status(500)
       .json({ error: "Failed to submit edit request", details: err.message });
-  }
-});
-
-router.post("/:sessionId/vote-counts", auth, async (req, res) => {
-  try {
-    const sessionId = req.params.sessionId;
-    const { type, voteCounts, voterCount, source } = req.body;
-    
-    if (!isValidObjectId(sessionId)) {
-      return res.status(400).json({ error: "Invalid session ID" });
-    }
-
-    if (!type || !voteCounts || !Array.isArray(voteCounts)) {
-      return res.status(400).json({ error: "Invalid vote count data" });
-    }
-
-    const session = await Session.findById(sessionId);
-    if (!session) {
-      return res.status(404).json({ error: "Session not found" });
-    }
-
-    // Update the vote counts based on session type
-    if (type === 'election' && session.candidates) {
-      // Update candidate vote counts
-      voteCounts.forEach(({ id, votes }) => {
-        const candidate = session.candidates.id(id);
-        if (candidate) {
-          candidate.totalVotes = votes;
-        }
-      });
-    } else if (type === 'poll' && session.options) {
-      // Update poll option vote counts
-      voteCounts.forEach(({ id, votes }) => {
-        const optionIndex = session.options.findIndex(opt => 
-          opt._id.toString() === id);
-        if (optionIndex !== -1) {
-          session.options[optionIndex].totalVotes = votes;
-        }
-      });
-    }
-
-    // Add information to results metadata
-    if (!session.results) {
-      session.results = {};
-    }
-    
-    // Record blockchain sync information if source is blockchain
-    if (source === 'blockchain') {
-      session.results.lastBlockchainSync = new Date();
-      session.results.blockchainVoterCount = voterCount;
-    }
-
-    await session.save();
-    res.status(200).json({ 
-      message: "Vote counts updated successfully", 
-      source,
-      voterCount
-    });
-  } catch (err) {
-    console.error("Error updating vote counts:", err);
-    res.status(500).json({ 
-      error: "Failed to update vote counts", 
-      details: err.message 
-    });
   }
 });
 
@@ -454,6 +391,81 @@ router.patch("/edit-requests/:requestId/approve", auth, async (req, res) => {
   }
 });
 
+//dir ghir contract address f body
+router.patch(
+  "/:sessionId/contract-address",
+  auth,
+  isTeamLeader,
+  async (req, res) => {
+    const sessionId = req.params.sessionId;
+    const { contractAddress } = req.body;
+    if (!/^0x[a-fA-F0-9]{40}$/.test(contractAddress)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid contract address format" });
+    }
+    try {
+      const session = await Session.findByIdAndUpdate(
+        sessionId,
+        { contractAddress },
+        { new: true }
+      );
+      if (!session)
+        return res.status(404).json({ message: "Session not found" });
+
+      res.status(200).json({ message: "Contract address updated", session });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Server error" });
+    }
+  }
+);
+//body should be like this
+// {
+//   "type": "candidate",
+//   "counts": [
+//     { "id": "68226e77908dc1b0d5a8ba0e", "totalVotes": 200 }
+//   ]
+// }
+router.patch("/:sessionId/vote-counts", async (req, res) => {
+  const authToken = req.headers["x-auth-token"];
+  if (authToken !== process.env.VOTE_UPDATE_SECRET) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const { sessionId } = req.params;
+  const { type, counts } = req.body;
+
+  if (!["candidate", "option"].includes(type)) {
+    return res.status(400).json({ error: "Invalid type" });
+  }
+
+  try {
+    const session = await Session.findById(sessionId);
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    if (type === "candidate") {
+      counts.forEach(({ id, totalVotes }) => {
+        const candidate = session.candidates.id(id);
+        if (candidate) {
+          console.log(candidate);
+          candidate.totalVotes = totalVotes;
+        }
+      });
+    } else if (type === "option" && session.options) {
+      counts.forEach(({ id, totalVotes }) => {
+        const option = session.options.id(id);
+        if (option) {
+          option.totalVotes = totalVotes;
+        }
+      });
+    }
+    await session.save();
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 module.exports = router;
 // currently using simple middleware to make testing the logic easy
 // after everything is done we can add moed detailed middleware .

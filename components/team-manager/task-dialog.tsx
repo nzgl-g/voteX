@@ -23,9 +23,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils"
 import { format, set } from "date-fns"
 import { CalendarIcon, Clock, Loader2, CheckCircle2 } from "lucide-react"
-import { teamService, TeamMember as ApiTeamMember } from "@/api/team-service"
-import { sessionService } from "@/api/session-service"
-import { taskService, Task } from "@/api/task-service"
+import { teamService, TeamMember as ApiTeamMember } from "@/services/team-service"
+import { sessionService } from "@/services/session-service"
+import { taskService, Task } from "@/services/task-service"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 // Predefined productive colors
@@ -198,6 +198,7 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
       dueDate: dueDateTime ? dueDateTime.toISOString() : undefined,
       assignedMembers,
       color,
+      sessionId: sessionId, // Fix: changed 'session' to 'sessionId'
     }
     
     if (isEditMode && taskToEdit) {
@@ -223,7 +224,7 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
       // Create new task
       taskService.createTask({
         ...taskData,
-        session: sessionId
+        sessionId: sessionId
       })
         .then(createdTask => {
           toast.success("Task created", {

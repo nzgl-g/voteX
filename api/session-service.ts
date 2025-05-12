@@ -89,6 +89,8 @@ export interface Session {
   tournamentType?: 'Round Robin' | 'Knockout' | 'Swiss' | null;
   bracket?: any;
   maxRounds?: number;
+  // Blockchain integration
+  contractAddress?: string;
 }
 
 export interface CreateSessionParams {
@@ -247,9 +249,9 @@ export const sessionService = {
    * Get a session by its ID
    * @param sessionId The ID of the session
    * @param fields Optional comma-separated list of fields to return
-   * @returns Session object or selected fields
+   * @returns Session object or selected fields, or null if not found
    */
-  async getSessionById(sessionId: string, fields?: string): Promise<Session | Partial<Session>> {
+  async getSessionById(sessionId: string, fields?: string): Promise<Session | Partial<Session> | null> {
     try {
       if (!sessionId) {
         throw new Error("Session ID is required");
@@ -260,16 +262,49 @@ export const sessionService = {
         ? `/sessions/${sessionId}?fields=${encodeURIComponent(fields)}`
         : `/sessions/${sessionId}`;
         
-      console.log(`Fetching session with URL: ${url}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Fetching session with URL: ${url}`);
+      }
+      
       const response = await api.get(url);
       return response.data;
     } catch (error: any) {
-      console.error(`Failed to fetch session with ID ${sessionId}:`, error);
-      if (error.response?.status === 400) {
-        throw new Error("Invalid session ID format");
-      } else if (error.response?.status === 404) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error(`Failed to fetch session with ID ${sessionId}:`, error);
+      }
+      
+      // Check if this is a "not found" error
+      const isNotFound = 
+        error.response?.status === 404 || 
+        error.response?.data?.notFound === true ||
+        error.message?.includes("Session not found") ||
+        error.message?.includes("Resource not found");
+      
+      // Special handling for session-selector component or similar callers
+      // that should handle missing sessions gracefully
+      if (isNotFound) {
+        // Check if caller is the session-selector
+        const stack = new Error().stack || '';
+        const callerIsSessionSelector = 
+          stack.includes('session-selector') || 
+          fields?.includes('name,type,subscription') ||
+          // Check if we're being called from the team listing
+          stack.includes('getUserTeams');
+        
+        if (callerIsSessionSelector) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`Session ${sessionId} not found, returning null for session-selector`);
+          }
+          return null;
+        }
+        
         throw new Error("Session not found");
       }
+      
+      if (error.response?.status === 400) {
+        throw new Error("Invalid session ID format");
+      }
+      
       throw new Error(error.response?.data?.message || "Failed to fetch session");
     }
   },

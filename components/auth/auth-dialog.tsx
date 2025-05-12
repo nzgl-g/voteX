@@ -23,7 +23,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { sessionService } from "@/api/session-service"
+import { sessionService } from "@/services/session-service"
+import { authService } from "@/services/auth-service"
 
 // Login form types
 type LoginFormData = {
@@ -105,8 +106,11 @@ export function AuthDialog({
     setLoginError(null)
     
     try {
-      const { authApi } = await import('@/lib/api')
-      const result = await authApi.login(data.email, data.password)
+      // Use the new authService instead of the old authApi
+      const result = await authService.login({
+        email: data.email,
+        password: data.password
+      })
       console.log('Login successful:', result)
       
       // Check if there's a redirect destination stored in localStorage
@@ -143,21 +147,21 @@ export function AuthDialog({
             
             if (memberData.sessions && memberData.sessions.length > 0) {
               // User has team member sessions, redirect to the first one
-              router.push(`/team-member/monitoring/${memberData.sessions[0]._id}`)
+              router.push(`/team-member/session/${memberData.sessions[0]._id}`)
             } else {
-              // User has no sessions, redirect to voter portal
-              router.push('/voter')
+              // User has no sessions, redirect to dashboard
+              router.push('/dashboard')
             }
           }
         } catch (error) {
           console.error('Error fetching sessions:', error)
-          // Default fallback if session fetch fails
-          router.push('/voter')
+          // Fallback to dashboard on error
+          router.push('/dashboard')
         }
       }
-    } catch (err: any) {
-      setLoginError(err.message || 'Failed to login. Please check your credentials and try again.')
-      console.error('Login error:', err)
+    } catch (error: any) {
+      console.error('Login error:', error)
+      setLoginError(error.message || 'Login failed. Please check your credentials and try again.')
     } finally {
       setIsLoginLoading(false)
     }
@@ -165,59 +169,56 @@ export function AuthDialog({
 
   // Handle signup submission
   const onSignupSubmit = async (data: SignupFormData) => {
+    setIsSignupLoading(true)
+    setSignupError(null)
+    
+    // Check if passwords match
     if (data.password !== data.confirmPassword) {
       setSignupFormError('confirmPassword', {
         type: 'manual',
         message: 'Passwords do not match'
       })
+      setIsSignupLoading(false)
       return
     }
-
-    setIsSignupLoading(true)
-    setSignupError(null)
-
+    
     try {
-      const { authApi } = await import('@/lib/api')
-      const result = await authApi.signup(
-        data.username, 
-        data.email, 
-        data.password, 
-        data.gender,
-        data.fullName
-      )
+      // Use the new authService instead of the old authApi
+      const result = await authService.signup({
+        username: data.username,
+        email: data.email,
+        password: data.password,
+        gender: data.gender,
+        fullName: data.fullName
+      })
+      
       console.log('Signup successful:', result)
-      
-      // Check if signup is triggered from navbar
-      const navbarSignup = localStorage.getItem('navbarSignup') === 'true'
-      // Check if there's a redirect destination stored in localStorage
-      const redirectAfterLogin = localStorage.getItem('redirectAfterLogin')
-      
       handleDialogClose()
       
-      if (navbarSignup) {
-        localStorage.removeItem('navbarSignup')
-        router.push('/voter')
-      } else if (redirectAfterLogin) {
+      // Check if there's a redirect destination stored in localStorage
+      const redirectAfterSignup = localStorage.getItem('redirectAfterLogin')
+      
+      if (redirectAfterSignup) {
         // Clear the redirect info
         localStorage.removeItem('redirectAfterLogin')
         
-        if (redirectAfterLogin === 'pricing') {
+        if (redirectAfterSignup === 'pricing') {
           // Redirect to home page with pricing dialog
           router.push('/?showPricing=true')
-        } else if (redirectAfterLogin.startsWith('session-setup')) {
+        } else if (redirectAfterSignup.startsWith('session-setup')) {
           // Redirect to session creation with the plan parameter preserved
-          router.push(`/${redirectAfterLogin}`)
+          router.push(`/${redirectAfterSignup}`)
         } else {
           // Handle any other redirects
-          router.push(`/${redirectAfterLogin}`)
+          router.push(`/${redirectAfterSignup}`)
         }
       } else {
-        // After signup, always redirect to voter portal
-        router.push('/voter')
+        // Redirect to dashboard after signup
+        router.push('/dashboard')
       }
-    } catch (err: any) {
-      setSignupError(err.message || 'Failed to sign up. Please check your connection and try again.')
-      console.error('Signup error:', err)
+    } catch (error: any) {
+      console.error('Signup error:', error)
+      setSignupError(error.message || 'Signup failed. Please try again.')
     } finally {
       setIsSignupLoading(false)
     }

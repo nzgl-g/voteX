@@ -1,108 +1,137 @@
-serve# Blockchain Voting System
+# Vote System - Blockchain Component
 
-A decentralized voting system built on Ethereum that enables Team Leaders to create and manage isolated voting sessions.
+This directory contains the blockchain component of the Vote System, built using Solidity smart contracts and Hardhat.
 
-## Features
+## Architecture
 
-- Modular and isolated voting sessions
-- Team Leader controlled sessions
-- Support for multiple voting types:
-  - **Poll** - Simple polling with options
-  - **Election** - Formal election with candidates
-- Support for multiple voting modes:
-  - **Single Choice** - Traditional one vote per voter
-  - **Multiple Choice** - Select up to N options
-  - **Ranked Choice** - Rank options by preference
-- Gas-efficient design with minimal on-chain storage
-- Protection against double voting
+The blockchain component consists of two main contracts:
 
-## Contract Architecture
+1. **VoteSessionFactory** - A factory contract that creates and tracks individual voting sessions.
+2. **VoteSession** - Individual voting session contracts that handle the voting logic.
 
-1. **VotingFactory.sol**
-   - Factory contract for deploying new voting sessions
-   - Maintains registry of all deployed sessions
-   - Maps Team Leaders to their sessions
+### Voting Modes
 
-2. **VotingSession.sol**
-   - Standalone contract for each voting session
-   - Controlled by the creator (Team Leader)
-   - Manages the full voting lifecycle
-   - Stores votes and results on-chain
+The system supports three voting modes:
 
-3. **VoteCounter.sol**
-   - Helper contract for vote tallying
-   - Provides utilities for different voting modes
-   - Includes functions for ranked choice calculations
+- **Single** - Users can vote for exactly one option
+- **Multiple** - Users can vote for up to N options
+- **Ranked** - Users can rank their choices (1st, 2nd, 3rd, etc.)
 
-## Getting Started
+## Prerequisites
 
-### Prerequisites
+- Node.js (v14+)
+- npm or yarn
+- MetaMask or another Ethereum wallet for testing
 
-- Node.js v14 or later
-- NPM or Yarn
+## Setup
 
-### Installation
+1. Install dependencies:
 
-```shell
-# Install dependencies
+```bash
 npm install
-
-# Compile contracts
-npx hardhat compile
 ```
 
-### Testing
+2. Create a `.env` file with the following variables:
 
-Run the test suite to ensure everything is working correctly:
-
-```shell
-npx hardhat test
+```
+PRIVATE_KEY=your_private_key_without_0x_prefix
+INFURA_API_KEY=your_infura_api_key
+ETHERSCAN_API_KEY=your_etherscan_api_key
 ```
 
-### Deployment
+## Development
 
-Deploy to a local Hardhat network:
+### Compile Contracts
 
-```shell
-npx hardhat node
-npx hardhat run scripts/deploy.js --network localhost
+```bash
+npm run compile
 ```
 
-Deploy to a testnet (e.g., Sepolia):
+### Run Tests
 
-```shell
-npx hardhat run scripts/deploy.js --network sepolia
+```bash
+npm test
 ```
 
-## Usage
+### Start Local Node
 
-### Creating a Voting Session
+```bash
+npm run node
+```
 
-1. Deploy the `VotingFactory` contract
-2. Call `createVotingSession` with:
-   - Options array
-   - Session type (0: Poll, 1: Election)
-   - Voting mode (0: Single, 1: Multiple, 2: Ranked)
-   - Session name
-   - Mode-specific parameters
+This will start a local Hardhat node at http://127.0.0.1:8545.
 
-### Starting and Ending a Session
+## Deployment
 
-The Team Leader who created the session can:
-- Call `startSession()` to open voting
-- Call `endSession()` to close voting
+### Deploy to Local Node
 
-### Voting
+```bash
+npm run deploy:local
+```
 
-Voters can participate using one of these functions:
-- `voteSingle(optionIndex)` - For single choice voting
-- `voteMultiple([optionIndexes])` - For multiple choice voting
-- `voteRanked([rankedOptions])` - For ranked choice voting
+### Deploy to Ganache
 
-### Getting Results
+Make sure Ganache is running at http://127.0.0.1:7545, then:
 
-- `getResults()` - Returns vote counts for each option
-- `getVoterRankedChoices(voterAddress)` - Gets a voter's ranked choices
+```bash
+npm run deploy:ganache
+```
+
+### Deploy to Sepolia Testnet
+
+```bash
+npm run deploy:sepolia
+```
+
+## Integration
+
+### Backend Integration
+
+To integrate with the backend, use the utility functions in `scripts/examples/backend-integration.js`. 
+
+The backend can:
+- Deploy new voting sessions
+- Poll for voting results
+- Listen for voting events
+- Fetch all session data
+
+### Frontend Integration
+
+To integrate with the frontend, use the utility functions in `scripts/examples/frontend-integration.js`.
+
+The frontend can:
+- Connect to MetaMask
+- Cast votes
+- View session details and results
+- Check if a user has already voted
+
+## Contract Interface
+
+The blockchain contracts expose the following main functionalities:
+
+### VoteSessionFactory
+
+- `createVoteSession(uint256 sessionId, string[] memory participants, uint256 endTimestamp, VoteMode mode, uint8 maxChoices)` - Creates a new voting session
+- `getAllSessionIds()` - Returns all session IDs
+- `getSessionCount()` - Returns the number of sessions
+
+### VoteSession
+
+- `vote(string[] memory choices, uint8[] memory ranks)` - Cast a vote
+- `getResults()` - Get voting results
+- `getStatus()` - Check if session is active and get remaining time
+- `getVoterCount()` - Get number of voters
+- `checkVoted(address voter)` - Check if an address has voted
+
+## Data Flow
+
+1. Team Leader creates a session in the frontend
+2. Frontend calls backend API to store session metadata
+3. When session is started, user confirms transaction via MetaMask
+4. Session is deployed on-chain via the factory contract
+5. Backend stores the contract address alongside off-chain data
+6. Voters connect their wallets and cast votes on-chain
+7. Backend polls for results and updates the database
 
 ## License
 

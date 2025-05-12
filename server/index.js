@@ -5,8 +5,6 @@ require("dotenv").config();
 const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
-const { startAgenda } = require("./lib/agenda");
-const { initializeBridge } = require("./bridge");
 let io;
 
 const connectDB = async () => {
@@ -38,9 +36,6 @@ const routes = require("./startup/routes");
 
 // Use routes
 routes(app);
-
-// Initialize blockchain bridge
-initializeBridge(app);
 
 io = new Server(server, {
   cors: {
@@ -94,9 +89,6 @@ const startApp = async () => {
   try {
     // Connect to MongoDB
     await connectDB();
-
-    // Start Agenda
-    await startAgenda();
 
     // Start server
     await startServer();

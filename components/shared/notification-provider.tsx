@@ -3,16 +3,23 @@
 import { createContext, useContext, ReactNode, useState, useEffect, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { NotificationSheet } from './notification-sheet';
-import { NotificationPayload } from '@/api/notification-service';
+import { Notification, notificationService } from '@/services/notification-service';
+
+// Extended notification type with UI-specific properties
+type NotificationWithUI = Notification & {
+  category?: 'Interaction' | 'Information';
+  timestamp?: string;
+  id?: string; // For backward compatibility with UI
+};
 
 type NotificationContextType = {
-  notifications: NotificationPayload[];
+  notifications: NotificationWithUI[];
   unreadCount: number;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
-  handleNotificationClick: (notification: NotificationPayload) => void;
-  handleAccept: (notification: NotificationPayload) => void;
-  handleDecline: (notification: NotificationPayload) => void;
+  handleNotificationClick: (notification: NotificationWithUI) => void;
+  handleAccept: (notification: NotificationWithUI) => void;
+  handleDecline: (notification: NotificationWithUI) => void;
 };
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -27,10 +34,50 @@ export function useNotificationContext() {
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [notifications, setNotifications] = useState<NotificationPayload[]>([]);
+  const [notifications, setNotifications] = useState<NotificationWithUI[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+
+  // Fetch notifications from the service
+  useEffect(() => {
+    // Check if we're in the browser
+    if (typeof window === 'undefined') return;
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.log('No authentication token found, cannot fetch notifications');
+      return;
+    }
+
+    // Fetch initial notifications
+    const fetchNotifications = async () => {
+      try {
+        const notificationsData = await notificationService.getNotifications();
+        
+        // Transform to UI format
+        const uiNotifications = notificationsData.map(notification => {
+          const notificationWithUI: NotificationWithUI = {
+            ...notification,
+            id: notification._id, // For backward compatibility with UI
+            category: notification.type === 'invitation' ? 'Interaction' as const : 'Information' as const,
+            timestamp: notification.createdAt
+          };
+          return notificationWithUI;
+        });
+        
+        setNotifications(uiNotifications);
+        
+        // Get unread count
+        const unreadData = await notificationService.getUnreadCount();
+        setUnreadCount(unreadData.count);
+      } catch (error: any) {
+        console.error('Failed to fetch notifications:', error.message);
+      }
+    };
+
+    fetchNotifications();
+  }, []);
 
   // Initialize socket connection
   useEffect(() => {
@@ -81,12 +128,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         console.log('Sent authentication with user ID:', userId);
       });
 
-      socketInstance.on('connect_error', (error) => {
+      socketInstance.on('connect_error', (error: Error) => {
         console.error('Socket connection error:', error.message);
         setIsConnected(false);
       });
 
-      socketInstance.on('error', (error) => {
+      socketInstance.on('error', (error: Error) => {
         console.error('Socket error:', error);
         setIsConnected(false);
       });
@@ -96,14 +143,23 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         setIsConnected(false);
       });
 
-      socketInstance.on('connection-confirmed', (data) => {
+      socketInstance.on('connection-confirmed', (data: any) => {
         console.log('Connection confirmed:', data);
         // You could show a toast or some UI indication that the connection is working
       });
 
-      socketInstance.on('new-notification', (notification: NotificationPayload) => {
+      socketInstance.on('new-notification', (notification: Notification) => {
         console.log('New notification received:', notification);
-        setNotifications(prev => [notification, ...prev]);
+        
+        // Transform to UI format
+        const uiNotification: NotificationWithUI = {
+          ...notification,
+          id: notification._id, // For backward compatibility with UI
+          category: notification.type === 'invitation' ? 'Interaction' as const : 'Information' as const,
+          timestamp: notification.createdAt
+        };
+        
+        setNotifications(prev => [uiNotification, ...prev]);
         setUnreadCount(count => count + 1);
       });
 
@@ -113,7 +169,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         console.log('Disconnecting socket...');
         socketInstance.disconnect();
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to connect to socket:', error);
     }
   }, []);
@@ -122,53 +178,85 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const handleMockNotification = (event: any) => {
-      const notification = event.detail;
+    const handleMockNotification = (event: CustomEvent) => {
+      const notification = event.detail as NotificationWithUI;
       console.log('Mock notification received:', notification);
       setNotifications(prev => [notification, ...prev]);
       setUnreadCount(count => count + 1);
     };
 
-    window.addEventListener('mock-notification', handleMockNotification);
+    window.addEventListener('mock-notification', handleMockNotification as EventListener);
 
     return () => {
-      window.removeEventListener('mock-notification', handleMockNotification);
+      window.removeEventListener('mock-notification', handleMockNotification as EventListener);
     };
   }, []);
 
   // Handle notification click
-  const handleNotificationClick = useCallback((notification: NotificationPayload) => {
-    // Mark as read logic would go here
-    // For now, just mark it as read in the local state
-    setNotifications(prev => 
-      prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
-    );
-    setUnreadCount(count => Math.max(0, count - 1));
+  const handleNotificationClick = useCallback(async (notification: NotificationWithUI) => {
+    try {
+      // Mark as read on the server
+      if (notification._id && !notification.read) {
+        await notificationService.markAsRead(notification._id);
+      }
+      
+      // Update local state
+      setNotifications(prev => 
+        prev.map(n => n._id === notification._id ? { ...n, read: true } : n)
+      );
+      setUnreadCount(count => Math.max(0, count - 1));
 
-    // Close the notification panel
-    setIsOpen(false);
+      // Close the notification panel
+      setIsOpen(false);
+    } catch (error: any) {
+      console.error('Error marking notification as read:', error.message);
+    }
   }, []);
 
   // Handle accept interaction
-  const handleAccept = useCallback((notification: NotificationPayload) => {
+  const handleAccept = useCallback(async (notification: NotificationWithUI) => {
     console.log('Accept notification:', notification);
     
-    // Mark as read in local state
-    setNotifications(prev => 
-      prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
-    );
-    setUnreadCount(count => Math.max(0, count - 1));
+    try {
+      // Mark as read on the server
+      if (notification._id && !notification.read) {
+        await notificationService.markAsRead(notification._id);
+      }
+      
+      // Update local state
+      setNotifications(prev => 
+        prev.map(n => n._id === notification._id ? { ...n, read: true } : n)
+      );
+      setUnreadCount(count => Math.max(0, count - 1));
+      
+      // TODO: Handle the accept action based on notification type
+      // This would typically involve calling another service method
+    } catch (error: any) {
+      console.error('Error accepting notification:', error.message);
+    }
   }, []);
 
   // Handle decline interaction
-  const handleDecline = useCallback((notification: NotificationPayload) => {
+  const handleDecline = useCallback(async (notification: NotificationWithUI) => {
     console.log('Decline notification:', notification);
     
-    // Mark as read in local state
-    setNotifications(prev => 
-      prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
-    );
-    setUnreadCount(count => Math.max(0, count - 1));
+    try {
+      // Mark as read on the server
+      if (notification._id && !notification.read) {
+        await notificationService.markAsRead(notification._id);
+      }
+      
+      // Update local state
+      setNotifications(prev => 
+        prev.map(n => n._id === notification._id ? { ...n, read: true } : n)
+      );
+      setUnreadCount(count => Math.max(0, count - 1));
+      
+      // TODO: Handle the decline action based on notification type
+      // This would typically involve calling another service method
+    } catch (error: any) {
+      console.error('Error declining notification:', error.message);
+    }
   }, []);
 
   return (

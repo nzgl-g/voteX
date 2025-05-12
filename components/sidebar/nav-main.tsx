@@ -3,6 +3,7 @@
 import { type LucideIcon } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { cn } from "@/lib/utils"
 
 import {
   SidebarMenu,
@@ -27,7 +28,7 @@ export function NavMain({
     const pathSegments = pathname.split('/')
     // Assuming session IDs are MongoDB ObjectIds (24 character hex strings)
     const sessionIdPattern = /^[0-9a-f]{24}$/i
-    return pathSegments.find(segment => sessionIdPattern.test(segment)) || 'default'
+    return pathSegments.find(segment => sessionIdPattern.test(segment))
   }
   
   // Build the correct URL with the session ID
@@ -40,6 +41,9 @@ export function NavMain({
     // Get the session ID from the current path
     const sessionId = getSessionIdFromPath()
     
+    // If no session ID found, use 'default'
+    const sessionParam = sessionId || 'default'
+    
     // Handle relative URLs (starting with ./)
     if (baseUrl.startsWith('./')) {
       // Remove the ./ prefix
@@ -50,11 +54,11 @@ export function NavMain({
       
       // If the route includes 'default', replace it with the session ID
       if (routeParts.length > 1 && routeParts[1] === 'default') {
-        return `/${routeParts[0]}/${sessionId}`
+        return `/${routeParts[0]}/${sessionParam}`
       }
       
       // Return the full path with session ID
-      return `/team-leader/${routePath.replace('default', sessionId)}`
+      return `/team-leader/${routePath.replace('default', sessionParam)}`
     }
     
     // For absolute URLs, extract the base route and append the session ID
@@ -62,16 +66,23 @@ export function NavMain({
     const routeType = urlParts[urlParts.length - 2] // e.g., 'monitoring', 'session'
     
     // Construct the proper URL format
-    return `/team-leader/${routeType}/${sessionId}`
+    return `/team-leader/${routeType}/${sessionParam}`
   }
 
   return (
     <SidebarMenu>
       {items.map((item) => (
         <SidebarMenuItem key={item.title}>
-          <SidebarMenuButton asChild isActive={item.isActive}>
+          <SidebarMenuButton 
+            asChild 
+            isActive={item.isActive}
+            className={cn(
+              "transition-all",
+              item.isActive ? "font-medium" : "text-muted-foreground"
+            )}
+          >
             <Link href={buildUrl(item.url)}>
-              <item.icon />
+              <item.icon className={item.isActive ? "text-primary" : "text-inherit"} />
               <span>{item.title}</span>
             </Link>
           </SidebarMenuButton>

@@ -6,6 +6,8 @@ import {
     SidebarContent,
     SidebarHeader,
     SidebarRail,
+    SidebarTrigger,
+    SidebarSeparator,
 } from "@/components/ui/sidebar"
 
 import { NavMain } from "@/components/sidebar/nav-main"
@@ -16,6 +18,8 @@ import { LucideIcon } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import { authApi } from "@/lib/api"
+import { Vote } from "lucide-react"
+import Image from "next/image"
 
 interface NavItem {
     title: string
@@ -94,13 +98,35 @@ export function SidebarLeft({
     }
 
     return (
-        <Sidebar className="border-r-0" {...props}>
-            <SidebarHeader />
-            <SidebarContent>
-                <div className="ml-2 mt-1">
+        <Sidebar className="border-r shadow-sm" {...props}>
+            <SidebarHeader className="py-3 px-2">
+                <div className="flex items-center justify-center w-full">
+                    <div className="flex items-center">
+                        <div className="h-8 w-auto mr-2">
+                            <Image 
+                                src="/logos/logo-expanded.svg" 
+                                alt="VoteX Logo" 
+                                width={120}
+                                height={32}
+                                className="h-8 w-auto hidden dark:block" 
+                            />
+                            <Image 
+                                src="/logos/logo-expanded-dark.svg" 
+                                alt="VoteX Logo" 
+                                width={120}
+                                height={32}
+                                className="h-8 w-auto block dark:hidden" 
+                            />
+                        </div>
+                    </div>
+                </div>
+            </SidebarHeader>
+            <SidebarContent className="pt-2">
+                <div className="px-2 mb-4">
                     <SessionSelector />
                 </div>
-                <div className="mt-6 ml-2">
+                <SidebarSeparator className="mb-2" />
+                <div className="px-2 mb-1">
                     <NavMain items={getActiveItems(navMain)} />
                 </div>
                 <NavSecondary items={getActiveItems(navSecondary)} className="mt-auto" />

@@ -1,12 +1,23 @@
 "use client";
 
+//-----------------------------------------------------
+// IMPORTS
+//-----------------------------------------------------
+
+// React and hooks
 import { useEffect, useState } from "react";
-import { Plus, Key, RefreshCcw } from "lucide-react";
-import { Session } from "@/api/session-service";
-import { sessionService } from "@/api/session-service";
+
+// Icons
+import { Plus, Key, RefreshCcw, Filter } from "lucide-react";
+
+// Services
+import { Session } from "@/services/session-service";
+import { sessionService } from "@/services/session-service";
+import { candidateService } from "@/services/candidate-service";
+
+// UI Components
 import { Button } from "@/components/ui/button";
-import { candidateService } from "@/api/candidate-service";
-import useNotification from "@/hooks/use-notification";
+import { Badge } from "@/components/ui/badge";
 import { PricingDialog } from "@/components/pricing-dialog";
 import { toast } from "sonner";
 import {
@@ -15,25 +26,62 @@ import {
   VoterHeader
 } from "@/components/voter-portal";
 import CandidateFormDialog from "@/components/voter-portal/candidate-form-dialog";
-import { authApi } from "@/lib/api";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+//-----------------------------------------------------
+// TYPE DEFINITIONS
+//-----------------------------------------------------
+
+// Session type and status filter definitions
+type SessionTypeFilter = 'all' | 'election' | 'poll' | 'tournament';
+type SessionStatusFilter = 'all' | 'nomination' | 'upcoming' | 'started' | 'ended';
 
 export default function VoterPage() {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [hiddenSessions, setHiddenSessions] = useState<Session[]>([]);
-  const [publicSessions, setPublicSessions] = useState<Session[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
-  const [showCandidateForm, setShowCandidateForm] = useState(false);
-  const [showPricingDialog, setShowPricingDialog] = useState(false);
-  const [showSecretPhraseDialog, setShowSecretPhraseDialog] = useState(false);
-  const [isSubmittingPhrase, setIsSubmittingPhrase] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  //-----------------------------------------------------
+  // STATE MANAGEMENT
+  //-----------------------------------------------------
   
-  // Get the current user ID for notifications
-  const [userId, setUserId] = useState<string>("anonymous");
+  // Session data states
+  const [sessions, setSessions] = useState<Session[]>([]);          // All sessions
+  const [hiddenSessions, setHiddenSessions] = useState<Session[]>([]); // Sessions requiring secret phrase
+  const [publicSessions, setPublicSessions] = useState<Session[]>([]); // Publicly accessible sessions
+  const [filteredSessions, setFilteredSessions] = useState<Session[]>([]); // Sessions after applying filters
+  
+  // UI state management
+  const [loading, setLoading] = useState(true);                     // Loading indicator
+  const [refreshing, setRefreshing] = useState(false);              // Refresh indicator
+  const [error, setError] = useState<string | null>(null);          // Error messages
+  
+  // Modal dialog states
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null); // Currently selected session
+  const [showCandidateForm, setShowCandidateForm] = useState(false);           // Candidate form dialog
+  const [showPricingDialog, setShowPricingDialog] = useState(false);           // Pricing dialog
+  const [showSecretPhraseDialog, setShowSecretPhraseDialog] = useState(false); // Secret phrase dialog
+  const [isSubmittingPhrase, setIsSubmittingPhrase] = useState(false);         // Secret phrase submission state
+  
+  // Filter states
+  const [typeFilter, setTypeFilter] = useState<SessionTypeFilter>('all');      // Filter by session type
+  const [statusFilter, setStatusFilter] = useState<SessionStatusFilter>('all'); // Filter by session status
+  
+  // User information
+  const [userId, setUserId] = useState<string>("anonymous");                   // Current user ID
 
-  // Function to validate session data
+  //-----------------------------------------------------
+  // UTILITY FUNCTIONS
+  //-----------------------------------------------------
+
+  /**
+   * Validates if a session object has all required properties
+   * @param session - Session object to validate
+   * @returns boolean indicating if session is valid
+   */
   const isValidSession = (session: any): boolean => {
     if (!session || typeof session !== 'object') return false;
     if (!session._id || !session.name || !session.type) return false;
@@ -46,13 +94,18 @@ export default function VoterPage() {
     return true;
   };
 
-  // Function to process sessions and separate them into public and hidden
+  /**
+   * Processes an array of sessions and separates them into public and hidden categories
+   * Updates the state with processed sessions and applies filters
+   * @param allSessions - Array of all sessions from the API
+   */
   const processSessions = (allSessions: any[]): void => {
     if (!allSessions || !Array.isArray(allSessions) || allSessions.length === 0) {
       console.log("No sessions to process or invalid data format");
       setSessions([]);
       setPublicSessions([]);
       setHiddenSessions([]);
+      setFilteredSessions([]);
       return;
     }
     
@@ -92,132 +145,117 @@ export default function VoterPage() {
       
       setPublicSessions(public_sessions);
       setHiddenSessions(secret_sessions);
+      
+      // Apply filters to the public sessions
+      applyFilters(public_sessions);
     } catch (err) {
       console.error("Error processing sessions:", err);
       setError("Error processing sessions. Please try again.");
     }
   };
 
-  // Function to fetch all sessions
+  /**
+   * Determines the current status of a session based on its lifecycle dates
+   * @param session - Session to check status for
+   * @returns SessionStatusFilter representing the current status
+   */
+  const getSessionStatus = (session: Session): SessionStatusFilter => {
+    if (!session || !session.sessionLifecycle) {
+      return 'all';
+    }
+
+    const now = new Date();
+    const scheduledStart = session.sessionLifecycle.scheduledAt?.start
+      ? new Date(session.sessionLifecycle.scheduledAt.start)
+      : null;
+    const scheduledEnd = session.sessionLifecycle.scheduledAt?.end
+      ? new Date(session.sessionLifecycle.scheduledAt.end)
+      : null;
+    const startedAt = session.sessionLifecycle.startedAt
+      ? new Date(session.sessionLifecycle.startedAt)
+      : null;
+    const endedAt = session.sessionLifecycle.endedAt
+      ? new Date(session.sessionLifecycle.endedAt)
+      : null;
+
+    if (endedAt && now > endedAt) {
+      return 'ended';
+    }
+
+    if (startedAt && now >= startedAt && (!endedAt || now <= endedAt)) {
+      return 'started';
+    }
+
+    if (scheduledStart && scheduledEnd && now >= scheduledStart && now <= scheduledEnd) {
+      return 'nomination';
+    }
+
+    if (scheduledStart && now < scheduledStart) {
+      return 'upcoming';
+    }
+
+    return 'all';
+  };
+
+  /**
+   * Applies type and status filters to the sessions array
+   * @param sessions - Array of sessions to filter
+   */
+  const applyFilters = (sessions: Session[]) => {
+    let filtered = [...sessions];
+    
+    // Apply type filter
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(session => session.type === typeFilter);
+    }
+    
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(session => getSessionStatus(session) === statusFilter);
+    }
+    
+    setFilteredSessions(filtered);
+  };
+
+  //-----------------------------------------------------
+  // DATA FETCHING
+  //-----------------------------------------------------
+
+  /**
+   * Fetches all available sessions from the API
+   * Updates state with fetched sessions and handles loading/error states
+   */
   const fetchSessions = async () => {
     setLoading(true);
     setError(null);
-    
     try {
-      console.log("Fetching all sessions for voter portal...");
-      const allSessions = await sessionService.getAvailableSessions();
-      
-      if (!allSessions || !Array.isArray(allSessions)) {
-        throw new Error("Invalid response format from server");
+      // Get the current user ID for notifications
+      const user = localStorage.getItem('user');
+      if (user) {
+        const userData = JSON.parse(user);
+        setUserId(userData._id || "anonymous");
       }
       
+      console.log("Fetching sessions...");
+      const allSessions = await sessionService.getAllSessions();
+      console.log(`Fetched ${allSessions.length} sessions`);
       processSessions(allSessions);
-    } catch (err: any) {
-      console.error("Failed to fetch sessions:", err);
-      setError(err.message || "Failed to load sessions. Please try again later.");
-      toast.error("Failed to load sessions. Please try again later.");
+    } catch (error) {
+      console.error("Error fetching sessions:", error);
+      setError("Failed to load sessions. Please try again later.");
       setSessions([]);
       setPublicSessions([]);
       setHiddenSessions([]);
+      setFilteredSessions([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Initial fetch on component mount
-  useEffect(() => {
-    fetchSessions();
-  }, []);
-
-  // Handle joining as a candidate
-  const handleJoinAsCandidate = async (session: Session) => {
-    if (!session || !session._id) {
-      toast.error("Invalid session data");
-      return;
-    }
-    
-    try {
-      // Check if user has already applied
-      const hasApplied = await candidateService.hasUserApplied(session._id);
-      if (hasApplied) {
-        toast.info("You have already applied as a candidate for this session");
-        return;
-      }
-      
-      setSelectedSession(session);
-      setShowCandidateForm(true);
-    } catch (error) {
-      console.error("Error checking candidate status:", error);
-      toast.error("Failed to check candidate status. Please try again.");
-    }
-  };
-
-  // Handle casting a vote
-  const handleCastVote = (session: Session) => {
-    if (!session || !session._id) {
-      toast.error("Invalid session data");
-      return;
-    }
-    
-    // The VotingDialog is now handled by the SessionCard component
-    console.log(`Vote submitted for session: ${session.name} (${session._id})`);
-    toast.success(`Your vote for "${session.name}" has been recorded`);
-  };
-
-  // Handle showing results
-  const handleShowResults = (session: Session) => {
-    if (!session || !session._id) {
-      toast.error("Invalid session data");
-      return;
-    }
-    
-    toast.info(`Showing results for ${session.name}`);
-    // Implementation would depend on your app's navigation/routing
-  };
-
-  // Handle viewing profile
-  const handleViewProfile = (session: Session) => {
-    if (!session || !session._id) {
-      toast.error("Invalid session data");
-      return;
-    }
-    
-    toast.info(`Viewing profile for ${session.name}`);
-    // Implementation would depend on your app's navigation/routing
-  };
-
-  // Handle secret phrase submission
-  const handleSecretPhraseSubmit = async (secretPhrase: string) => {
-    if (!secretPhrase.trim()) {
-      toast.error("Please enter a secret phrase");
-      return;
-    }
-
-    setIsSubmittingPhrase(true);
-    try {
-      const session = await sessionService.getSessionByPhrase(secretPhrase);
-      
-      if (!isValidSession(session)) {
-        throw new Error("Invalid session data received");
-      }
-      
-      // If successful, add it to public sessions if not already there
-      if (!publicSessions.some(s => s._id === session._id)) {
-        setPublicSessions(prev => [...prev, session]);
-        toast.success("Session accessed successfully");
-        setShowSecretPhraseDialog(false);
-      } else {
-        toast.info("You already have access to this session");
-      }
-    } catch (error: any) {
-      console.error("Failed to access session with phrase:", error);
-      toast.error(error.message || "Invalid secret phrase. Please try again.");
-    } finally {
-      setIsSubmittingPhrase(false);
-    }
-  };
-
-  // Handle refreshing sessions
+  /**
+   * Refreshes the sessions list with the latest data from the API
+   * Handles loading/error states and provides user feedback
+   */
   const refreshSessions = async () => {
     if (refreshing) return;
     
@@ -226,7 +264,7 @@ export default function VoterPage() {
     
     try {
       console.log("Refreshing all sessions for voter portal...");
-      const allSessions = await sessionService.getAvailableSessions();
+      const allSessions = await sessionService.getAllSessions();
       
       if (!allSessions || !Array.isArray(allSessions)) {
         throw new Error("Invalid response format from server");
@@ -243,48 +281,299 @@ export default function VoterPage() {
     }
   };
 
+  //-----------------------------------------------------
+  // EFFECTS
+  //-----------------------------------------------------
+
+  // Re-apply filters when filter values change
+  useEffect(() => {
+    applyFilters(publicSessions);
+  }, [typeFilter, statusFilter]);
+
+  // Initial fetch on component mount
+  useEffect(() => {
+    fetchSessions();
+  }, []);
+
+  //-----------------------------------------------------
+  // EVENT HANDLERS
+  //-----------------------------------------------------
+
+  /**
+   * Handles the process of joining a session as a candidate
+   * Checks if user has already applied and shows the candidate form if not
+   * @param session - The session to join as a candidate
+   */
+  const handleJoinAsCandidate = (session: Session) => {
+    if (!session) return;
+    
+    // Check if user is already a candidate
+    candidateService.hasUserApplied(session._id as string)
+      .then(hasApplied => {
+        if (hasApplied) {
+          toast.info("You have already applied as a candidate for this session.");
+          return;
+        }
+        
+        // If not, show the candidate form
+        setSelectedSession(session);
+        setShowCandidateForm(true);
+      })
+      .catch(error => {
+        console.error("Error checking candidate status:", error);
+        // If there's an error, we'll still allow them to try applying
+        setSelectedSession(session);
+        setShowCandidateForm(true);
+      });
+  };
+
+  /**
+   * Handles the process of casting a vote in a session
+   * @param session - The session to cast a vote in
+   */
+  const handleCastVote = (session: Session) => {
+    if (!session || !session._id) {
+      toast.error("Invalid session data");
+      return;
+    }
+    
+    // The VotingDialog is now handled by the SessionCard component
+    console.log(`Vote submitted for session: ${session.name} (${session._id})`);
+    toast.success(`Your vote for "${session.name}" has been recorded`);
+  };
+
+  /**
+   * Handles showing results for a session
+   * @param session - The session to show results for
+   */
+  const handleShowResults = (session: Session) => {
+    if (!session || !session._id) {
+      toast.error("Invalid session data");
+      return;
+    }
+    
+    toast.info(`Showing results for ${session.name}`);
+    // Implementation would depend on your app's navigation/routing
+  };
+
+  /**
+   * Handles viewing a session profile
+   * @param session - The session to view the profile for
+   */
+  const handleViewProfile = (session: Session) => {
+    if (!session || !session._id) {
+      toast.error("Invalid session data");
+      return;
+    }
+    
+    toast.info(`Viewing profile for ${session.name}`);
+    // Implementation would depend on your app's navigation/routing
+  };
+
+  /**
+   * Handles secret phrase submission to access private sessions
+   * @param secretPhrase - The secret phrase entered by the user
+   */
+  const handleSecretPhraseSubmit = async (secretPhrase: string) => {
+    if (!secretPhrase.trim()) {
+      toast.error("Please enter a secret phrase");
+      return;
+    }
+    
+    setIsSubmittingPhrase(true);
+    
+    try {
+      const session = await sessionService.getSessionByPhrase(secretPhrase);
+      
+      if (!session || !session._id) {
+        toast.error("Invalid secret phrase. Please try again.");
+        return;
+      }
+      
+      // Add the session to our list if it's not already there
+      setSessions(prevSessions => {
+        // Check if we already have this session
+        const exists = prevSessions.some(s => s._id === session._id);
+        if (exists) {
+          toast.info("You already have access to this session.");
+          return prevSessions;
+        }
+        
+        // Add the new session and process
+        const updatedSessions = [...prevSessions, session];
+        processSessions(updatedSessions);
+        toast.success(`Joined session: ${session.name}`);
+        return updatedSessions;
+      });
+      
+      // Close the dialog
+      setShowSecretPhraseDialog(false);
+    } catch (error: any) {
+      console.error("Error joining session with phrase:", error);
+      toast.error(error.message || "Failed to join session. Please try again.");
+    } finally {
+      setIsSubmittingPhrase(false);
+    }
+  };
+
+  /**
+   * Calculates the number of active filters for the filter badge
+   * @returns Number of active filters
+   */
+  const getFilterCount = (): number => {
+    let count = 0;
+    if (typeFilter !== 'all') count++;
+    if (statusFilter !== 'all') count++;
+    return count;
+  };
+
+  //-----------------------------------------------------
+  // RENDER UI
+  //-----------------------------------------------------
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Header */}
+      {/* Page Header */}
       <VoterHeader />
 
-      {/* Main Content */}
+      {/* Main Content Area */}
       <main className="flex-1 container mx-auto py-8 px-4">
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Available Sessions</h1>
-          <div className="flex gap-4 mt-4 md:mt-0">
+        {/* Page Title and Action Buttons */}
+        <div className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:items-center mb-8">
+          {/* Page Title */}
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">Available Sessions</h1>
+          </div>
+          
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2 md:justify-end">
+            {/* Filter Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="flex items-center gap-1.5 h-9 rounded-lg border-muted-foreground/20 bg-background/50 backdrop-blur-sm shadow-sm hover:bg-background transition-all"
+                >
+                  <Filter className="h-3.5 w-3.5" />
+                  <span>Filter</span>
+                  {getFilterCount() > 0 && (
+                    <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 flex items-center justify-center rounded-full">
+                      {getFilterCount()}
+                    </Badge>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              
+              {/* Filter Options */}
+              <DropdownMenuContent className="w-56">
+                {/* Session Type Filters */}
+                <DropdownMenuLabel>Session Type</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem
+                  checked={typeFilter === 'all'}
+                  onCheckedChange={() => setTypeFilter('all')}
+                >
+                  All Types
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={typeFilter === 'election'}
+                  onCheckedChange={() => setTypeFilter('election')}
+                >
+                  Elections
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={typeFilter === 'poll'}
+                  onCheckedChange={() => setTypeFilter('poll')}
+                >
+                  Polls
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={typeFilter === 'tournament'}
+                  onCheckedChange={() => setTypeFilter('tournament')}
+                >
+                  Tournaments
+                </DropdownMenuCheckboxItem>
+                
+                {/* Session Status Filters */}
+                <DropdownMenuLabel className="mt-2">Session Status</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem
+                  checked={statusFilter === 'all'}
+                  onCheckedChange={() => setStatusFilter('all')}
+                >
+                  All Statuses
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={statusFilter === 'nomination'}
+                  onCheckedChange={() => setStatusFilter('nomination')}
+                >
+                  Nominations Open
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={statusFilter === 'upcoming'}
+                  onCheckedChange={() => setStatusFilter('upcoming')}
+                >
+                  Coming Soon
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={statusFilter === 'started'}
+                  onCheckedChange={() => setStatusFilter('started')}
+                >
+                  Active Voting
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={statusFilter === 'ended'}
+                  onCheckedChange={() => setStatusFilter('ended')}
+                >
+                  Ended
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {/* Refresh Button */}
             <Button 
               onClick={refreshSessions}
               variant="outline"
-              className="flex items-center gap-2"
+              size="sm"
+              className="flex items-center gap-1.5 h-9 rounded-lg border-muted-foreground/20 bg-background/50 backdrop-blur-sm shadow-sm hover:bg-background transition-all"
               disabled={refreshing || loading}
             >
-              <RefreshCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              Refresh
+              <RefreshCcw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
             </Button>
+            
+            {/* Secret Phrase Button */}
             <Button 
               onClick={() => setShowSecretPhraseDialog(true)}
               variant="outline"
-              className="flex items-center gap-2"
+              size="sm"
+              className="flex items-center gap-1.5 h-9 rounded-lg border-muted-foreground/20 bg-background/50 backdrop-blur-sm shadow-sm hover:bg-background transition-all"
             >
-              <Key className="h-4 w-4" />
-              Enter Secret Phrase
+              <Key className="h-3.5 w-3.5" />
+              <span>Enter Secret Phrase</span>
             </Button>
+            
+            {/* Create Session Button */}
             <Button 
               onClick={() => setShowPricingDialog(true)}
-              className="flex items-center gap-2"
+              variant="default"
+              size="sm"
+              className="flex items-center gap-1.5 h-9 rounded-lg shadow-sm hover:shadow-md transition-all"
             >
-              <Plus className="h-4 w-4" />
-              Create Session
+              <Plus className="h-3.5 w-3.5" />
+              <span>Create Session</span>
             </Button>
           </div>
         </div>
         
+        {/* Content Area - Conditional Rendering Based on State */}
         {loading ? (
+          // Loading State
           <div className="grid place-items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
           </div>
         ) : error ? (
+          // Error State
           <div className="text-center py-12">
             <p className="text-destructive">{error}</p>
             <Button 
@@ -296,9 +585,10 @@ export default function VoterPage() {
               Try Again
             </Button>
           </div>
-        ) : publicSessions.length > 0 ? (
+        ) : filteredSessions.length > 0 ? (
+          // Sessions Grid - When Sessions Match Filters
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {publicSessions.map((session) => (
+            {filteredSessions.map((session) => (
               <SessionCard
                 key={session._id}
                 session={session}
@@ -309,13 +599,59 @@ export default function VoterPage() {
               />
             ))}
           </div>
-        ) : (
+        ) : publicSessions.length > 0 ? (
+          // No Sessions Match Filters - But Sessions Exist
           <div className="text-center py-12">
-            <p className="text-muted-foreground">No sessions available at this time.</p>
+            <p className="text-muted-foreground">No sessions match your current filters.</p>
+            <Button 
+              onClick={() => {
+                setTypeFilter('all');
+                setStatusFilter('all');
+              }} 
+              variant="outline" 
+              className="mt-4"
+            >
+              Clear Filters
+            </Button>
+          </div>
+        ) : (
+          // Empty State - No Sessions Available
+          <div className="flex flex-col items-center justify-center h-[50vh] max-w-md mx-auto text-center">
+            <div className="rounded-full bg-primary/10 p-6 mb-6">
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="48" 
+                height="48" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className="text-primary"
+              >
+                <circle cx="12" cy="8" r="5" />
+                <path d="M20 21a8 8 0 0 0-16 0" />
+                <path d="M12 11v4" />
+                <path d="M12 19h.01" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold mb-2">No Sessions Yet</h3>
+            <p className="text-muted-foreground mb-6">There are no active voting sessions available at this time. Check back later or refresh to see new sessions.</p>
+            <Button 
+              onClick={refreshSessions} 
+              variant="outline" 
+              className="gap-2"
+              disabled={refreshing}
+            >
+              <RefreshCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh Sessions
+            </Button>
           </div>
         )}
       </main>
 
+      {/* Modals and Dialogs */}
       {/* Secret Phrase Dialog */}
       <SecretPhraseDialog
         open={showSecretPhraseDialog}
@@ -331,11 +667,11 @@ export default function VoterPage() {
       />
 
       {/* Candidate Form Dialog */}
-      {selectedSession && (
+      {selectedSession && selectedSession._id && (
         <CandidateFormDialog 
           open={showCandidateForm}
           onOpenChange={setShowCandidateForm}
-          sessionId={selectedSession._id}
+          sessionId={selectedSession._id as string}
           sessionTitle={selectedSession.name}
         />
       )}

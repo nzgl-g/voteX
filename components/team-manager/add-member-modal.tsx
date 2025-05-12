@@ -18,10 +18,10 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import { Search, Mail, User, Check } from "lucide-react"
-import { teamService } from "@/api/team-service"
-import { sessionService } from "@/api/session-service"
-import { userService, User as UserType } from "@/api/user-service"
-import { invitationService } from "@/api/invitation-service"
+import { teamService } from "@/services/team-service"
+import { sessionService } from "@/services/session-service"
+import { userService, User as UserType } from "@/services/user-service"
+import { invitationService } from "@/services/invitation-service"
 
 interface AddMemberModalProps {
   isOpen: boolean

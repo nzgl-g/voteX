@@ -1,39 +1,51 @@
-// Script to deploy the VotingFactory contract
-const hre = require("hardhat");
+const { ethers } = require("hardhat");
 
 async function main() {
-  console.log("Deploying VotingFactory contract...");
+  console.log("Deploying contracts...");
 
-  // Get the contract factory
-  const VotingFactory = await hre.ethers.getContractFactory("VotingFactory");
+  // Get the Contract Factories
+  const VoteSessionFactory = await ethers.getContractFactory("VoteSessionFactory");
   
-  // Deploy the contract
-  const factory = await VotingFactory.deploy();
+  // Deploy the factory contract
+  console.log("Deploying VoteSessionFactory...");
+  const factory = await VoteSessionFactory.deploy();
+  await factory.waitForDeployment();
   
-  // Wait for deployment to finish
-  await factory.deployed();
+  const address = await factory.getAddress();
+  console.log(`VoteSessionFactory deployed to: ${address}`);
   
-  console.log("VotingFactory deployed to:", factory.address);
-  
-  // Verify the contract on Etherscan if not on a local network
-  if (hre.network.name !== "localhost" && hre.network.name !== "hardhat") {
-    console.log("Waiting for block confirmations...");
+  // For testing, deploy a sample voting session
+  if (network.name === "localhost" || network.name === "hardhat" || network.name === "ganache") {
+    console.log("\nDeploying a sample voting session for testing...");
     
-    // Wait for 6 block confirmations
-    await factory.deployTransaction.wait(6);
+    // Current timestamp
+    const now = Math.floor(Date.now() / 1000);
+    // Session ends in 1 day
+    const endTime = now + 86400;
     
-    // Verify contract
-    console.log("Verifying contract...");
-    await hre.run("verify:verify", {
-      address: factory.address,
-      constructorArguments: [],
-    });
+    // Sample participants
+    const participants = ["Option A", "Option B", "Option C"];
     
-    console.log("Contract verified!");
+    // Create a sample session (single vote mode)
+    const tx = await factory.createVoteSession(
+      1, // Session ID
+      participants,
+      endTime,
+      0, // Single vote mode
+      1 // Max choices (only relevant for multiple/ranked)
+    );
+    
+    await tx.wait();
+    console.log("Sample voting session created with ID: 1");
+    
+    // Get the session address
+    const sessionAddress = await factory.sessions(1);
+    console.log(`Session address: ${sessionAddress}`);
   }
+  
+  console.log("\nDeployment completed successfully!");
 }
 
-// Execute the deployment
 main()
   .then(() => process.exit(0))
   .catch((error) => {

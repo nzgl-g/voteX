@@ -181,6 +181,7 @@ router.post("/", auth, async (req, res) => {
       bracket,
       maxRounds,
       maxChoices,
+      contractAddress,
     } = req.body;
     if (secretPhrase) {
       const existingSession = await Session.findOne({ secretPhrase });
@@ -215,6 +216,7 @@ router.post("/", auth, async (req, res) => {
       ...(type === "election" && { candidates, maxChoices }),
       ...(type === "poll" && { options, maxChoices }),
       ...(type === "tournament" && { tournamentType, bracket, maxRounds }),
+      contractAddress,
     });
 
     await session.save();
@@ -319,6 +321,70 @@ router.patch("/:sessionId/edit-request", auth, async (req, res) => {
   }
 });
 
+router.post("/:sessionId/vote-counts", auth, async (req, res) => {
+  try {
+    const sessionId = req.params.sessionId;
+    const { type, voteCounts, voterCount, source } = req.body;
+    
+    if (!isValidObjectId(sessionId)) {
+      return res.status(400).json({ error: "Invalid session ID" });
+    }
+
+    if (!type || !voteCounts || !Array.isArray(voteCounts)) {
+      return res.status(400).json({ error: "Invalid vote count data" });
+    }
+
+    const session = await Session.findById(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    // Update the vote counts based on session type
+    if (type === 'election' && session.candidates) {
+      // Update candidate vote counts
+      voteCounts.forEach(({ id, votes }) => {
+        const candidate = session.candidates.id(id);
+        if (candidate) {
+          candidate.totalVotes = votes;
+        }
+      });
+    } else if (type === 'poll' && session.options) {
+      // Update poll option vote counts
+      voteCounts.forEach(({ id, votes }) => {
+        const optionIndex = session.options.findIndex(opt => 
+          opt._id.toString() === id);
+        if (optionIndex !== -1) {
+          session.options[optionIndex].totalVotes = votes;
+        }
+      });
+    }
+
+    // Add information to results metadata
+    if (!session.results) {
+      session.results = {};
+    }
+    
+    // Record blockchain sync information if source is blockchain
+    if (source === 'blockchain') {
+      session.results.lastBlockchainSync = new Date();
+      session.results.blockchainVoterCount = voterCount;
+    }
+
+    await session.save();
+    res.status(200).json({ 
+      message: "Vote counts updated successfully", 
+      source,
+      voterCount
+    });
+  } catch (err) {
+    console.error("Error updating vote counts:", err);
+    res.status(500).json({ 
+      error: "Failed to update vote counts", 
+      details: err.message 
+    });
+  }
+});
+
 router.patch("/edit-requests/:requestId/approve", auth, async (req, res) => {
   try {
     const requestId = req.params.requestId;
@@ -351,6 +417,7 @@ router.patch("/edit-requests/:requestId/approve", auth, async (req, res) => {
       "sessionLifecycle.scheduledAt.end": 1,
       securityMethod: 1,
       secretPhrase: 1,
+      contractAddress: 1,
     };
 
     const filteredUpdates = Object.keys(updates).reduce((acc, key) => {

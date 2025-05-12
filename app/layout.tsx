@@ -1,10 +1,12 @@
-import type { Metadata } from "next";
-import { Inter} from "next/font/google";
+import type {Metadata} from "next";
+import {Inter} from "next/font/google";
 import "./globals.css";
 import {ThemeProvider} from "@/components/theme-provider";
 import {cn} from "@/lib/utils";
-import { ClientLoadingBar } from "@/components/ui/client-loading-bar";
-import { Toaster } from "sonner";
+import {ClientLoadingBar} from "@/components/ui/client-loading-bar";
+import {Toaster} from "sonner";
+import {StagewiseToolbar} from '@stagewise/toolbar-next';
+import {NotificationProvider} from "@/components/shared/notification-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,7 +25,9 @@ export default function RootLayout({
         <html lang="en" suppressHydrationWarning>
         <body className={cn("min-h-screen bg-background", inter.className)}>
         <ClientLoadingBar />
-        <ThemeProvider
+        <NotificationProvider>
+
+            <ThemeProvider
             attribute="class"
             defaultTheme="system"
             enableSystem
@@ -40,8 +44,15 @@ export default function RootLayout({
                 },
               }}
             />
+                <StagewiseToolbar
+                    config={{
+                        plugins: [], // Add your custom plugins here
+                    }}
+                />
             {children}
         </ThemeProvider>
+        </NotificationProvider>
+
         </body>
         </html>
     );

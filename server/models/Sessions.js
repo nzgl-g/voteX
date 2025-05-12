@@ -82,6 +82,7 @@ const sessionSchema = new mongoose.Schema({
   team: { type: mongoose.Schema.Types.ObjectId, ref: "Team" },
   candidates: [candidateSchema],
   results: { type: mongoose.Schema.Types.Mixed, default: null },
+  contractAddress: { type: String, default: null },
 
   securityMethod: {
     type: String,

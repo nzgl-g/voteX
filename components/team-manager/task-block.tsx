@@ -22,7 +22,7 @@ import {
   Trash2,
   Edit,
 } from "lucide-react"
-import { taskService, Task } from "@/api/task-service"
+import { taskService, Task } from "@/services/task-service"
 import { toast } from "sonner"
 import { useParams } from "next/navigation"
 import { format, isAfter, formatDistanceToNow } from "date-fns"
@@ -51,18 +51,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { teamService } from "@/api/team-service"
-import { sessionService } from "@/api/session-service"
+import { teamService, TeamMember } from "@/services/team-service"
+import { sessionService } from "@/services/session-service"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Progress } from "@/components/ui/progress"
 import TaskDialog from "./task-dialog"
 
 // Extended TeamMember interface to include avatar property
-interface TeamMember {
-  _id: string;
-  username: string;
-  email: string;
-  fullName?: string;
+interface ExtendedTeamMember extends TeamMember {
   avatar?: string;
 }
 
@@ -74,7 +70,7 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [teamMembers, setTeamMembers] = useState<Record<string, TeamMember>>({})
+  const [teamMembers, setTeamMembers] = useState<Record<string, ExtendedTeamMember>>({})
   const [updating, setUpdating] = useState<string | null>(null)
   const [filter, setFilter] = useState<"all" | "pending" | "completed">("all")
   const [sortBy, setSortBy] = useState<"dueDate" | "priority" | "recent">("dueDate")
@@ -89,7 +85,7 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
   
   // Auto-refresh reference
   const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const lastDataRef = useRef<{ tasks: Task[], members: Record<string, TeamMember> }>({ 
+  const lastDataRef = useRef<{ tasks: Task[], members: Record<string, ExtendedTeamMember> }>({ 
     tasks: [], 
     members: {} 
   })
@@ -116,22 +112,26 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
           const teamData = await teamService.getTeamMembers(teamId)
           
           // Create a map of member IDs to member data
-          const membersMap: Record<string, TeamMember> = {}
+          const membersMap: Record<string, ExtendedTeamMember> = {}
           
           // Add leader
           if (teamData.leader) {
-            membersMap[teamData.leader._id] = {
-              ...teamData.leader,
-              avatar: `/api/avatar?name=${teamData.leader.username}`
+            if (typeof teamData.leader !== 'string' && teamData.leader._id) {
+              membersMap[teamData.leader._id] = {
+                ...teamData.leader,
+                avatar: `/api/avatar?name=${teamData.leader.username}`
+              }
             }
           }
           
           // Add members
           if (teamData.members && Array.isArray(teamData.members)) {
             teamData.members.forEach(member => {
-              membersMap[member._id] = {
-                ...member,
-                avatar: `/api/avatar?name=${member.username}`
+              if (typeof member !== 'string' && member._id) {
+                membersMap[member._id] = {
+                  ...member,
+                  avatar: `/api/avatar?name=${member.username}`
+                }
               }
             })
           }
@@ -741,7 +741,7 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
               {task.status === "completed" && (
                 <CardFooter className="px-4 py-2 bg-muted/50 flex justify-between items-center text-xs text-muted-foreground">
                   <span>Completed</span>
-                  <span>{format(new Date(task.updatedAt), "MMM d, yyyy")}</span>
+                  <span>{task.updatedAt ? format(new Date(task.updatedAt), "MMM d, yyyy") : format(new Date(task.createdAt), "MMM d, yyyy")}</span>
                 </CardFooter>
               )}
             </Card>

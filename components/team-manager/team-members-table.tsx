@@ -31,8 +31,8 @@ import {
   RefreshCw
 } from "lucide-react"
 import { toast } from "sonner"
-import { teamService, TeamMember as BaseTeamMember } from "@/api/team-service"
-import { sessionService } from "@/api/session-service"
+import { teamService, TeamMember as BaseTeamMember } from "@/services/team-service"
+import { sessionService } from "@/services/session-service"
 import { Card, CardContent } from "@/components/ui/card"
 
 // Extend the TeamMember interface for UI needs

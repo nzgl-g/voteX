@@ -11,18 +11,25 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Check, X } from "lucide-react";
-import { NotificationPayload } from "@/api/notification-service";
+import { Notification } from "@/services/notification-service";
+
+// Extended notification type with UI-specific properties
+type NotificationWithUI = Notification & {
+  category?: 'Interaction' | 'Information';
+  timestamp?: string;
+  id?: string; // For backward compatibility with UI
+};
 
 interface NotificationSheetProps {
-  notifications: NotificationPayload[];
-  onNotificationClick: (notification: NotificationPayload) => void;
+  notifications: NotificationWithUI[];
+  onNotificationClick: (notification: NotificationWithUI) => void;
   unreadCount: number;
   open: boolean;
   setOpen: (open: boolean) => void;
   triggerClassName?: string;
   contentClassName?: string;
-  onAccept?: (notification: NotificationPayload) => void;
-  onDecline?: (notification: NotificationPayload) => void;
+  onAccept?: (notification: NotificationWithUI) => void;
+  onDecline?: (notification: NotificationWithUI) => void;
 }
 
 export function NotificationSheet({
@@ -67,7 +74,7 @@ export function NotificationSheet({
           <div className="mt-4 flex flex-col gap-3 overflow-y-auto max-h-[calc(100vh-120px)] pr-1">
             {notifications.map((notification) => (
               <div
-                key={notification.id || Math.random().toString()}
+                key={notification._id || notification.id || Math.random().toString()}
                 className={`rounded-lg border p-3 shadow-sm transition-colors ${
                   notification.read ? "bg-background" : "bg-muted"
                 }`}

@@ -1,3 +1,5 @@
+import { ReactNode } from "react";
+
 export type VotingType = 'poll' | 'election' | 'tournament';
 export type SessionLifecycle = 'nominations' | 'upcoming' | 'started' | 'ended';
 
@@ -32,6 +34,7 @@ export interface SessionLifecycleStatus {
     status: string;
     label: string;
     color: string;
+    icon?: ReactNode;
 }
 
 // Props for SessionCard component
@@ -43,21 +46,20 @@ export interface SessionCardProps {
         organizationName?: string | null;
         banner?: string | null;
         type: 'election' | 'poll' | 'tournament';
-        subtype: 'single' | 'multiple' | 'ranked' | 'single elimination' | 'double elimination';
-        securityMethod?: string | null;
-        secretPhrase?: string;
-        verificationMethod?: string | null;
+        subtype?: 'single' | 'multiple' | 'ranked';
+        securityMethod?: string;
+        verificationMethod?: string;
         sessionLifecycle?: {
-            createdAt?: string;
             scheduledAt?: {
-                start?: string | null;
-                end?: string | null;
+                start?: string;
+                end?: string;
             };
-            startedAt?: string | null;
-            endedAt?: string | null;
+            startedAt?: string;
+            endedAt?: string;
         };
         candidates?: any[];
         options?: any[];
+        contractAddress?: string;
     };
     onJoinAsCandidate: (session: any) => void;
     onCastVote: (session: any) => void;

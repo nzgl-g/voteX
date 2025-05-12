@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -10,35 +11,49 @@ import {
 } from "@/components/ui/breadcrumb";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { NotificationButton } from "@/components/shared/notification-button";
+import { cn } from "@/lib/utils";
 
 type SiteHeaderProps = {
     title: string;
 };
 
 export function SiteHeader({ title }: SiteHeaderProps) {
-    // Using a simple string ID for demonstration - replace with your user ID
-    const userId = "current-user-id"; 
+    const [scrolled, setScrolled] = useState(false);
+    
+    // Add scroll event listener to detect when page is scrolled
+    useEffect(() => {
+        const handleScroll = () => {
+            setScrolled(window.scrollY > 10);
+        };
+        
+        window.addEventListener("scroll", handleScroll);
+        return () => window.removeEventListener("scroll", handleScroll);
+    }, []);
 
     return (
-        <header className="bg-background sticky top-0 z-50 flex h-14 items-center gap-2 px-3 rounded-t-md shadow-sm">
-            <SidebarTrigger />
+        <header 
+            className={cn(
+                "bg-background/80 backdrop-blur-sm sticky top-0 z-50 flex h-16 items-center gap-3 px-4 border-b transition-all duration-200 ease-in-out",
+                scrolled && "shadow-md h-14 border-b-primary/10"
+            )}
+        >
+            <SidebarTrigger className="text-muted-foreground hover:text-primary" />
             <Separator
                 orientation="vertical"
-                className="mr-2 data-[orientation=vertical]:h-4"
+                className="mr-2 data-[orientation=vertical]:h-5"
             />
             <Breadcrumb className="flex-1">
                 <BreadcrumbList>
                     <BreadcrumbItem>
-                        <BreadcrumbPage className="line-clamp-1 font-medium">
+                        <BreadcrumbPage className="line-clamp-1 font-semibold text-lg">
                             {title}
                         </BreadcrumbPage>
                     </BreadcrumbItem>
                 </BreadcrumbList>
             </Breadcrumb>
-
-            <NotificationButton />
-
-            <div className="ml-2">
+            
+            <div className="flex items-center gap-2">
+                <NotificationButton />
                 <ThemeToggle />
             </div>
         </header>

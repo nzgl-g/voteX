@@ -2,13 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { VoteSessionForm } from "@/components/setup-form/vote-session-form";
 import Image from "next/image";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { UserProfile } from "@/components/shared/user-profile";
+import { NotificationButton } from "@/components/shared/notification-button";
 import { authApi } from "@/lib/api";
 import { toast } from "sonner";
+import VotingSessionForm from "@/components/session-creation/voting-session-form";
+import { motion } from "framer-motion";
+import { useTheme } from "next-themes";
 
 export default function SessionSetupPage() {
   const router = useRouter();
@@ -18,6 +21,14 @@ export default function SessionSetupPage() {
       name: "User", 
       email: "" 
   });
+  const { theme } = useTheme();
+
+  const getLogo = () => {
+    if (theme === 'dark') {
+      return "/logo/expended-dark.png";
+    }
+    return "/logo/expended.png";
+  };
   
   useEffect(() => {
     // Get plan from URL parameters
@@ -57,38 +68,45 @@ export default function SessionSetupPage() {
   
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2">
-            <Link href="/" className="flex items-center">
-              <div className="hidden dark:block">
-                <Image src="/logo/expended-dark.png" alt="Vote System Logo" width={120} height={40} className="mr-2" />
-              </div>
-              <div className="block dark:hidden">
-                <Image src="/logo/expended.png" alt="Vote System Logo" width={120} height={40} className="mr-2" />
-              </div>
-            </Link>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <UserProfile 
-              userName={userData.name}
-              userEmail={userData.email}
-              userAvatar={userData.avatar}
-              variant="dropdown"
-            />
-          </div>
+      <motion.header
+        initial={{ y: -32, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 120, damping: 16 }}
+        className="mb-4 sticky top-4 z-50 mx-auto w-full container max-w-7xl xl:max-w-[1400px] rounded-full bg-background/80 shadow-lg backdrop-blur-md flex items-center justify-between px-4 py-2 border border-border transition-all"
+        style={{ boxShadow: '0 4px 24px 0 rgba(0,0,0,0.04)' }}
+      >
+        <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center">
+            <div className="relative h-8 w-32 flex items-center justify-center">
+              <Image
+                src={getLogo()}
+                alt="Vote System Logo"
+                width={128}
+                height={32}
+                className="object-contain select-none"
+                priority
+              />
+            </div>
+          </Link>
         </div>
-      </header>
-
-      <main className="flex-1 container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="max-w-[1400px] mx-auto">
-          <h1 className="text-2xl sm:text-3xl font-bold mb-6">Create Vote Session</h1>
-          <VoteSessionForm 
-            plan={plan} 
-            onComplete={handleSessionCreated}
+        <div className="flex items-center gap-2 bg-muted/40 rounded-full px-2 py-1 transition-all">
+          <ThemeToggle className="!rounded-full !bg-transparent !shadow-none !border-0" />
+          <NotificationButton />
+          <UserProfile 
+            userName={userData.name}
+            userEmail={userData.email}
+            userAvatar={userData.avatar}
+            variant="dropdown"
+            className="!rounded-full !bg-transparent !shadow-none !border-0"
           />
         </div>
+      </motion.header>
+
+      <main className="flex-1 container mx-auto max-w-7xl xl:max-w-[1400px] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+          <VotingSessionForm
+            subscription={plan === "enterprise" ? "pro" : (plan as "free" | "pro") || "free"}
+            onSuccess={handleSessionCreated}
+          />
       </main>
     </div>
   );

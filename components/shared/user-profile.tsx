@@ -93,8 +93,11 @@ export function UserProfile({
                         <button className={`flex items-center space-x-2 rounded-full p-1 bg-background hover:bg-accent hover:text-accent-foreground transition-all duration-300 ease-out transform hover:scale-105 active:scale-95 outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background ${className}`}>
                             <Avatar className={`h-8 w-8 cursor-pointer ${avatarAnimation}`}>
                                 <AvatarImage src={userAvatar} alt={userName} />
-                                <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-white">
-                                    {initials}
+                                <AvatarFallback className="relative flex size-full items-center justify-center overflow-hidden rounded-full">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-primary/70 to-secondary/70 blur-md opacity-80" />
+                                    <div className="absolute inset-0 bg-gradient-to-tl from-background/10 to-background/5 mix-blend-overlay" />
+                                    <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary opacity-70" />
+                                    <span className="relative font-semibold z-10 text-white drop-shadow-sm">{initials}</span>
                                 </AvatarFallback>
                             </Avatar>
                         </button>
@@ -107,8 +110,11 @@ export function UserProfile({
                         <div className="flex items-center gap-3 p-2">
                             <Avatar className={`h-10 w-10 ${avatarAnimation}`}>
                                 <AvatarImage src={userAvatar} alt={userName} />
-                                <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-white">
-                                    {initials}
+                                <AvatarFallback className="relative flex size-full items-center justify-center overflow-hidden rounded-full">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-primary/70 to-secondary/70 blur-md opacity-80" />
+                                    <div className="absolute inset-0 bg-gradient-to-tl from-background/10 to-background/5 mix-blend-overlay" />
+                                    <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary opacity-70" />
+                                    <span className="relative font-semibold z-10 text-white drop-shadow-sm">{initials}</span>
                                 </AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col space-y-0.5 leading-none overflow-hidden">
@@ -179,8 +185,11 @@ export function UserProfile({
                     <button className={`flex w-full items-center gap-3 rounded-lg p-2 text-left transition-all duration-300 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-sm group ${className}`}>
                         <Avatar className={`h-8 w-8 rounded-lg ${avatarAnimation}`}>
                             <AvatarImage src={userAvatar} alt={userName} />
-                            <AvatarFallback className="rounded-lg bg-gradient-to-br from-primary to-secondary text-white">
-                                {initials}
+                            <AvatarFallback className="relative flex size-full items-center justify-center overflow-hidden rounded-lg">
+                                <div className="absolute inset-0 bg-gradient-to-br from-primary/70 to-secondary/70 blur-md opacity-80" />
+                                <div className="absolute inset-0 bg-gradient-to-tl from-background/10 to-background/5 mix-blend-overlay" />
+                                <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary opacity-70" />
+                                <span className="relative font-semibold z-10 text-white drop-shadow-sm">{initials}</span>
                             </AvatarFallback>
                         </Avatar>
                         <div className="grid flex-1 text-left text-sm leading-tight overflow-hidden">
@@ -205,8 +214,11 @@ export function UserProfile({
                         <div className="flex items-center gap-3 p-2">
                             <Avatar className={`h-10 w-10 rounded-lg ${avatarAnimation}`}>
                                 <AvatarImage src={userAvatar} alt={userName} />
-                                <AvatarFallback className="rounded-lg bg-gradient-to-br from-primary to-secondary text-white">
-                                    {initials}
+                                <AvatarFallback className="relative flex size-full items-center justify-center overflow-hidden rounded-lg">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-primary/70 to-secondary/70 blur-md opacity-80" />
+                                    <div className="absolute inset-0 bg-gradient-to-tl from-background/10 to-background/5 mix-blend-overlay" />
+                                    <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary opacity-70" />
+                                    <span className="relative font-semibold z-10 text-white drop-shadow-sm">{initials}</span>
                                 </AvatarFallback>
                             </Avatar>
                             <div className="grid flex-1 text-left text-sm leading-tight overflow-hidden">

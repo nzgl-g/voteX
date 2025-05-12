@@ -3,7 +3,7 @@ const isTeamLeader = require("../middleware/isTeamLeader");
 const auth = require("../middleware/auth");
 const Task = require("../models/Task");
 const sendNotification = require("../helpers/sendNotification");
-const Team= require("../models/Team");
+const Team = require("../models/Team");
 
 const router = express.Router();
 
@@ -114,7 +114,9 @@ router.patch("/:taskId/complete", auth, async (req, res) => {
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
     }
-
+    if (!task.session) {
+      return res.status(500).json({ message: "Session data is missing" });
+    }
     const isAssigned = task.assignedMembers.some((memberId) =>
       memberId.equals(req.user._id)
     );
@@ -136,7 +138,7 @@ router.patch("/:taskId/complete", auth, async (req, res) => {
         type: "task-completed",
         message: `A member has completed the task "${task.title}".`,
         link: `/tasks/${task._id}`,
-        targetType: "team-leader",
+        targetType: "user",
       });
     }
 

@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { SiteHeader } from "@/components/sidebar/site-header"
-import { Button } from "@/components/ui/button"
-import { 
+import {
   BarChart, 
   Clock, 
   Lightbulb, 
@@ -43,7 +42,6 @@ export default function MonitoringPage() {
     }
   }, [sessionId])
   
-  // Keep the "Coming Soon" UI
   return (
     <>
       <SiteHeader title={sessionData?.name ? `Monitoring: ${sessionData.name}` : "Monitoring Dashboard"} />

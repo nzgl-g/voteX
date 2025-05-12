@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { PricingDialog } from "@/components/pricing-dialog";
-import { authApi } from "@/lib/api";
+import { authService } from "@/services";
 
 export const HeroSection = () => {
   const { resolvedTheme } = useTheme();
@@ -21,7 +21,7 @@ export const HeroSection = () => {
   // Function to check authentication status
   const checkAuth = () => {
     if (typeof window !== 'undefined') {
-      const auth = authApi.isAuthenticated();
+      const auth = authService.isAuthenticated();
       console.log('Authentication status checked:', auth);
       setIsAuthenticated(auth);
       return auth;
@@ -37,22 +37,35 @@ export const HeroSection = () => {
     
     // If user is authenticated, redirect to the appropriate dashboard
     if (isAuth) {
-      // Get user role from localStorage
-      const user = authApi.getCurrentUser();
-      if (user && user.role) {
-        switch (user.role.toLowerCase()) {
-          case 'team-leader':
-            router.push('/team-leader/monitoring/default');
-            break;
-          case 'team-member':
-            router.push('/team-member/monitoring/default');
-            break;
-          default:
-            router.push('/voter');
-            break;
+      // Get user from localStorage
+      const user = authService.getCurrentUser();
+      
+      // In the new services structure, we need to access the role differently
+      // It might be stored as a custom property or we need to determine it based on other properties
+      let userRole = null;
+      
+      if (user) {
+        // Try to get role from user object (could be stored in different ways)
+        userRole = (user as any).role || localStorage.getItem('userRole');
+        
+        if (userRole) {
+          switch (userRole.toLowerCase()) {
+            case 'team-leader':
+              router.push('/team-leader/monitoring/default');
+              break;
+            case 'team-member':
+              router.push('/team-member/monitoring/default');
+              break;
+            default:
+              router.push('/voter');
+              break;
+          }
+        } else {
+          // Default to voter portal if no role is found
+          router.push('/voter');
         }
       } else {
-        // Default to voter portal if role is not available
+        // Default to voter portal if no user is found
         router.push('/voter');
       }
     }

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Settings, LogOut, User, LayoutDashboard, Vote } from "lucide-react";
 import { SettingsDialog } from "@/components/user-settings/settings-dialog";
-import { authApi, sessionApi } from "@/lib/api";
+import { authService, sessionService } from "@/services";
 import { useRouter, usePathname } from "next/navigation";
 
 export interface UserProfileProps {
@@ -39,7 +39,7 @@ export function UserProfile({
     useEffect(() => {
         const checkUserSessions = async () => {
             try {
-                const sessions = await sessionApi.getUserSessions();
+                const sessions = await sessionService.getUserSessions();
                 if (sessions && sessions.length > 0) {
                     setHasSessions(true);
                     if (sessions[0]._id) {
@@ -51,7 +51,7 @@ export function UserProfile({
             }
         };
 
-        if (authApi.isAuthenticated()) {
+        if (authService.isAuthenticated()) {
             checkUserSessions();
         }
     }, []);
@@ -65,7 +65,7 @@ export function UserProfile({
         : "U";
 
     const handleLogout = () => {
-        authApi.logout();
+        authService.logout();
         router.push('/');
     };
 

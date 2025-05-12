@@ -33,9 +33,13 @@ app.use(express.json());
 
 // Import routes
 const routes = require("./startup/routes");
+const sessionBridge = require('./bridge/sessionBridge');
 
 // Use routes
 routes(app);
+
+// Register routes
+app.use("/api/blockchain", sessionBridge);
 
 io = new Server(server, {
   cors: {

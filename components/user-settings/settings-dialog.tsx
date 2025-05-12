@@ -10,7 +10,7 @@ import { LogoutSection } from "@/components/user-settings/logout";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Settings as SettingsIcon, Save, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { authApi } from "@/lib/api";
+import { authService } from "@/services";
 
 export interface SettingsDialogProps {
     open: boolean;
@@ -28,7 +28,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     useEffect(() => {
         if (open) {
             setLoading(true);
-            authApi.fetchUserProfile()
+            authService.fetchUserProfile()
                 .then(data => {
                     setUserData(data);
                 })

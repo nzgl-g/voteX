@@ -6,7 +6,7 @@ import BigCalendar from "@/components/event-calendar/big-calendar"
 import { CalendarProvider } from "@/components/event-calendar/calendar-context"
 import { SiteHeader } from "@/components/sidebar/site-header"
 import { Loader2, Plus } from "lucide-react"
-import apiClient from "@/lib/api"
+import { baseApi } from "@/services"
 
 export default function SchedulerPage() {
   const params = useParams()
@@ -25,7 +25,7 @@ export default function SchedulerPage() {
         setError(null)
         
         // First fetch all user sessions to check if any exist
-        const userSessionsResponse = await apiClient.get('/sessions/my-sessions')
+        const userSessionsResponse = await baseApi.get('/sessions/my-sessions')
         const userSessionsData = userSessionsResponse.data || []
         setUserSessions(userSessionsData)
         

@@ -346,8 +346,8 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
       // Perform the actual delete operation
       await taskService.deleteTask(taskId);
 
-      // Refresh tasks from backend to ensure UI is in sync
-      await fetchTasksAndMembers();
+      // OPTIMISTIC UPDATE: Remove task from local state
+      setTasks(prevTasks => prevTasks.filter(task => task._id !== taskId));
 
       toast.success("Task deleted", {
         description: `Task "${taskTitle}" has been deleted successfully.`,
@@ -357,10 +357,13 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
       toast.error("Error", {
         description: error.message || "Failed to delete task. Please try again.",
       });
-      // Optionally refresh tasks to restore the correct state
-      setTimeout(() => {
-        fetchTasksAndMembers();
-      }, 500);
+      // Optionally refresh tasks to restore the correct state if delete failed
+      // Consider if a full refresh is really needed here on error, 
+      // maybe just log the error and inform the user.
+      // If refresh is needed, uncomment the below:
+      // setTimeout(() => {
+      //   fetchTasksAndMembers();
+      // }, 500);
     } finally {
       toast.dismiss(loadingToast);
       setIsDeleteDialogOpen(false);
@@ -719,4 +722,3 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
     </div>
   )
 }
-

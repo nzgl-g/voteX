@@ -1,7 +1,23 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
-import { notificationService, NotificationPayload } from '@/api/notification-service';
+import { notificationService, Notification } from '@/services/notification-service';
+
+// Define a NotificationPayload interface that combines the old and new notification structures
+interface NotificationPayload {
+  _id: string;
+  id?: string;
+  userId?: string;
+  type: string;
+  title?: string;
+  message: string;
+  link?: string;
+  targetType?: 'user' | 'team' | 'all';
+  category?: 'Alert' | 'Interaction';
+  timestamp?: string;
+  createdAt: string;
+  relatedId?: string;
+}
 
 export function useNotifications() {
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -63,8 +79,22 @@ export function useNotifications() {
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        const data = await notificationService.getUserNotifications(10, 0);
-        setNotifications(data);
+        // Use the new getNotifications method instead of getUserNotifications
+        const data = await notificationService.getNotifications();
+        
+        // Map the Notification objects to NotificationPayload objects
+        const mappedData: NotificationPayload[] = data.map(notification => ({
+          _id: notification._id,
+          id: notification._id,
+          userId: notification.userId,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          link: notification.relatedId ? `/tasks/${notification.relatedId}` : undefined,
+          createdAt: notification.createdAt
+        }));
+        
+        setNotifications(mappedData);
       } catch (error) {
         console.error('Failed to fetch notifications:', error);
       }

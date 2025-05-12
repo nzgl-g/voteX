@@ -219,10 +219,14 @@ class SessionService {
    */
   async createSession(sessionData: Session): Promise<Session> {
     try {
+      console.log('Sending session data to API:', JSON.stringify(sessionData, null, 2));
       const response = await baseApi.post<Session>('/sessions', sessionData);
       return response.data;
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to create session';
+      console.error('Session creation error details:', error);
+      const errorResponse = error.response?.data;
+      const errorMessage = errorResponse?.message || errorResponse?.error || 'Failed to create session';
+      console.error('Error response data:', errorResponse);
       throw new Error(errorMessage);
     }
   }

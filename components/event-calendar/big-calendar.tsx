@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { addDays, setHours, setMinutes, getDay, format, parseISO } from "date-fns";
 import { useCalendarContext } from "@/components/event-calendar/calendar-context";
-import apiClient from "@/lib/api";
+import { baseApi } from "@/services";
 
 import {
   EventCalendar,
@@ -93,7 +93,7 @@ export default function Component({ sessionId }: BigCalendarProps) {
   useEffect(() => {
     if (sessionId) {
       setLoading(true);
-      apiClient.get(`/sessions/${sessionId}`)
+      baseApi.get(`/sessions/${sessionId}`)
         .then(response => {
           setSession(response.data);
           generateSessionLifecycleEvents(response.data);

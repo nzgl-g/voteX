@@ -17,7 +17,7 @@ import { UserProfile } from "@/components/shared/user-profile"
 import { LucideIcon } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
-import { authApi } from "@/lib/api"
+import { authService } from "@/services"
 import { Vote } from "lucide-react"
 import Image from "next/image"
 
@@ -57,11 +57,11 @@ export function SidebarLeft({
         const fetchUserData = async () => {
             try {
                 setLoading(true);
-                const userProfile = await authApi.fetchUserProfile();
+                const userProfile = await authService.fetchUserProfile();
                 setUserData({
-                    name: userProfile.name || "User",
+                    name: userProfile.fullName || userProfile.username || "User",
                     email: userProfile.email || "",
-                    avatar: userProfile.avatar || undefined
+                    avatar: userProfile.profilePic || undefined
                 });
             } catch (error) {
                 console.error("Failed to fetch user profile:", error);
@@ -104,14 +104,14 @@ export function SidebarLeft({
                     <div className="flex items-center">
                         <div className="h-8 w-auto mr-2">
                             <Image 
-                                src="/logos/logo-expanded.svg" 
+                                src="/logos/expended-dark.svg" 
                                 alt="VoteX Logo" 
                                 width={120}
                                 height={32}
                                 className="h-8 w-auto hidden dark:block" 
                             />
                             <Image 
-                                src="/logos/logo-expanded-dark.svg" 
+                                src="/logos/expended.svg" 
                                 alt="VoteX Logo" 
                                 width={120}
                                 height={32}

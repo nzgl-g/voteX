@@ -7,7 +7,7 @@ import Link from "next/link";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { UserProfile } from "@/components/shared/user-profile";
 import { NotificationButton } from "@/components/shared/notification-button";
-import { authApi } from "@/lib/api";
+import { authService } from "@/services";
 import { toast } from "sonner";
 import VotingSessionForm from "@/components/session-creation/voting-session-form";
 import { motion } from "framer-motion";
@@ -47,11 +47,11 @@ export default function SessionSetupPage() {
     // Fetch user data
     const fetchUserData = async () => {
       try {
-        const userProfile = await authApi.fetchUserProfile();
+        const userProfile = await authService.fetchUserProfile();
         setUserData({
-          name: userProfile.name || "User",
+          name: userProfile.fullName || userProfile.username || "User",
           email: userProfile.email || "",
-          avatar: userProfile.avatar || undefined
+          avatar: userProfile.profilePic || undefined
         });
       } catch (error) {
         console.error("Failed to fetch user profile:", error);

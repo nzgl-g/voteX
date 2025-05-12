@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Camera, Check, Pencil, Dices, Loader2 } from "lucide-react";
-import { authApi } from "@/lib/api";
+import { authService } from "@/services";
 
 interface ProfileSettingsProps {
     onSave: () => void;
@@ -44,7 +44,7 @@ export function ProfileSettings({ onSave, userData }: ProfileSettingsProps) {
                     
                     try {
                         setLoading(true);
-                        await authApi.updateProfile({ profilePic: newAvatarUrl });
+                        await authService.updateProfile({ profilePic: newAvatarUrl });
                         toast({ title: "Avatar updated successfully!", duration: 2000 });
                         onSave();
                     } catch (error: any) {
@@ -69,7 +69,7 @@ export function ProfileSettings({ onSave, userData }: ProfileSettingsProps) {
         
         try {
             setLoading(true);
-            await authApi.updateProfile({ profilePic: newAvatarUrl });
+            await authService.updateProfile({ profilePic: newAvatarUrl });
             toast({
                 title: "Random avatar generated!",
                 description: "How's this look? ",
@@ -109,7 +109,7 @@ export function ProfileSettings({ onSave, userData }: ProfileSettingsProps) {
 
         try {
             setLoading(true);
-            await authApi.updateProfile({ email });
+            await authService.updateProfile({ email });
             toast({
                 title: "Email updated successfully!",
                 description: "We've sent a verification email to your new address",
@@ -146,8 +146,8 @@ export function ProfileSettings({ onSave, userData }: ProfileSettingsProps) {
         }
         try {
             setLoading(true);
-            const available = await authApi.checkUsernameAvailability(username);
-            if (!available) {
+            const response = await authService.checkUsernameAvailability(username);
+            if (!response.available) {
                 toast({
                     title: "Username unavailable",
                     description: "This username is already taken. Please choose another.",
@@ -155,7 +155,7 @@ export function ProfileSettings({ onSave, userData }: ProfileSettingsProps) {
                 });
                 return;
             }
-            await authApi.updateProfile({ username });
+            await authService.updateProfile({ username });
             toast({ title: "Username updated successfully!", duration: 2000 });
             onSave();
         } catch (error: any) {
@@ -181,7 +181,7 @@ export function ProfileSettings({ onSave, userData }: ProfileSettingsProps) {
 
         try {
             setLoading(true);
-            await authApi.updateProfile({ fullName });
+            await authService.updateProfile({ fullName });
             toast({ title: "Full name updated successfully!", duration: 2000 });
             onSave();
         } catch (error: any) {
@@ -205,7 +205,7 @@ export function ProfileSettings({ onSave, userData }: ProfileSettingsProps) {
         
         try {
             setLoading(true);
-            await authApi.updateProfile({ gender: newGender });
+            await authService.updateProfile({ gender: newGender });
             toast({ title: "Gender updated successfully!", duration: 2000 });
             onSave();
         } catch (error: any) {

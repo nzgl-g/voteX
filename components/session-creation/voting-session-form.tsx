@@ -80,22 +80,22 @@ const initialFormData: FormData = {
   maxRanks: 3,
 
   // Step 3
-  startDate: null,
-  endDate: null,
+  startDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // Default to tomorrow
+  endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default to a week from now
   hasNomination: false,
   nominationStartDate: null,
   nominationEndDate: null,
 
   // Step 4
-  verificationType: null,
+  verificationType: "standard", // Default to standard verification
 
   // Step 5
-  visibility: null,
+  visibility: "public", // Default to public
   secretPhrase: "",
   csvFile: null,
 
   // Step 6
-  resultVisibility: null,
+  resultVisibility: "post-completion", // Default to showing results after completion
 
   // Step 7
   pollOptions: [],
@@ -156,16 +156,59 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
     }
   }
 
+  // Validate required fields for session creation
+  const validateSessionData = () => {
+    const errors = [];
+    
+    // Basic validation
+    if (!formData.title) errors.push("Session title is required");
+    if (!formData.voteType) errors.push("Vote type is required");
+    if (!formData.votingMode) errors.push("Voting mode is required");
+    
+    // Type-specific validation
+    if (formData.voteType === 'poll' && (!formData.pollOptions || formData.pollOptions.length < 2)) {
+      errors.push("Poll requires at least two options");
+    }
+    
+    if (formData.voteType === 'election' && !formData.hasNomination && 
+        (!formData.candidates || formData.candidates.length === 0)) {
+      errors.push("Election requires at least one candidate or nomination phase");
+    }
+    
+    // If we have no verification method selected
+    if (!formData.verificationType) {
+      errors.push("Please select a verification method");
+    }
+    
+    // If private visibility is selected but no secret phrase
+    if (formData.visibility === 'private' && !formData.secretPhrase) {
+      errors.push("Secret phrase is required for private sessions");
+    }
+    
+    return errors;
+  };
+
   const handleSubmit = async () => {
     try {
+      // Validate form data
+      const validationErrors = validateSessionData();
+      if (validationErrors.length > 0) {
+        toast({
+          title: "Validation Error",
+          description: validationErrors.join("\n"),
+          variant: "destructive",
+        });
+        return;
+      }
+      
       setIsSubmitting(true);
-      // Map the form data to the Session interface format
+      
+      // Map the form data to the Session interface format - ensure it exactly matches backend model
       const sessionData: any = {
         name: formData.title,
-        description: formData.description,
-        organizationName: formData.organization,
-        // For banner, you would need to upload it separately and get a URL
-        // banner: formData.banner ? URL of uploaded banner : undefined,
+        description: formData.description || "", // Ensure not null
+        organizationName: formData.organization || "", // Ensure not null
+        banner: null, // We'll handle file uploads separately
         
         type: formData.voteType as 'election' | 'poll' | 'tournament',
         subtype: formData.votingMode as 'single' | 'multiple' | 'ranked',
@@ -176,49 +219,75 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
           name: subscription,
           price: subscription === 'free' ? 0 : 49.99,
           voterLimit: subscription === 'free' ? 100 : 5000,
+          features: [], // Required array field
+          isRecommended: false
         },
         
         sessionLifecycle: {
-          // Add created date
+          // Always include creation timestamp
           createdAt: new Date().toISOString(),
-          // Add scheduled dates if nomination is enabled
-          scheduledAt: formData.hasNomination && formData.nominationStartDate && formData.nominationEndDate ? {
-            start: formData.nominationStartDate.toISOString(),
-            end: formData.nominationEndDate.toISOString()
-          } : undefined,
-          // Voting period
-          // These are added later when the session is started
-          // startedAt: formData.startDate?.toISOString(),
-          // endedAt: formData.endDate?.toISOString(),
+          
+          // Only use scheduledAt for nomination phase in election type
+          scheduledAt: formData.hasNomination && formData.voteType === 'election'
+            ? {
+                start: formData.nominationStartDate ? formData.nominationStartDate.toISOString() : null,
+                end: formData.nominationEndDate ? formData.nominationEndDate.toISOString() : null
+              }
+            : { start: null, end: null },
+            
+          // Always include start and end dates for the voting period
+          startedAt: formData.startDate ? formData.startDate.toISOString() : new Date().toISOString(),
+          endedAt: formData.endDate ? formData.endDate.toISOString() : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
         },
+        
+        // Contract address starts as null - will be set when session is deployed to blockchain
+        contractAddress: null,
         
         // Security settings
         securityMethod: formData.visibility === 'private' ? 'Secret Phrase' : null,
-        secretPhrase: formData.visibility === 'private' ? formData.secretPhrase : undefined,
+        secretPhrase: formData.visibility === 'private' ? formData.secretPhrase : null,
         verificationMethod: formData.verificationType === 'kyc' ? 'KYC' : null,
+        
+        // Default required fields
+        candidateRequests: [],
+        participants: [],
+        allowDirectEdit: false,
+        allowsOfficialPapers: false,
+        results: null,
       };
       
       // Add type-specific data
       if (formData.voteType === 'poll') {
         sessionData.options = formData.pollOptions.map(option => ({
           name: option.title,
-          description: option.description,
+          description: option.description || "", // Ensure not null
           totalVotes: 0
         }));
         sessionData.maxChoices = formData.votingMode === 'multiple' ? formData.maxSelections : 1;
       } else if (formData.voteType === 'election') {
+        sessionData.candidates = [];
         // If not in nomination phase, add candidates
-        if (!formData.hasNomination) {
+        if (!formData.hasNomination && formData.candidates.length > 0) {
           sessionData.candidates = formData.candidates.map(candidate => ({
             user: candidate.id, // This would normally be a user ID
             fullName: candidate.name,
-            biography: candidate.biography,
-            partyName: '',
+            biography: candidate.biography || "", // Ensure not null
+            partyName: 'Independent', // Required field
             totalVotes: 0
           }));
         }
         sessionData.maxChoices = formData.votingMode === 'multiple' ? formData.maxSelections : 1;
       }
+      
+      console.log('Creating session with data:', JSON.stringify(sessionData, null, 2));
+      
+      // Debug date values
+      console.log('Date debugging:');
+      console.log('Start date from form:', formData.startDate);
+      console.log('End date from form:', formData.endDate);
+      console.log('Nomination start from form:', formData.nominationStartDate);
+      console.log('Nomination end from form:', formData.nominationEndDate);
+      console.log('Session lifecycle in payload:', sessionData.sessionLifecycle);
       
       // Call the session service to create the session
       const response = await sessionService.createSession(sessionData);

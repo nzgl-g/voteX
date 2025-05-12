@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CalendarIcon, Upload } from 'lucide-react';
-import { candidateService } from '@/api/candidate-service';
+import { candidateService } from '@/services/candidate-service';
 
 interface CandidateFormDialogProps {
     open: boolean;
@@ -161,16 +161,13 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
                 biography: formData.biography,
                 experience: formData.experience,
                 nationalities: formData.nationalities.split(',').map(n => n.trim()),
-                dobPob: formData.dateOfBirth ? 
-                    `${format(formData.dateOfBirth, 'yyyy-MM-dd')}, ${formData.placeOfBirth}` : 
-                    `Unknown, ${formData.placeOfBirth}`,
-                promises: formData.promises,
+                dobPob: {
+                    dateOfBirth: formData.dateOfBirth ? format(formData.dateOfBirth, 'yyyy-MM-dd') : 'Unknown',
+                    placeOfBirth: formData.placeOfBirth
+                },
+                promises: formData.promises.split('\n').map(p => p.trim()).filter(p => p),
                 partyName: formData.partyName,
-                paper: formData.paperBase64 && formData.officialPaper ? 
-                    [{ 
-                        name: formData.officialPaper.name,
-                        url: formData.paperBase64
-                    }] : undefined
+                paper: formData.paperBase64 || undefined
             };
 
             // Submit the application using the candidate service

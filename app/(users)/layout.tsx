@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { authApi } from '@/lib/api';
+import { authService } from '@/services';
 import { NotificationProvider } from '@/components/shared/notification-provider';
 
 export default function UsersLayout({
@@ -14,7 +14,7 @@ export default function UsersLayout({
 
   useEffect(() => {
     // Check if the user is authenticated
-    const isAuthenticated = authApi.isAuthenticated();
+    const isAuthenticated = authService.isAuthenticated();
     
     // If not authenticated, redirect to the landing page
     if (!isAuthenticated) {

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { authApi } from '@/lib/api';
+import { authService } from '@/services';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +25,7 @@ export function UserAccountNav() {
     if (typeof window === 'undefined') return;
     
     try {
-      const currentUser = authApi.getCurrentUser();
+      const currentUser = authService.getCurrentUser();
       setUser(currentUser);
     } catch (error) {
       console.error('Failed to get current user:', error);
@@ -35,7 +35,7 @@ export function UserAccountNav() {
   }, []);
 
   const handleLogout = () => {
-    authApi.logout();
+    authService.logout();
     router.push('/login');
   };
 

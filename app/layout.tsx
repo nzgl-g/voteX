@@ -4,7 +4,7 @@ import "./globals.css";
 import {ThemeProvider} from "@/components/theme-provider";
 import {cn} from "@/lib/utils";
 import {ClientLoadingBar} from "@/components/ui/client-loading-bar";
-import {Toaster} from "sonner";
+import {Toaster} from "@/components/ui/sonner";
 import {StagewiseToolbar} from '@stagewise/toolbar-next';
 import {NotificationProvider} from "@/components/shared/notification-provider";
 
@@ -34,7 +34,6 @@ export default function RootLayout({
             disableTransitionOnChange
         >
             <Toaster 
-              position="bottom-center"
               toastOptions={{
                 style: {
                   background: 'var(--background)',

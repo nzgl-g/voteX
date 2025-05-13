@@ -54,9 +54,13 @@ const sessionSchema = new mongoose.Schema({
     ],
     required: true,
   },
-  accessLevel: {
+  visibility: {
     type: String,
-    enum: ["Public", "Private"],
+    enum: ["public", "private"],
+  },
+  resultVisibility: {
+    type: String,
+    enum: ["real-time", "post-completion"],
   },
   subscription: {
     name: {
@@ -91,8 +95,7 @@ const sessionSchema = new mongoose.Schema({
   },
   secretPhrase: {
     type: String,
-    unique: true,
-    sparse: true,
+    default: null,
   },
   verificationMethod: {
     type: String,

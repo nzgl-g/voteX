@@ -84,7 +84,7 @@ router.get("/by-phrase/:phrase", auth, async (req, res) => {
     }
     const session = await Session.findOne({
       secretPhrase: phrase,
-      accessLevel: "Private",
+      visibility: "Private",
       securityMethod: "Secret Phrase",
     });
 
@@ -173,7 +173,8 @@ router.post("/", auth, async (req, res) => {
       subscription,
       sessionLifecycle,
       securityMethod,
-      accessLevel,
+      visibility,
+      resultVisibility,
       secretPhrase,
       verificationMethod,
       candidates,
@@ -208,7 +209,8 @@ router.post("/", auth, async (req, res) => {
       subscription,
       sessionLifecycle,
       securityMethod,
-      accessLevel,
+      visibility,
+      resultVisibility,
       secretPhrase,
       verificationMethod,
       createdBy: creator,

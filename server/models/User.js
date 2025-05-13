@@ -70,6 +70,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
+  kycSignature: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
 });
 
 userSchema.methods.generateAuthToken = function () {

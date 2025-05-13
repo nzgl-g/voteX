@@ -100,7 +100,7 @@ const sessionSchema = new mongoose.Schema({
   },
   verificationMethod: {
     type: String,
-    enum: ["KYC", "CVC", null],
+    enum: ["KYC", "standard", null],
     default: null,
   },
   candidateRequests: [

@@ -96,6 +96,7 @@ const sessionSchema = new mongoose.Schema({
   secretPhrase: {
     type: String,
     default: null,
+    unique: true,
   },
   verificationMethod: {
     type: String,

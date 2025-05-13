@@ -34,7 +34,8 @@ export interface Session {
     | "Double Elimination"
     | "Single Elimination";
   tournamentType?: "Round Robin" | "Knockout" | "Swiss" | null;
-  accessLevel: "Public" | "Private";
+  visibility: "public" | "private";
+  resultVisibility?: "real-time" | "post-completion";
   securityMethod?: "Secret Phrase" | "Area Restriction" | null;
   verificationMethod?: "S" | "CVC" | null;
   candidateStep: "Nomination" | "Invitation";

@@ -94,6 +94,7 @@ const startApp = async () => {
 
     // Start server
     await startServer();
+
   } catch (error) {
     process.exit(1);
   }

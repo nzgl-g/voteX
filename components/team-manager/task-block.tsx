@@ -24,7 +24,6 @@ import {
 } from "lucide-react"
 import { taskService, Task } from "@/services/task-service"
 import { toast } from "sonner"
-import { useParams } from "next/navigation"
 import { format, isAfter, formatDistanceToNow } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -51,197 +50,39 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { teamService, TeamMember } from "@/services/team-service"
-import { sessionService } from "@/services/session-service"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Progress } from "@/components/ui/progress"
+import { useTeam, ExtendedTeamMember } from "./team-context"
 import TaskDialog from "./task-dialog"
-
-// Extended TeamMember interface to include avatar property
-interface ExtendedTeamMember extends TeamMember {
-  avatar?: string;
-}
 
 interface TaskBlockProps {
   onAddTask: () => void
 }
 
 export default function TaskBlock({ onAddTask }: TaskBlockProps) {
-  const [tasks, setTasks] = useState<Task[]>([])
+  const { teamMembers, tasks, fetchTasks, refreshCounter } = useTeam()
+  
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [teamMembers, setTeamMembers] = useState<Record<string, ExtendedTeamMember>>({})
   const [updating, setUpdating] = useState<string | null>(null)
   const [filter, setFilter] = useState<"all" | "pending" | "completed">("all")
   const [sortBy, setSortBy] = useState<"dueDate" | "priority" | "recent">("dueDate")
-  const params = useParams()
-  const sessionId = params.id as string
   
   // Edit and delete state
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [taskToEdit, setTaskToEdit] = useState<Task | undefined>(undefined)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<Task | undefined>(undefined)
-  
-  // Auto-refresh reference
-  const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const lastDataRef = useRef<{ tasks: Task[], members: Record<string, ExtendedTeamMember> }>({ 
-    tasks: [], 
-    members: {} 
-  })
 
-  // Quiet fetch function that doesn't set loading state
-  const quietFetchData = useCallback(async () => {
-    try {
-      // Fetch tasks for the session
-      const tasksData = await taskService.getSessionTasks(sessionId)
-      
-      // Check if tasks have changed
-      const tasksChanged = JSON.stringify(tasksData) !== JSON.stringify(lastDataRef.current.tasks)
-      
-      if (tasksChanged) {
-        // Update tasks state
-        setTasks(tasksData)
-        lastDataRef.current.tasks = tasksData
-        
-        // Get team ID for the session
-        const teamId = await sessionService.getSessionTeam(sessionId)
-        
-        if (teamId) {
-          // Fetch team members data
-          const teamData = await teamService.getTeamMembers(teamId)
-          
-          // Create a map of member IDs to member data
-          const membersMap: Record<string, ExtendedTeamMember> = {}
-          
-          // Add leader
-          if (teamData.leader && typeof teamData.leader !== 'string') {
-            membersMap[teamData.leader._id] = {
-              ...teamData.leader,
-              avatar: `/api/avatar?name=${teamData.leader.username}`
-            } as ExtendedTeamMember
-          }
-          
-          // Add members
-          if (teamData.members && Array.isArray(teamData.members)) {
-            teamData.members.forEach(member => {
-              if (typeof member !== 'string') {
-                membersMap[member._id] = {
-                  ...member,
-                  avatar: `/api/avatar?name=${member.username}`
-                } as ExtendedTeamMember
-              }
-            })
-          }
-          
-          // Check if members have changed
-          const membersChanged = JSON.stringify(membersMap) !== JSON.stringify(lastDataRef.current.members)
-          
-          if (membersChanged) {
-            setTeamMembers(membersMap)
-            lastDataRef.current.members = membersMap
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Auto-refresh failed:", error)
-      // Don't show error toast for quiet refresh
-    }
-  }, [sessionId])
-
-  // Memoize the fetchTasksAndMembers function to prevent unnecessary re-renders
-  const fetchTasksAndMembers = useCallback(async () => {
+  // Apply filters and sorting to tasks
+  useEffect(() => {
     setIsLoading(true)
-    try {
-      // Fetch tasks for the session
-      const tasksData = await taskService.getSessionTasks(sessionId)
-      setTasks(tasksData)
-      lastDataRef.current.tasks = tasksData
-      
-      // Get unique member IDs from all tasks
-      const memberIds = new Set<string>()
-      tasksData.forEach(task => {
-        task.assignedMembers.forEach(memberId => {
-          memberIds.add(memberId)
-        })
-      })
-      
-      // Get team ID for the session
-      const teamId = await sessionService.getSessionTeam(sessionId)
-      
-      if (teamId) {
-        // Fetch team members data
-        const teamData = await teamService.getTeamMembers(teamId)
-        
-        // Create a map of member IDs to member data
-        const membersMap: Record<string, TeamMember> = {}
-        
-        // Add leader
-        if (teamData.leader && typeof teamData.leader !== 'string') {
-          membersMap[teamData.leader._id] = {
-            ...teamData.leader,
-            avatar: `/api/avatar?name=${teamData.leader.username}`
-          } as ExtendedTeamMember
-        }
-        
-        // Add members
-        if (teamData.members && Array.isArray(teamData.members)) {
-          teamData.members.forEach(member => {
-            if (typeof member !== 'string') {
-              membersMap[member._id] = {
-                ...member,
-                avatar: `/api/avatar?name=${member.username}`
-              } as ExtendedTeamMember
-            }
-          })
-        }
-        
-        setTeamMembers(membersMap)
-        lastDataRef.current.members = membersMap
-      }
-    } catch (error) {
-      console.error("Failed to fetch tasks:", error)
-      toast.error("Error", {
-        description: "Failed to load tasks. Please try again later.",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }, [sessionId])
-
-  useEffect(() => {
-    if (sessionId) {
-      fetchTasksAndMembers()
-      
-      // Set up auto-refresh interval
-      autoRefreshIntervalRef.current = setInterval(() => {
-        quietFetchData()
-      }, 15000) // 15 seconds
-    }
     
-    // Cleanup function
-    return () => {
-      setTasks([])
-      setFilteredTasks([])
-      setTeamMembers({})
-      setUpdating(null)
-      setTaskToEdit(undefined)
-      setTaskToDelete(undefined)
-      
-      // Clear the interval when component unmounts
-      if (autoRefreshIntervalRef.current) {
-        clearInterval(autoRefreshIntervalRef.current)
-      }
-    }
-  }, [sessionId, fetchTasksAndMembers, quietFetchData])
-
-  useEffect(() => {
-    // Apply filters and sorting
+    // Filter tasks
     let result = [...tasks]
     
-    // Filter by status
     if (filter === "pending") {
-      result = result.filter(task => task.status === "pending")
+      result = result.filter(task => task.status !== "completed")
     } else if (filter === "completed") {
       result = result.filter(task => task.status === "completed")
     }
@@ -249,46 +90,45 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
     // Sort tasks
     result.sort((a, b) => {
       if (sortBy === "dueDate") {
-        // Sort by due date (tasks without due dates go to the end)
-        if (!a.dueDate && !b.dueDate) return 0
-        if (!a.dueDate) return 1
-        if (!b.dueDate) return -1
-        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+        // If both have due dates, compare them
+        if (a.dueDate && b.dueDate) {
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+        }
+        // If only one has a due date, prioritize the one with a due date
+        if (a.dueDate) return -1
+        if (b.dueDate) return 1
+        return 0
       } else if (sortBy === "priority") {
-        // Sort by priority (high > medium > low)
-        const priorityWeight = { high: 3, medium: 2, low: 1 }
-        return priorityWeight[b.priority] - priorityWeight[a.priority]
+        // Convert priority to numeric value for comparison
+        const priorityValue: Record<string, number> = { high: 0, medium: 1, low: 2 }
+        return priorityValue[a.priority] - priorityValue[b.priority]
       } else {
-        // Sort by creation date (recent first)
+        // Sort by creation date (most recent first)
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       }
     })
     
     setFilteredTasks(result)
-  }, [tasks, filter, sortBy])
+    setIsLoading(false)
+  }, [tasks, filter, sortBy, refreshCounter])
 
   const handleToggleComplete = async (taskId: string) => {
-    setUpdating(taskId)
+    if (updating) return; // Prevent multiple simultaneous updates
+    
+    setUpdating(taskId);
+    
     try {
-      // Call the backend to toggle completion
       const updatedTask = await taskService.toggleTaskCompletion(taskId);
       // Update the task in state with the server response
-      setTasks(prevTasks => 
-        prevTasks.map(task => task._id === taskId ? updatedTask : task)
+      await fetchTasks();
+      
+      toast.success(
+        updatedTask.status === "completed" ? "Task completed" : "Task reopened",
+        { description: "Task status has been updated." }
       );
-      // Show success toast
-      if (updatedTask.status === "completed") {
-        toast.success("Task completed", {
-          description: `You've marked \"${updatedTask.title}\" as complete.`,
-        });
-      } else {
-        toast.success("Task reopened", {
-          description: `You've reopened \"${updatedTask.title}\".`,
-        });
-      }
     } catch (error: any) {
       console.error("Failed to toggle task completion:", error);
-      fetchTasksAndMembers();
+      fetchTasks();
       toast.error("Error", {
         description: error.message || "Failed to update task status. Please try again.",
       });
@@ -335,39 +175,36 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
 
   const confirmDeleteTask = async () => {
     if (!taskToDelete) return;
-
+    
     const taskId = taskToDelete._id;
-    const taskTitle = taskToDelete.title;
-
-    // Show loading toast
+    setIsDeleteDialogOpen(false);
+    setTaskToDelete(undefined);
+    
     const loadingToast = toast.loading("Deleting task...");
-
+    
     try {
-      // Perform the actual delete operation
       await taskService.deleteTask(taskId);
-
-      // OPTIMISTIC UPDATE: Remove task from local state
-      setTasks(prevTasks => prevTasks.filter(task => task._id !== taskId));
-
+      
       toast.success("Task deleted", {
-        description: `Task "${taskTitle}" has been deleted successfully.`,
+        description: "The task has been successfully removed.",
       });
+      
+      // Refresh tasks after deletion
+      await fetchTasks();
+      toast.dismiss(loadingToast);
     } catch (error: any) {
       console.error("Failed to delete task:", error);
-      toast.error("Error", {
+      toast.error("Error deleting task", {
         description: error.message || "Failed to delete task. Please try again.",
       });
-      // Optionally refresh tasks to restore the correct state if delete failed
-      // Consider if a full refresh is really needed here on error, 
-      // maybe just log the error and inform the user.
-      // If refresh is needed, uncomment the below:
-      // setTimeout(() => {
-      //   fetchTasksAndMembers();
-      // }, 500);
-    } finally {
-      toast.dismiss(loadingToast);
-      setIsDeleteDialogOpen(false);
-      setTaskToDelete(undefined);
+      
+      // Refresh tasks after a short delay
+      setTimeout(() => {
+        fetchTasks().then(() => {
+          // Dismiss loading toast when done
+          toast.dismiss(loadingToast);
+        });
+      }, 500);
     }
   };
 
@@ -383,7 +220,7 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
     
     // Refresh tasks after a short delay
     setTimeout(() => {
-      fetchTasksAndMembers().then(() => {
+      fetchTasks().then(() => {
         // Dismiss loading toast when done
         toast.dismiss(loadingToast)
       }).catch(() => {
@@ -391,6 +228,21 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
         toast.dismiss(loadingToast)
       })
     }, 300)
+  }
+
+  // Helper function to get member initials for avatar
+  const getMemberInitials = (memberId: string): string => {
+    const member = teamMembers.find(m => m._id === memberId)
+    if (!member) return '??'
+    
+    const username = member.username || ''
+    return username.substring(0, 2).toUpperCase()
+  }
+
+  // Helper function to get member username
+  const getMemberUsername = (memberId: string): string => {
+    const member = teamMembers.find(m => m._id === memberId)
+    return member?.username || 'Unknown Member'
   }
 
   // Render loading skeleton
@@ -596,25 +448,22 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
                 {task.assignedMembers.length > 0 && (
                   <div className="flex items-center gap-2 mt-1">
                     <div className="flex -space-x-2">
-                      {task.assignedMembers.slice(0, 3).map(memberId => {
-                        const member = teamMembers[memberId]
-                        return (
-                          <TooltipProvider key={memberId}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Avatar className="h-8 w-8 border-2 border-background shadow-sm">
-                                  <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                                    {member?.username.substring(0, 2).toUpperCase() || '??'}
-                                  </AvatarFallback>
-                                </Avatar>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom">
-                                {member?.username || 'Unknown Member'}
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )
-                      })}
+                      {task.assignedMembers.slice(0, 3).map(memberId => (
+                        <TooltipProvider key={memberId}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Avatar className="h-8 w-8 border-2 border-background shadow-sm">
+                                <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                                  {getMemberInitials(memberId)}
+                                </AvatarFallback>
+                              </Avatar>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              {getMemberUsername(memberId)}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ))}
                       {task.assignedMembers.length > 3 && (
                         <TooltipProvider>
                           <Tooltip>
@@ -624,14 +473,11 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
                               </div>
                             </TooltipTrigger>
                             <TooltipContent side="bottom">
-                              {task.assignedMembers.slice(3).map(memberId => {
-                                const member = teamMembers[memberId]
-                                return (
-                                  <div key={memberId}>
-                                    {member?.username || 'Unknown Member'}
-                                  </div>
-                                )
-                              })}
+                              {task.assignedMembers.slice(3).map(memberId => (
+                                <div key={memberId}>
+                                  {getMemberUsername(memberId)}
+                                </div>
+                              ))}
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -680,13 +526,13 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
       )}
 
       {/* Edit Task Dialog */}
-      <TaskDialog
-        isOpen={isEditDialogOpen}
-        onClose={handleTaskDialogClose}
-        selectedMembers={taskToEdit?.assignedMembers || []}
-        sessionId={sessionId}
-        taskToEdit={taskToEdit}
-      />
+      {isEditDialogOpen && (
+        <TaskDialog 
+          isOpen={isEditDialogOpen}
+          onClose={handleTaskDialogClose}
+          taskToEdit={taskToEdit}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={(open) => {

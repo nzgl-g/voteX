@@ -8,13 +8,18 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Vote, AlertCircle, ThumbsUp, Rocket, Lock } from "lucide-react";
+import { Loader2, Vote, AlertCircle, ThumbsUp, Mail, Shield, ExternalLink } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import blockchainService from '@/services/blockchain-service';
 import { toast } from '@/lib/toast';
+import sessionService from "@/services/session-service";
+import metamaskService from "@/services/metamask-service";
+import blockchainService from "@/services/blockchain-service";
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export type VoteType = "poll" | "elections"
-export type VoteMode = "single" | "multiple" | "ranked"
+export type VoteMode = "single" | "multiple"
 
 export interface VotingOption {
     id: string
@@ -41,459 +46,380 @@ export interface KYCData {
 export interface VotingDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
-    voteType: VoteType
-    voteMode: VoteMode
-    kyc?: boolean
-    maxSelections?: number
-    options?: VotingOption[]
-    candidates?: Candidate[]
-    contractAddress?: string
-    onSubmit: (data: any) => void
+    sessionId: string
+    onVoteSubmitted?: (data: any) => void
 }
 
 export function VotingDialog({
-                                 open,
-                                 onOpenChange,
-                                 voteType,
-                                 voteMode,
-    kyc = false,
-                                 maxSelections = 1,
-                                 options = [],
-                                 candidates = [],
-    contractAddress,
-    onSubmit
-                             }: VotingDialogProps) {
-    // For single selection
-    const [selectedOption, setSelectedOption] = useState<string>('');
-    
-    // For multiple selection
+    open,
+    onOpenChange,
+    sessionId,
+    onVoteSubmitted,
+}: VotingDialogProps) {
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [blockchainTxHash, setBlockchainTxHash] = useState<string | null>(null);
+    const [isBlockchainSession, setIsBlockchainSession] = useState(false);
+    const [voteData, setVoteData] = useState<{
+        type: string;
+        subtype: string;
+        title: string;
+        description?: string;
+        candidates?: Array<{
+            _id: string;
+            name: string;
+            bio?: string;
+            image?: string;
+        }>;
+        options?: Array<{
+            _id: string;
+            text: string;
+            description?: string;
+        }>;
+        maxChoices: number;
+    } | null>(null);
+
     const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
-    
-    // For ranked selection
-    const [rankingMap, setRankingMap] = useState<Record<string, number>>({});
-    
-    // For blockchain integration
-    const [isBlockchainVoting, setIsBlockchainVoting] = useState<boolean>(!!contractAddress);
-    const [walletAddress, setWalletAddress] = useState<string | null>(null);
-    const [isConnecting, setIsConnecting] = useState<boolean>(false);
-    const [isVoting, setIsVoting] = useState<boolean>(false);
-    const [walletConnected, setWalletConnected] = useState<boolean>(false);
-    
-    // Determine items to display based on vote type
-    const items = voteType === 'poll' ? options : candidates;
-    
+
     useEffect(() => {
-        // Reset state when dialog opens
-        if (open) {
-            setSelectedOption('');
+        if (open && sessionId) {
+            loadVoteOptions();
+        } else {
+            // Reset selections when dialog closes
             setSelectedOptions([]);
-            setRankingMap({});
-            setWalletAddress(null);
-            setWalletConnected(false);
-            
-            // Check if we need blockchain voting
-            setIsBlockchainVoting(!!contractAddress);
-            
-            // If user already has MetaMask connected, check it
-            if (contractAddress && typeof window !== 'undefined' && window.ethereum) {
-                checkWalletConnection();
-            }
+            setBlockchainTxHash(null);
         }
-    }, [open, contractAddress]);
-    
-    // Check if wallet is already connected
-    const checkWalletConnection = async () => {
-        if (blockchainService.isConnected()) {
-            setWalletAddress(blockchainService.getWalletAddress());
-            setWalletConnected(true);
+    }, [open, sessionId]);
+
+    const loadVoteOptions = async () => {
+        try {
+            setLoading(true);
+            const data = await sessionService.getVoteOptions(sessionId);
+            setVoteData(data);
+            
+            // Check if this is a blockchain session
+            const session = await sessionService.getSessionById(sessionId);
+            setIsBlockchainSession(!!session.contractAddress);
+            
+            // Initialize selected options based on vote subtype
+            if (data.subtype === "single" && (data.candidates?.length || data.options?.length)) {
+                setSelectedOptions([]);
+            } else {
+                setSelectedOptions([]);
+            }
+        } catch (error) {
+            console.error("Error loading vote options:", error);
+            toast({
+                title: "Error",
+                description: "Failed to load voting options. Please try again.",
+                variant: "destructive",
+            });
+            onOpenChange(false);
+        } finally {
+            setLoading(false);
         }
     };
-    
-    // Connect to MetaMask wallet
-    const connectWallet = async () => {
+
+    const handleOptionSelect = (optionId: string) => {
+        if (voteData?.subtype === "single") {
+            setSelectedOptions([optionId]);
+        } else {
+            // For multiple selection
+            if (selectedOptions.includes(optionId)) {
+                setSelectedOptions(selectedOptions.filter((id) => id !== optionId));
+            } else {
+                // Check if maximum choices limit is reached
+                if (selectedOptions.length < (voteData?.maxChoices || 1)) {
+                    setSelectedOptions([...selectedOptions, optionId]);
+                } else {
+                    toast({
+                        title: "Maximum Selections Reached",
+                        description: `You can only select up to ${voteData?.maxChoices} option${voteData?.maxChoices !== 1 ? "s" : ""}.`,
+                        variant: "destructive",
+                    });
+                }
+            }
+        }
+    };
+
+    const handleSubmitVote = async () => {
+        if (selectedOptions.length === 0) {
+            toast({
+                title: "Selection Required",
+                description: "Please select at least one option to cast your vote.",
+                variant: "destructive",
+            });
+            return;
+        }
+
         try {
-            setIsConnecting(true);
-            const connected = await blockchainService.connect();
+            setSubmitting(true);
             
-            if (connected) {
-                setWalletAddress(blockchainService.getWalletAddress());
-                setWalletConnected(true);
+            // For blockchain sessions, we need to connect to MetaMask first
+            if (isBlockchainSession && !metamaskService.isConnected()) {
+                const connected = await metamaskService.connect();
+                if (!connected) {
+                    throw new Error("Please connect your wallet to cast a vote");
+                }
+            }
+            
+            // Prepare vote data for the session service
+            const voteData = {
+                candidateId: selectedOptions[0],
+                selectedOptions: selectedOptions
+            };
+            
+            // Submit the vote through the session service
+            const result = await sessionService.castVote(sessionId, voteData);
+            
+            // Validate the result
+            if (!result) {
+                throw new Error("Invalid response received");
+            }
+            
+            // If there's a blockchain transaction hash, store it
+            if (result.txHash) {
+                setBlockchainTxHash(result.txHash);
                 toast({
-                    title: "Wallet Connected",
-                    description: "Your wallet is now connected and ready to vote.",
-                    variant: "default"
+                    title: "Blockchain Vote Submitted",
+                    description: "Your vote has been submitted on the blockchain and is being processed.",
                 });
             } else {
                 toast({
-                    title: "Connection Failed",
-                    description: "Could not connect to MetaMask. Please make sure it's installed and unlocked.",
-                    variant: "destructive"
+                    title: "Vote Submitted",
+                    description: "Your vote has been successfully recorded.",
                 });
             }
-        } catch (error) {
-            console.error("Error connecting wallet:", error);
-            toast({
-                title: "Connection Error",
-                description: "There was an error connecting to your wallet.",
-                variant: "destructive"
-            });
-        } finally {
-            setIsConnecting(false);
-        }
-    };
-    
-    // Handle checkbox change for multiple selections
-    const handleCheckboxChange = (id: string, checked: boolean) => {
-        if (checked) {
-            // Prevent selecting more than maxSelections
-            if (selectedOptions.length >= maxSelections) {
-                toast({
-                    title: "Selection Limit",
-                    description: `You can only select up to ${maxSelections} options.`,
-                    variant: "default"
+            
+            if (onVoteSubmitted) {
+                onVoteSubmitted({
+                    selectedOptions,
+                    sessionId,
+                    voteId: result.voteId || 'anonymous',
+                    success: true
                 });
-                return;
-            }
-            setSelectedOptions([...selectedOptions, id]);
-        } else {
-            setSelectedOptions(selectedOptions.filter(item => item !== id));
-        }
-    };
-    
-    // Handle rank change for ranked voting
-    const handleRankChange = (id: string, rank: number) => {
-        // Check if this rank is already assigned
-        const existingItemWithRank = Object.entries(rankingMap).find(
-            ([itemId, itemRank]) => itemRank === rank && itemId !== id
-        );
-        
-        // If rank already used, swap the items
-        if (existingItemWithRank) {
-            const [existingId] = existingItemWithRank;
-            setRankingMap(prev => ({
-                ...prev,
-                [id]: rank,
-                [existingId]: prev[id] || 0
-            }));
-        } else {
-            // Otherwise just set the rank
-            setRankingMap(prev => ({
-                ...prev,
-                [id]: rank
-            }));
-        }
-    };
-    
-    // Handle submission
-    const handleSubmit = async () => {
-        let selections;
-        
-        // Format data based on vote mode
-        if (voteMode === 'single') {
-            selections = selectedOption;
-        } else if (voteMode === 'multiple') {
-            selections = selectedOptions;
-        } else if (voteMode === 'ranked') {
-            selections = rankingMap;
-        }
-        
-        // Validate selection
-        if (!validateSelection(selections)) {
-            return;
-        }
-        
-        // If this is a blockchain vote, handle it differently
-        if (isBlockchainVoting && contractAddress) {
-            await handleBlockchainVote(selections);
-        } else {
-            // Regular API vote
-            onSubmit({ selections });
-        }
-    };
-    
-    // Validate that a proper selection was made
-    const validateSelection = (selections: any): boolean => {
-        if (voteMode === 'single' && !selections) {
-            toast({
-                title: "Selection Required",
-                description: "Please select an option to vote.",
-                variant: "destructive"
-            });
-            return false;
-        }
-        
-        if (voteMode === 'multiple' && (!selections || selections.length === 0)) {
-            toast({
-                title: "Selection Required",
-                description: "Please select at least one option to vote.",
-                variant: "destructive"
-            });
-            return false;
-        }
-        
-        if (voteMode === 'ranked') {
-            const rankCount = Object.keys(selections).length;
-            if (rankCount === 0) {
-                toast({
-                    title: "Ranking Required",
-                    description: "Please rank at least one option to vote.",
-                    variant: "destructive"
-                });
-                return false;
-            }
-        }
-        
-        return true;
-    };
-    
-    // Handle blockchain voting
-    const handleBlockchainVote = async (selections: any) => {
-        if (!contractAddress || !walletConnected) {
-            toast({
-                title: "Wallet Required",
-                description: "Please connect your wallet first.",
-                variant: "destructive"
-            });
-            return;
-        }
-        
-        try {
-            setIsVoting(true);
-            
-            // Format the choices and ranks for the blockchain
-            let choices: string[] = [];
-            let ranks: number[] = [];
-            
-            if (voteMode === 'single') {
-                choices = [selections];
-            } else if (voteMode === 'multiple') {
-                choices = selections;
-            } else if (voteMode === 'ranked') {
-                // Convert ranking map to parallel arrays of choices and ranks
-                const sortedEntries = Object.entries(selections)
-                    .sort((a, b) => a[1] - b[1]) // sort by rank
-                    .filter(([_, rank]) => rank > 0); // filter out unranked
-                    
-                choices = sortedEntries.map(([id]) => id);
-                ranks = sortedEntries.map(([_, rank]) => rank);
             }
             
-            // Cast vote on blockchain
-            const txHash = await blockchainService.castVote(
-                contractAddress,
-                choices,
-                voteMode === 'ranked' ? ranks : []
-            );
-            
-            toast({
-                title: "Vote Cast Successfully",
-                description: "Your vote has been recorded on the blockchain.",
-                variant: "default"
-            });
-            
-            // Close dialog and notify parent
-            onOpenChange(false);
-            onSubmit({ selections, txHash });
+            // If it's not a blockchain vote or the tx is complete, close the dialog
+            if (!result.txHash) {
+                onOpenChange(false);
+            }
         } catch (error: any) {
-            console.error("Blockchain voting error:", error);
+            console.error("Error submitting vote:", error);
             toast({
-                title: "Voting Error",
-                description: error.message || "Failed to cast your vote on the blockchain.",
-                variant: "destructive"
+                title: "Error",
+                description: error.message || "Failed to submit your vote. Please try again.",
+                variant: "destructive",
             });
         } finally {
-            setIsVoting(false);
+            setSubmitting(false);
         }
     };
-    
-    // Render blockchain connection UI if needed
-    if (isBlockchainVoting && !walletConnected) {
-    return (
-            <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center">
-                            <Rocket className="mr-2 h-5 w-5" />
-                            Connect Your Wallet to Vote
-                        </DialogTitle>
-                        <DialogDescription>
-                            This voting session is on the blockchain. Connect your wallet to continue.
-                        </DialogDescription>
-                    </DialogHeader>
 
-                    <div className="py-4">
-                        <Alert className="mb-4">
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertTitle>Blockchain Voting</AlertTitle>
-                            <AlertDescription>
-                                Your vote will be recorded on the Ethereum blockchain, ensuring transparency and security.
-                            </AlertDescription>
-                        </Alert>
-                        
-                        <p className="text-sm text-muted-foreground mb-2">Requirements:</p>
-                        <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1 mb-4">
-                            <li>MetaMask or compatible wallet extension</li>
-                            <li>Small amount of ETH for transaction gas</li>
-                            <li>One-time transaction approval</li>
-                        </ul>
-                        
-                        <Separator className="my-4" />
-                        
-                        <div className="flex justify-center">
+    // Function to render blockchain transaction status
+    const renderBlockchainStatus = () => {
+        if (!blockchainTxHash) return null;
+        
+        const explorerUrl = `https://sepolia.etherscan.io/tx/${blockchainTxHash}`;
+        
+        return (
+            <div className="mt-4">
+                <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Blockchain Transaction</AlertTitle>
+                    <AlertDescription>
+                        Your vote has been submitted to the blockchain. 
+                        <div className="mt-2 flex flex-wrap gap-2">
                             <Button 
-                                onClick={connectWallet} 
-                                disabled={isConnecting}
-                                size="lg"
-                                className="px-6"
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => window.open(explorerUrl, '_blank')}
                             >
-                                {isConnecting ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Connecting...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Lock className="mr-2 h-4 w-4" />
-                                        Connect Wallet to Vote
-                                    </>
-                                )}
+                                View on Etherscan <ExternalLink className="ml-1 h-3 w-3" />
+                            </Button>
+                            <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => onOpenChange(false)}
+                            >
+                                Close
                             </Button>
                         </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
+                    </AlertDescription>
+                </Alert>
+            </div>
         );
-    }
-    
+    };
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
                 <DialogHeader>
-                    <DialogTitle className="flex items-center">
-                        <Vote className="mr-2 h-5 w-5" />
-                        Cast Your Vote
-                    </DialogTitle>
+                    <DialogTitle>{voteData?.title || "Cast Your Vote"}</DialogTitle>
                     <DialogDescription>
-                        {voteType === 'poll' ? 'Select your preferred option(s)' : 'Vote for your preferred candidate(s)'}
+                        {voteData?.description || "Select your preferred option(s) and submit your vote."}
+                        {voteData?.subtype === "multiple" && (
+                            <span className="block mt-1 font-medium text-xs">
+                                You can select up to {voteData.maxChoices} option{voteData.maxChoices !== 1 ? "s" : ""}.
+                            </span>
+                        )}
+                        {isBlockchainSession && (
+                            <span className="block mt-1 font-medium text-xs">
+                                This vote will be recorded on the blockchain for transparency and security.
+                            </span>
+                        )}
                     </DialogDescription>
                 </DialogHeader>
-                
-                {isBlockchainVoting && walletConnected && (
-                    <Alert>
-                        <ThumbsUp className="h-4 w-4" />
-                        <AlertTitle>Wallet Connected</AlertTitle>
-                        <AlertDescription className="text-xs">
-                            {walletAddress ? (
-                                <span>Your vote will be cast from: {walletAddress.slice(0, 8)}...{walletAddress.slice(-6)}</span>
-                            ) : (
-                                <span>Your wallet is connected and ready to vote.</span>
-                            )}
-                        </AlertDescription>
-                    </Alert>
-                )}
-                
-                {kyc && (
-                    <Alert variant="warning" className="mb-4">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>KYC Required</AlertTitle>
-                        <AlertDescription>
-                            Your identity will be verified when casting your vote.
-                        </AlertDescription>
-                    </Alert>
-                )}
-                
-                <div className="py-4">
-                    {voteMode === 'single' && (
-                        <RadioGroup value={selectedOption} onValueChange={setSelectedOption}>
-                            {items.map((item) => (
-                                <div key={item.id} className="flex items-center space-x-2 mb-3 pb-3 border-b">
-                                    <RadioGroupItem value={item.id} id={`radio-${item.id}`} />
-                                    <Label htmlFor={`radio-${item.id}`} className="flex-1 cursor-pointer">
-                                        <div className="font-medium">{item.title}</div>
-                                        {(item.description || item.biography) && (
-                                            <div className="text-sm text-muted-foreground mt-1">
-                                                {item.description || item.biography}
-                                            </div>
-                                        )}
-                                    </Label>
-                                </div>
-                            ))}
-                        </RadioGroup>
-                    )}
-                    
-                    {voteMode === 'multiple' && (
-                        <div className="space-y-3">
-                            {items.map((item) => (
-                                <div key={item.id} className="flex items-start space-x-2 mb-3 pb-3 border-b">
-                                    <Checkbox 
-                                        id={`checkbox-${item.id}`} 
-                                        checked={selectedOptions.includes(item.id)}
-                                        onCheckedChange={(checked) => handleCheckboxChange(item.id, checked === true)} 
-                                        className="mt-1"
-                                    />
-                                    <Label htmlFor={`checkbox-${item.id}`} className="flex-1 cursor-pointer">
-                                        <div className="font-medium">{item.title}</div>
-                                        {(item.description || item.biography) && (
-                                            <div className="text-sm text-muted-foreground mt-1">
-                                                {item.description || item.biography}
-                                    </div>
-                                    )}
-                                    </Label>
-                                </div>
-                            ))}
-                            <p className="text-sm text-muted-foreground">
-                                {selectedOptions.length} of {maxSelections} options selected
-                            </p>
-                        </div>
-                    )}
-                    
-                    {voteMode === 'ranked' && (
-                        <div className="space-y-3">
-                            {items.map((item) => (
-                                <div key={item.id} className="flex items-center space-x-3 mb-3 pb-3 border-b">
-                                    <Label htmlFor={`rank-${item.id}`} className="flex-1">
-                                        <div className="font-medium">{item.title}</div>
-                                        {(item.description || item.biography) && (
-                                            <div className="text-sm text-muted-foreground mt-1">
-                                                {item.description || item.biography}
-                    </div>
-                                        )}
-                                    </Label>
-                                    <Input
-                                        id={`rank-${item.id}`}
-                                        type="number"
-                                        min="1"
-                                        max={items.length}
-                                        value={rankingMap[item.id] || ''}
-                                        onChange={(e) => handleRankChange(item.id, parseInt(e.target.value) || 0)}
-                                        className="w-16 text-center"
-                                        placeholder="#"
-                                    />
-                                </div>
-                            ))}
-                            <p className="text-sm text-muted-foreground">
-                                Rank your choices from 1 (highest) to {items.length} (lowest)
-                            </p>
-                        </div>
-                        )}
-                    </div>
 
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isVoting}>
-                        Cancel
+                {loading ? (
+                    <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        <span className="ml-2">Loading voting options...</span>
+                    </div>
+                ) : blockchainTxHash ? (
+                    renderBlockchainStatus()
+                ) : (
+                    <ScrollArea className="flex-grow">
+                        <div className="py-4 space-y-4">
+                            {voteData?.type === "election" && voteData.candidates && (
+                                voteData.subtype === "single" ? (
+                                    <RadioGroup value={selectedOptions[0] || ""} className="space-y-3">
+                                        {voteData.candidates.map((candidate) => (
+                                            <div
+                                                key={candidate._id}
+                                                className="flex items-start space-x-3 p-3 rounded-lg hover:bg-muted/50 cursor-pointer"
+                                                onClick={() => handleOptionSelect(candidate._id)}
+                                            >
+                                                <RadioGroupItem value={candidate._id} id={candidate._id} />
+                                                <div className="flex-1 flex">
+                                                    <Avatar className="h-10 w-10 mr-3">
+                                                        <AvatarImage src={candidate.image} alt={candidate.name} />
+                                                        <AvatarFallback>{candidate.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div>
+                                                        <Label htmlFor={candidate._id} className="text-base font-medium">
+                                                            {candidate.name}
+                                                        </Label>
+                                                        {candidate.bio && (
+                                                            <p className="text-sm text-muted-foreground">{candidate.bio}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </RadioGroup>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {voteData.candidates.map((candidate) => (
+                                            <div
+                                                key={candidate._id}
+                                                className="flex items-start space-x-3 p-3 rounded-lg hover:bg-muted/50 cursor-pointer"
+                                                onClick={() => handleOptionSelect(candidate._id)}
+                                            >
+                                                <Checkbox
+                                                    checked={selectedOptions.includes(candidate._id)}
+                                                    id={candidate._id}
+                                                />
+                                                <div className="flex-1 flex">
+                                                    <Avatar className="h-10 w-10 mr-3">
+                                                        <AvatarImage src={candidate.image} alt={candidate.name} />
+                                                        <AvatarFallback>{candidate.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div>
+                                                        <Label htmlFor={candidate._id} className="text-base font-medium">
+                                                            {candidate.name}
+                                                        </Label>
+                                                        {candidate.bio && (
+                                                            <p className="text-sm text-muted-foreground">{candidate.bio}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )
+                            )}
+
+                            {voteData?.type === "poll" && voteData.options && (
+                                voteData.subtype === "single" ? (
+                                    <RadioGroup value={selectedOptions[0] || ""} className="space-y-3">
+                                        {voteData.options.map((option) => (
+                                            <Card
+                                                key={option._id}
+                                                className={`cursor-pointer ${
+                                                    selectedOptions[0] === option._id ? "border-primary" : ""
+                                                }`}
+                                                onClick={() => handleOptionSelect(option._id)}
+                                            >
+                                                <CardContent className="p-4 flex items-start space-x-3">
+                                                    <RadioGroupItem value={option._id} id={option._id} />
+                                                    <div>
+                                                        <Label htmlFor={option._id} className="text-base font-medium">
+                                                            {option.text}
+                                                        </Label>
+                                                        {option.description && (
+                                                            <p className="text-sm text-muted-foreground">{option.description}</p>
+                                                        )}
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        ))}
+                                    </RadioGroup>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {voteData.options.map((option) => (
+                                            <Card
+                                                key={option._id}
+                                                className={`cursor-pointer ${
+                                                    selectedOptions.includes(option._id) ? "border-primary" : ""
+                                                }`}
+                                                onClick={() => handleOptionSelect(option._id)}
+                                            >
+                                                <CardContent className="p-4 flex items-start space-x-3">
+                                                    <Checkbox
+                                                        checked={selectedOptions.includes(option._id)}
+                                                        id={option._id}
+                                                    />
+                                                    <div>
+                                                        <Label htmlFor={option._id} className="text-base font-medium">
+                                                            {option.text}
+                                                        </Label>
+                                                        {option.description && (
+                                                            <p className="text-sm text-muted-foreground">{option.description}</p>
+                                                        )}
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        ))}
+                                    </div>
+                                )
+                            )}
+                        </div>
+                    </ScrollArea>
+                )}
+
+                <DialogFooter className="pt-4">
+                    {!blockchainTxHash && (
+                        <>
+                            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+                                Cancel
                             </Button>
-                    <Button onClick={handleSubmit} disabled={isVoting}>
-                        {isVoting ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Submitting...
-                            </>
-                        ) : (
-                            'Cast Vote'
-                        )}
-                    </Button>
+                            <Button onClick={handleSubmitVote} disabled={selectedOptions.length === 0 || submitting}>
+                                {submitting ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Submitting...
+                                    </>
+                                ) : isBlockchainSession ? (
+                                    "Submit Blockchain Vote"
+                                ) : (
+                                    "Submit Vote"
+                                )}
+                            </Button>
+                        </>
+                    )}
                 </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            </DialogContent>
+        </Dialog>
     );
 }

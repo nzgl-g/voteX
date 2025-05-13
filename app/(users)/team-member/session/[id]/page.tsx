@@ -1,12 +1,19 @@
-import { VoteSessionManagement } from "@/components/session-profile/vote-session-management"
-import {SiteHeader} from "@/components/sidebar/site-header";
+"use client"
 
-export default function Home() {
-    return (
-        <><SiteHeader title="Session Management"/>
-            <main className="min-h-screen bg-background">
-                <VoteSessionManagement/>
-            </main>
-        </>
-    )
+import { useParams } from "next/navigation"
+import { SiteHeader } from "@/components/sidebar/site-header"
+import { SessionDetail } from "@/components/session-detail"
+
+export default function SessionPage() {
+  const params = useParams()
+  const sessionId = params.id as string
+
+  return (
+    <>
+      <SiteHeader title="Session Management" />
+      <main className="min-h-screen bg-background">
+        <SessionDetail sessionId={sessionId} />
+      </main>
+    </>
+  )
 }

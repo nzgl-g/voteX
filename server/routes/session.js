@@ -9,6 +9,8 @@ const auth = require("../middleware/auth");
 const sendNotification = require("../helpers/sendNotification");
 const isTeamLeader = require("../middleware/isTeamLeader");
 const router = express.Router();
+require("dotenv").config();
+
 router.get("/", async (req, res) => {
   try {
     const sessions = await Session.find({})
@@ -453,6 +455,7 @@ router.patch("/:sessionId/vote-counts", async (req, res) => {
       counts.forEach(({ id, totalVotes }) => {
         const option = session.options.id(id);
         if (option) {
+          console.log(option);
           option.totalVotes = totalVotes;
         }
       });

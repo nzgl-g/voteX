@@ -3,7 +3,6 @@ import {Inter} from "next/font/google";
 import "./globals.css";
 import {ThemeProvider} from "@/components/theme-provider";
 import {cn} from "@/lib/utils";
-import {ClientLoadingBar} from "@/components/ui/client-loading-bar";
 import {Toaster} from "@/components/ui/sonner";
 import {StagewiseToolbar} from '@stagewise/toolbar-next';
 import {NotificationProvider} from "@/components/shared/notification-provider";
@@ -24,7 +23,6 @@ export default function RootLayout({
     return (
         <html lang="en" suppressHydrationWarning>
         <body className={cn("min-h-screen bg-background", inter.className)}>
-        <ClientLoadingBar />
         <NotificationProvider>
 
             <ThemeProvider
@@ -45,7 +43,8 @@ export default function RootLayout({
             />
                 <StagewiseToolbar
                     config={{
-                        plugins: [], // Add your custom plugins here
+                        plugins: [
+                        ],
                     }}
                 />
             {children}

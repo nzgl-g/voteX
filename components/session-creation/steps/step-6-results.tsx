@@ -20,7 +20,7 @@ export default function Step6Results({ formData, updateFormData }: Step6Props) {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Result Visibility</h2>
+        <h3 className="text-lg font-medium text-gray-700 dark:text-gray-200">Choose when to display results</h3>
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger>
@@ -116,8 +116,8 @@ export default function Step6Results({ formData, updateFormData }: Step6Props) {
       </div>
 
       {formData.resultVisibility === "real-time" && (
-        <Alert variant="warning" className="animate-in fade-in duration-300">
-          <AlertTriangle className="h-4 w-4" />
+        <Alert className="animate-in fade-in duration-300 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
           <AlertTitle>Important Note</AlertTitle>
           <AlertDescription>
             Showing real-time results may influence voter behavior. Participants might be swayed to vote for leading

@@ -5,7 +5,7 @@ pragma solidity ^0.8.28;
 /// @notice Contract for managing a single voting session
 contract VoteSession {
     // Vote mode enum
-    enum VoteMode { Single, Multiple, Ranked }
+    enum VoteMode { Single, Multiple }
     
     // Session data
     uint256 public sessionId;
@@ -20,12 +20,8 @@ contract VoteSession {
     mapping(address => bool) public hasVoted;
     address[] public voters;
     
-    // For ranked voting
-    mapping(address => mapping(string => uint8)) public voterRanks;
-    
     // Events
     event VoteCast(address indexed voter, string[] choices);
-    event RankedVoteCast(address indexed voter, string[] choices, uint8[] ranks);
     
     // Construction
     constructor(
@@ -39,7 +35,7 @@ contract VoteSession {
         require(_participants.length > 0, "Must have at least one participant");
         require(_endTimestamp > block.timestamp, "End time must be in the future");
         
-        if (_voteMode == VoteMode.Multiple || _voteMode == VoteMode.Ranked) {
+        if (_voteMode == VoteMode.Multiple) {
             require(_maxChoices > 0 && _maxChoices <= _participants.length, "Invalid max choices");
         }
         
@@ -65,28 +61,14 @@ contract VoteSession {
     /**
      * @notice Cast a vote in the session
      * @param choices Array of participant identifiers (names) being voted for
-     * @param ranks Array of ranks for each choice (only used in Ranked mode)
      */
-    function vote(string[] memory choices, uint8[] memory ranks) external onlyActive notVoted {
+    function vote(string[] memory choices) external onlyActive notVoted {
         // Validate based on vote mode
         if (voteMode == VoteMode.Single) {
             require(choices.length == 1, "Single vote mode requires exactly one choice");
         } else {
             require(choices.length <= maxChoices, "Too many choices selected");
             require(choices.length > 0, "Must select at least one choice");
-        }
-        
-        // For ranked voting, validate ranks
-        if (voteMode == VoteMode.Ranked) {
-            require(ranks.length == choices.length, "Ranks must match choices length");
-            
-            // Check that ranks are valid (1 to N with no duplicates)
-            bool[] memory usedRanks = new bool[](choices.length + 1);
-            for (uint8 i = 0; i < ranks.length; i++) {
-                require(ranks[i] > 0 && ranks[i] <= choices.length, "Invalid rank value");
-                require(!usedRanks[ranks[i]], "Duplicate rank");
-                usedRanks[ranks[i]] = true;
-            }
         }
         
         // Validate all choices exist
@@ -105,25 +87,11 @@ contract VoteSession {
         hasVoted[msg.sender] = true;
         voters.push(msg.sender);
         
-        // Process votes based on mode
-        if (voteMode == VoteMode.Single || voteMode == VoteMode.Multiple) {
-            // Each choice gets 1 vote
-            for (uint8 i = 0; i < choices.length; i++) {
-                participantVotes[choices[i]]++;
-            }
-            emit VoteCast(msg.sender, choices);
-        } else if (voteMode == VoteMode.Ranked) {
-            // Weighted voting based on rank (inverse)
-            for (uint8 i = 0; i < choices.length; i++) {
-                // Store the rank (for possible recounting)
-                voterRanks[msg.sender][choices[i]] = ranks[i];
-                
-                // Higher ranks get fewer points (rank 1 gets max points)
-                uint256 points = choices.length + 1 - ranks[i];
-                participantVotes[choices[i]] += points;
-            }
-            emit RankedVoteCast(msg.sender, choices, ranks);
+        // Each choice gets 1 vote
+        for (uint8 i = 0; i < choices.length; i++) {
+            participantVotes[choices[i]]++;
         }
+        emit VoteCast(msg.sender, choices);
     }
     
     /**

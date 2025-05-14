@@ -45,13 +45,19 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  nationality: {
+    type: String,
+    default: "",
+  },
+  dateOfBirth: {
+    type: Date,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
   },
   fullName: {
     type: String,
-    required: false, // Optional field
   },
   gender: {
     type: String,

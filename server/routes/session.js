@@ -137,6 +137,32 @@ router.get("/:sessionId", auth, async (req, res) => {
       .json({ message: "Failed to fetch session", error: err.message });
   }
 });
+router.get("/:sessionId/contract-data", async (req, res) => {
+  try {
+    const session = await Session.findById(req.params.id).lean();
+
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    const voteMode = session.subtype;
+    const endTime = session.sessionLifecycle?.scheduledAt?.end;
+
+    let ids = [];
+    if (session.type === "poll") {
+      ids = session.options?.map((opt) => opt._id) || [];
+    } else if (session.type === "election") {
+      ids = session.candidates?.map((cand) => cand._id) || [];
+    }
+
+    const maxChoices = session.maxChoices ?? null;
+
+    return res.json({ ids, voteMode, endTime, maxChoices });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+module.exports = router;
 router.delete("/:sessionId", auth, async (req, res) => {
   try {
     const session = await Session.findById(req.params.id).populate("team");

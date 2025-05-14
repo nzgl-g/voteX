@@ -109,7 +109,7 @@ describe("Vote System Contracts", function () {
     
     it("Should allow casting a valid vote", async function () {
       // Cast vote from account[1]
-      await session.connect(accounts[1]).vote(["Option B"], []);
+      await session.connect(accounts[1]).vote(["Option B"]);
       
       // Check that vote was recorded
       expect(await session.checkVoted(accounts[1].address)).to.be.true;
@@ -123,19 +123,19 @@ describe("Vote System Contracts", function () {
     
     it("Should not allow voting twice", async function () {
       await expect(
-        session.connect(accounts[1]).vote(["Option A"], [])
+        session.connect(accounts[1]).vote(["Option A"])
       ).to.be.revertedWith("Already voted");
     });
     
     it("Should not allow voting for multiple options in single mode", async function () {
       await expect(
-        session.connect(accounts[2]).vote(["Option A", "Option B"], [])
+        session.connect(accounts[2]).vote(["Option A", "Option B"])
       ).to.be.revertedWith("Single vote mode requires exactly one choice");
     });
     
     it("Should not allow voting for invalid options", async function () {
       await expect(
-        session.connect(accounts[2]).vote(["Invalid Option"], [])
+        session.connect(accounts[2]).vote(["Invalid Option"])
       ).to.be.revertedWith("Invalid choice");
     });
   });
@@ -164,7 +164,7 @@ describe("Vote System Contracts", function () {
     });
     
     it("Should allow voting for multiple options within limit", async function () {
-      await session.connect(accounts[1]).vote(["Candidate A", "Candidate C"], []);
+      await session.connect(accounts[1]).vote(["Candidate A", "Candidate C"]);
       
       expect(await session.checkVoted(accounts[1].address)).to.be.true;
       
@@ -176,64 +176,29 @@ describe("Vote System Contracts", function () {
     
     it("Should not allow voting for more than max choices", async function () {
       await expect(
-        session.connect(accounts[2]).vote(["Candidate A", "Candidate B", "Candidate C"], [])
+        session.connect(accounts[2]).vote(["Candidate A", "Candidate B", "Candidate C"])
       ).to.be.revertedWith("Too many choices selected");
     });
-  });
-  
-  describe("VoteSession - Ranked Vote Mode", function () {
-    let sessionAddress;
-    let session;
     
-    before(async function () {
-      // Create a new session with ranked vote mode
-      const sessionId = 4;
-      const now = Math.floor(Date.now() / 1000);
-      const endTime = now + 86400;
-      const participants = ["Candidate A", "Candidate B", "Candidate C"];
+    it("Should allow voting for a single option even in multiple mode", async function () {
+      await session.connect(accounts[3]).vote(["Candidate B"]);
       
-      await factory.createVoteSession(
-        sessionId,
-        participants,
-        endTime,
-        2, // Ranked vote mode
-        3  // Max 3 choices
-      );
-      
-      sessionAddress = await factory.sessions(sessionId);
-      session = await ethers.getContractAt("VoteSession", sessionAddress);
-    });
-    
-    it("Should allow ranked voting with valid ranks", async function () {
-      // Vote with ranks - rank 1 is highest (gets most points)
-      await session.connect(accounts[1]).vote(
-        ["Candidate C", "Candidate A", "Candidate B"], 
-        [1, 2, 3] // C is rank 1, A is rank 2, B is rank 3
-      );
-      
-      expect(await session.checkVoted(accounts[1].address)).to.be.true;
+      expect(await session.checkVoted(accounts[3].address)).to.be.true;
       
       const [participants, votes] = await session.getResults();
-      // Points: Rank 1 = 3 points, Rank 2 = 2 points, Rank 3 = 1 point
-      expect(votes[0]).to.equal(2); // Candidate A - Rank 2
-      expect(votes[1]).to.equal(1); // Candidate B - Rank 3
-      expect(votes[2]).to.equal(3); // Candidate C - Rank 1
+      expect(votes[1]).to.equal(1); // Candidate B now has 1 vote
     });
     
-    it("Should reject invalid rank values", async function () {
-      await expect(
-        session.connect(accounts[2]).vote(
-          ["Candidate A", "Candidate B"],
-          [1, 3] // Missing rank 2
-        )
-      ).to.be.revertedWith("Invalid rank value");
+    it("Should correctly return voter count and results", async function () {
+      expect(await session.getVoterCount()).to.equal(2); // Two voters so far
       
-      await expect(
-        session.connect(accounts[2]).vote(
-          ["Candidate A", "Candidate B"],
-          [1, 1] // Duplicate rank
-        )
-      ).to.be.revertedWith("Duplicate rank");
+      const [participants, votes] = await session.getResults();
+      expect(participants.length).to.equal(4);
+      expect(votes.length).to.equal(4);
+      
+      // Check total votes match number of choices made
+      const totalVotes = votes.reduce((acc, curr) => acc + Number(curr), 0);
+      expect(totalVotes).to.equal(3); // 2 from first voter + 1 from second voter
     });
   });
 }); 

@@ -52,15 +52,64 @@ router.get("/candidate-requests", auth, async (req, res) => {
     const sessionId = req.params.sessionId;
 
     const requests = await CandidateRequest.find({ session: sessionId })
-      .populate("user", "fullName email")
+      .populate("user", "fullName email username")
       .populate("session", "name type");
 
-    res.status(200).json(requests);
+    const transformedRequests = requests.map(request => {
+      const requestObj = request.toObject();
+      
+      if (requestObj.user) {
+        requestObj.email = requestObj.user.email;
+      }
+      
+      return requestObj;
+    });
+
+    res.status(200).json(transformedRequests);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server Error" });
   }
 });
+
+// New route to check if user has an existing application
+router.get("/check-application", auth, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const sessionId = req.params.sessionId;
+
+    const existingRequest = await CandidateRequest.findOne({
+      user: userId,
+      session: sessionId,
+    });
+
+    if (!existingRequest) {
+      return res.status(200).json({ 
+        exists: false
+      });
+    }
+
+    let responseData = {
+      exists: true,
+      status: existingRequest.status
+    };
+
+    // Add appropriate message based on status
+    if (existingRequest.status === "approved") {
+      responseData.message = "You are already a candidate for this session.";
+    } else if (existingRequest.status === "rejected") {
+      responseData.message = "Your previous request was rejected. You cannot apply again.";
+    } else {
+      responseData.message = "Your application is still pending.";
+    }
+
+    return res.status(200).json(responseData);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+
 
 router.post("/apply", auth, async (req, res) => {
   const userId = req.user._id;
@@ -243,6 +292,7 @@ router.post("/reject/:requestId", auth, async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 });
+
 //invite user to be a candidate
 router.post("/invite/:userId", auth, async (req, res) => {
   const inviterId = req.user._id;

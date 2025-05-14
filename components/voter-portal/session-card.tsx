@@ -2,16 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import {Calendar, Clock, Users, Eye, Vote, BarChart3, UserPlus, LockIcon, UnlockIcon, BadgeCheck, AlertTriangle, ExternalLink, Loader2, RefreshCw, Database, BlocksIcon, Lock} from "lucide-react";
+import {Calendar, Clock, Users, Eye, Vote, BarChart3, UserPlus, LockIcon, UnlockIcon, BadgeCheck, AlertTriangle, ExternalLink, Loader2, RefreshCw} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { SessionCardProps, SessionLifecycleStatus } from "./types";
 import {
@@ -19,10 +14,11 @@ import {
   VotingOption,
   Candidate as VotingCandidate,
 } from "./vote-cast/voting-dialog";
-import blockchainService from '@/services/blockchain-service';
 import { toast } from "@/lib/toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { sessionService } from "@/services/session-service";
+import { KYCVerificationDialog } from "./kyc-verification-dialog";
+import kycService from "@/services/kyc-service";
 
 export const getSessionLifecycleStatus = (session: any): SessionLifecycleStatus => {
   if (!session || !session.sessionLifecycle) {
@@ -59,7 +55,17 @@ export const getSessionLifecycleStatus = (session: any): SessionLifecycleStatus 
       };
     }
 
-    // 2. Check if session has started and is currently active
+    // 2. Check if contract address exists - this indicates the session is active on blockchain
+    if (session.contractAddress) {
+      return {
+        status: "started",
+        label: "Active",
+        color: "bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-700",
+        icon: <Vote className="h-3.5 w-3.5 mr-1" />,
+      };
+    }
+
+    // 3. Check if session has started and is currently active (fallback if no contract address)
     if (startedAt && now >= startedAt && (!endedAt || now <= endedAt)) {
       return {
         status: "started",
@@ -69,7 +75,7 @@ export const getSessionLifecycleStatus = (session: any): SessionLifecycleStatus 
       };
     }
 
-    // 3. Check if in nomination phase (only for election sessions with scheduled dates)
+    // 4. Check if in nomination phase (only for election sessions with scheduled dates)
     if (session.type === "election" && scheduledStart && scheduledEnd) {
       if (now >= scheduledStart && now <= scheduledEnd) {
         return {
@@ -81,7 +87,7 @@ export const getSessionLifecycleStatus = (session: any): SessionLifecycleStatus 
       }
     }
 
-    // 4. Check if session is upcoming (before nomination or start time)
+    // 5. Check if session is upcoming (before nomination or start time)
     if ((session.type === "election" && scheduledStart && now < scheduledStart) || 
         (!startedAt && !scheduledStart)) {
       return {
@@ -92,7 +98,7 @@ export const getSessionLifecycleStatus = (session: any): SessionLifecycleStatus 
       };
     }
 
-    // 5. Default to pending (created but not yet active)
+    // 6. Default to pending (created but not yet active)
     return {
       status: "pending",
       label: "Pending",
@@ -122,21 +128,20 @@ const formatDate = (dateString: string | null | undefined): string => {
 };
 
 export function SessionCard({
-                              session: initialSession,
-                              onJoinAsCandidate,
-                              onCastVote,
-                              onShowResults,
-                              onViewProfile,
-                            }: SessionCardProps) {
+    session: initialSession,
+    onJoinAsCandidate,
+    onCastVote,
+    onShowResults,
+    onViewProfile,
+}: SessionCardProps) {
   const [isHovered, setIsHovered] = useState(false);
-  const [showVotingDialog, setShowVotingDialog] = useState(false);
-  const [isBlockchainLoading, setIsBlockchainLoading] = useState(false);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [showBlockchainDialog, setShowBlockchainDialog] = useState(false);
-  const [voteData, setVoteData] = useState<any>(null);
+  const [showVotingDialog, setShowVotingDialog] = useState<boolean>(false);
+  const [showKYCDialog, setShowKYCDialog] = useState<boolean>(false);
   const [session, setSession] = useState<any>(initialSession);
   const [isLoadingVotes, setIsLoadingVotes] = useState(false);
   const [showVoteResults, setShowVoteResults] = useState(false);
+  const [kycUserData, setKycUserData] = useState<any>({});
+  const [isLoadingKYC, setIsLoadingKYC] = useState<boolean>(false);
 
   useEffect(() => {
     setSession(initialSession);
@@ -195,151 +200,49 @@ export function SessionCard({
   };
 
   const handleVoteSubmit = async (data: any) => {
-    console.log("Vote submitted:", data);
     try {
-      // First, check if this session uses blockchain voting
-      if (session.contractAddress) {
-        // For blockchain-enabled sessions, show connect wallet dialog
-        setVoteData(data);
-        setShowVotingDialog(false);
-        connectWalletForVoting();
-      } else {
-        // For traditional sessions, use the API directly
-        setIsLoadingVotes(true);
-        
-        // Extract the ID based on vote type
-        const selectedId = extractCandidateId(data.selections);
-        
-        // Update vote counts locally for immediate feedback
-        updateVoteCountsLocally(session, selectedId);
-        
-        // Call the parent component's handler to process the vote
-        if (onCastVote) {
-          await onCastVote(session._id);
-        }
-        
-        // Close the dialog and display success message
-        setShowVotingDialog(false);
-        toast({
-          title: "Vote Cast Successfully",
-          description: "Your vote has been recorded.",
-          variant: "default"
-        });
-        
-        // Refresh the data
-        await fetchLatestVotes();
+      // Extract selected option/candidate ID from the data
+      let selectedId = '';
+      
+      if (data.selections) {
+        // For backward compatibility
+        selectedId = extractCandidateId(data.selections);
+      } else if (data.selectedOptions && data.selectedOptions.length > 0) {
+        // For the new format
+        selectedId = data.selectedOptions[0];
       }
-    } catch (error) {
-      console.error("Error casting vote:", error);
-      toast({
-        title: "Voting Error",
-        description: "Failed to cast your vote. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingVotes(false);
-    }
-  };
 
-  const connectWalletForVoting = async () => {
-    setIsBlockchainLoading(true);
-    try {
-      // Try to connect to blockchain
-      const connected = await blockchainService.connect();
-      if (!connected) {
+      if (!selectedId) {
         toast({
-          title: "Connection Failed",
-          description: "Could not connect to blockchain wallet. Please ensure you have MetaMask installed and unlocked.",
+          title: "Error",
+          description: "No selection detected. Please try again.",
           variant: "destructive"
         });
-        setIsBlockchainLoading(false);
         return;
       }
-      
-      // Get wallet address
-      const address = await blockchainService.getWalletAddress();
-      setWalletAddress(address);
-      
-      // Show confirmation dialog
-      setShowBlockchainDialog(true);
-    } catch (error) {
-      console.error("Error connecting to blockchain:", error);
-      toast({
-        title: "Connection Error",
-        description: "Failed to connect to blockchain wallet. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsBlockchainLoading(false);
-    }
-  };
 
-  // Mock blockchain vote function to replace the removed functionality
-  const confirmBlockchainVote = async () => {
-    try {
-      setIsBlockchainLoading(true);
-      
-      // Simulate blockchain delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Extract the ID based on vote type
-      const selectedId = extractCandidateId(voteData.selections);
-      
-      // Update vote counts locally for immediate feedback
-      updateVoteCountsLocally(session, selectedId);
-      
-      // Call the parent component's handler to process the vote
+      // Call the onCastVote callback if provided
       if (onCastVote) {
         await onCastVote(session._id);
       }
-      
-      toast({
-        title: "Vote Cast Successfully",
-        description: "Your vote has been recorded on the blockchain.",
-        variant: "default"
-      });
-      
-      // Refresh the data
-      await fetchLatestVotes();
-    } catch (error) {
-      console.error("Error in blockchain vote:", error);
-      toast({
-        title: "Blockchain Error",
-        description: "Failed to cast your vote. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setShowBlockchainDialog(false);
-      setIsBlockchainLoading(false);
-    }
-  };
 
-  const loadVoteResults = async () => {
-    try {
-      setIsLoadingVotes(true);
-      
-      // For blockchain sessions, we would normally get results from the chain
-      // Now we just use the API data
-      
-      // If session has a blockchain contract but we're in test mode
-      if (session.contractAddress) {
-        // In a real implementation, we would fetch results from blockchain
-        // For now, just use the existing session data
-        
-        const updatedSession = await sessionService.getSessionById(session._id);
-        if (updatedSession) {
-          setSession(updatedSession);
-        }
-      }
-    } catch (error) {
-      console.error("Error loading vote results:", error);
+      // Update vote counts locally for immediate feedback
+      updateVoteCountsLocally(session, selectedId);
+
       toast({
-        title: "Results Error",
-        description: "Failed to load the latest results.",
+        title: "Vote Submitted",
+        description: "Your vote has been successfully recorded.",
+      });
+
+      // Close the voting dialog
+      setShowVotingDialog(false);
+    } catch (error) {
+      console.error("Error submitting vote:", error);
+      toast({
+        title: "Error",
+        description: "Failed to submit your vote. Please try again.",
         variant: "destructive"
       });
-    } finally {
-      setIsLoadingVotes(false);
     }
   };
 
@@ -371,8 +274,7 @@ export function SessionCard({
           return {
             ...option,
             totalVotes: (option.totalVotes || 0) + 1,
-            voteCount: (option.voteCount || 0) + 1, // For UI display
-            blockchainVerified: true
+            voteCount: (option.voteCount || 0) + 1 // For UI display
           };
         }
         return option;
@@ -386,13 +288,71 @@ export function SessionCard({
           return {
             ...candidate,
             totalVotes: (candidate.totalVotes || 0) + 1,
-            voteCount: (candidate.voteCount || 0) + 1, // For UI display
-            blockchainVerified: true
+            voteCount: (candidate.voteCount || 0) + 1 // For UI display
           };
         }
         return candidate;
       });
     }
+  };
+
+  const loadVoteResults = async () => {
+    try {
+      setIsLoadingVotes(true);
+      const updatedSession = await sessionService.getSessionById(session._id);
+      if (updatedSession) {
+        setSession(updatedSession);
+      }
+    } catch (error) {
+      console.error("Error loading vote results:", error);
+      toast({
+        title: "Results Error",
+        description: "Failed to load the latest results.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingVotes(false);
+    }
+  };
+
+  const handleVoteBtnClick = async () => {
+    try {
+      setIsLoadingKYC(true);
+      
+      // Check if the session requires KYC
+      const requiresKYC = await kycService.isKYCRequiredForSession(session._id);
+      
+      if (requiresKYC) {
+        // Get user KYC data
+        const userData = await kycService.getUserKYCData();
+        setKycUserData(userData);
+        
+        if (userData.isVerified) {
+          // User is already verified, proceed to voting
+          setShowVotingDialog(true);
+        } else {
+          // User needs KYC verification
+          setShowKYCDialog(true);
+        }
+      } else {
+        // No KYC required, proceed to voting
+        setShowVotingDialog(true);
+      }
+    } catch (error) {
+      console.error("Error checking KYC requirements:", error);
+      toast({
+        title: "Error",
+        description: "Failed to check verification requirements. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingKYC(false);
+    }
+  };
+  
+  const handleKYCVerified = () => {
+    // After successful KYC verification, proceed to voting
+    setShowVotingDialog(true);
   };
 
   const getContextualButton = () => {
@@ -428,13 +388,18 @@ export function SessionCard({
 
     if (lifecycleStatus.status === "started") {
       return (
-          <Button
-              className={`${buttonBaseClasses} ${getVariantClasses("default")}`}
-              onClick={() => setShowVotingDialog(true)}
-          >
+        <Button
+          className={`${buttonBaseClasses} ${getVariantClasses("default")}`}
+          onClick={handleVoteBtnClick}
+          disabled={isLoadingKYC}
+        >
+          {isLoadingKYC ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
             <Vote className="h-4 w-4 mr-2" />
-            <span>Cast Your Vote</span>
-          </Button>
+          )}
+          <span>{isLoadingKYC ? "Preparing..." : "Cast Your Vote"}</span>
+        </Button>
       );
     }
 
@@ -480,11 +445,20 @@ export function SessionCard({
       );
     }
     
-    if (session.verificationMethod === 'KYC') {
+    if (session.verificationMethod === 'kyc' || session.verificationMethod === 'KYC') {
       badges.push(
         <Badge key="verification" variant="outline" className="px-2 py-1 text-xs bg-blue-600/10 text-blue-600 border-blue-600/30 flex items-center gap-1">
           <BadgeCheck className="h-3 w-3" />
           KYC
+        </Badge>
+      );
+    }
+    
+    if (session.contractAddress) {
+      badges.push(
+        <Badge key="blockchain" variant="outline" className="px-2 py-1 text-xs bg-emerald-600/10 text-emerald-600 border-emerald-600/30 flex items-center gap-1" title={session.contractAddress}>
+          <ExternalLink className="h-3 w-3" />
+          On-Chain
         </Badge>
       );
     }
@@ -583,69 +557,23 @@ export function SessionCard({
           </div>
         </Card>
 
+        {showKYCDialog && (
+          <KYCVerificationDialog
+            open={showKYCDialog}
+            onOpenChange={setShowKYCDialog}
+            onVerified={handleKYCVerified}
+            userData={kycUserData}
+          />
+        )}
+
         {showVotingDialog && (
             <VotingDialog
                 open={showVotingDialog}
                 onOpenChange={setShowVotingDialog}
-                voteType={session.type === "poll" ? "poll" : "elections"}
-                voteMode={
-                  session.subtype === "multiple"
-                      ? "multiple"
-                      : session.subtype === "ranked"
-                          ? "ranked"
-                          : "single"
-                }
-                kyc={session.verificationMethod === "KYC"}
-                maxSelections={session.subtype === "multiple" ? 3 : 1}
-                options={session.type === "poll" ? getPollOptions() : undefined}
-                candidates={session.type !== "poll" ? getElectionCandidates() : undefined}
-                onSubmit={handleVoteSubmit}
+                sessionId={session._id}
+                onVoteSubmitted={handleVoteSubmit}
             />
         )}
-
-        <Dialog open={showBlockchainDialog} onOpenChange={setShowBlockchainDialog}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Confirm Your Vote</DialogTitle>
-              <DialogDescription>
-                You are about to cast your vote on the blockchain. This action cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="col-span-4">
-                  <p className="text-sm">Connected wallet address:</p>
-                  <p className="text-xs font-mono bg-muted p-2 rounded-md mt-1 break-all">
-                    {walletAddress || "Not connected"}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="col-span-4">
-                <p className="text-sm">Session:</p>
-                <p className="text-sm font-medium">{session.name}</p>
-                {session.contractAddress && (
-                  <>
-                    <p className="text-sm mt-2">Contract address:</p>
-                    <p className="text-xs font-mono bg-muted p-2 rounded-md mt-1 break-all">
-                      {session.contractAddress}
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
-            
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowBlockchainDialog(false)} disabled={isBlockchainLoading}>
-                Cancel
-              </Button>
-              <Button onClick={confirmBlockchainVote} disabled={isBlockchainLoading}>
-                {isBlockchainLoading ? "Processing..." : "Confirm Vote"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
         
         <Dialog open={showVoteResults} onOpenChange={setShowVoteResults}>
           <DialogContent className="sm:max-w-[600px]">
@@ -664,97 +592,64 @@ export function SessionCard({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {session.contractAddress && (
-                    <div className="flex items-center gap-2 mb-3 p-2 rounded-md bg-indigo-50 border border-indigo-100 text-sm text-indigo-700">
-                      <BlocksIcon className="h-4 w-4 text-indigo-500" />
-                      <span>Results verified on blockchain</span>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="ml-auto h-7 text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100"
-                        onClick={loadVoteResults}
-                        disabled={isLoadingVotes}
-                      >
-                        {isLoadingVotes ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-3 w-3" />
-                        )}
-                        <span>Refresh</span>
-                      </Button>
-                      <a 
-                        href={`https://sepolia.etherscan.io/address/${session.contractAddress}`} 
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-indigo-600 hover:underline flex items-center gap-1"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        View Contract
-                      </a>
+                  <div className="rounded-md border">
+                    <div className="grid grid-cols-12 bg-muted px-4 py-2 text-sm font-medium">
+                      <div className="col-span-7">{session.type === "poll" ? "Option" : "Candidate"}</div>
+                      <div className="col-span-3 text-right">Votes</div>
+                      <div className="col-span-2 text-right">Percentage</div>
                     </div>
-                  )}
-                
-                  {session.type === "poll" ? (
-                    <div className="rounded-md border">
-                      <div className="grid grid-cols-12 bg-muted px-4 py-2 text-sm font-medium">
-                        <div className="col-span-7">Option</div>
-                        <div className="col-span-3 text-right">Votes</div>
-                        <div className="col-span-2 text-right">Percentage</div>
-                      </div>
-                      <div className="divide-y">
-                        {session.options && session.options.map((option: any) => {
-                          const voteCount = option.voteCount || option.totalVotes || 0;
-                          const totalVotes = session.options.reduce((sum: number, opt: any) => 
-                            sum + (opt.voteCount || opt.totalVotes || 0), 0);
-                          const percentage = totalVotes > 0 ? ((voteCount / totalVotes) * 100).toFixed(1) : '0.0';
-                          
-                          return (
-                            <div key={option._id} className="grid grid-cols-12 px-4 py-3 text-sm">
-                              <div className="col-span-7 font-medium flex items-center">
-                                {option.name}
-                                {option.blockchainVerified && (
-                                  <BadgeCheck className="h-4 w-4 ml-1 text-green-500" aria-label="Verified on blockchain" />
-                                )}
-                              </div>
-                              <div className="col-span-3 text-right">{voteCount}</div>
-                              <div className="col-span-2 text-right">{percentage}%</div>
+                    <div className="divide-y">
+                      {session.type === "poll" && session.options && session.options.map((option: any) => {
+                        const voteCount = option.voteCount || option.totalVotes || 0;
+                        const totalVotes = session.options.reduce((sum: number, opt: any) => 
+                          sum + (opt.voteCount || opt.totalVotes || 0), 0);
+                        const percentage = totalVotes > 0 ? ((voteCount / totalVotes) * 100).toFixed(1) : '0.0';
+                        
+                        return (
+                          <div key={option._id} className="grid grid-cols-12 px-4 py-3 text-sm">
+                            <div className="col-span-7 font-medium flex items-center">
+                              {option.name}
                             </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-md border">
-                      <div className="grid grid-cols-12 bg-muted px-4 py-2 text-sm font-medium">
-                        <div className="col-span-7">Candidate</div>
-                        <div className="col-span-3 text-right">Votes</div>
-                        <div className="col-span-2 text-right">Percentage</div>
-                      </div>
-                      <div className="divide-y">
-                        {session.candidates && session.candidates.map((candidate: any) => {
-                          const voteCount = candidate.voteCount || candidate.totalVotes || 0;
-                          const totalVotes = session.candidates.reduce((sum: number, cand: any) => 
-                            sum + (cand.voteCount || cand.totalVotes || 0), 0);
-                          const percentage = totalVotes > 0 ? ((voteCount / totalVotes) * 100).toFixed(1) : '0.0';
-                          
-                          return (
-                            <div key={candidate._id} className="grid grid-cols-12 px-4 py-3 text-sm">
-                              <div className="col-span-7 font-medium flex items-center">
-                                {candidate.fullName || candidate.partyName}
-                                {candidate.blockchainVerified && (
-                                  <BadgeCheck className="h-4 w-4 ml-1 text-green-500" aria-label="Verified on blockchain" />
-                                )}
-                              </div>
-                              <div className="col-span-3 text-right">{voteCount}</div>
-                              <div className="col-span-2 text-right">{percentage}%</div>
+                            <div className="col-span-3 text-right">{voteCount}</div>
+                            <div className="col-span-2 text-right">{percentage}%</div>
+                          </div>
+                        );
+                      })}
+                      
+                      {session.type === "election" && session.candidates && session.candidates.map((candidate: any) => {
+                        const voteCount = candidate.voteCount || candidate.totalVotes || 0;
+                        const totalVotes = session.candidates.reduce((sum: number, cand: any) => 
+                          sum + (cand.voteCount || cand.totalVotes || 0), 0);
+                        const percentage = totalVotes > 0 ? ((voteCount / totalVotes) * 100).toFixed(1) : '0.0';
+                        
+                        return (
+                          <div key={candidate._id} className="grid grid-cols-12 px-4 py-3 text-sm">
+                            <div className="col-span-7 font-medium flex items-center">
+                              {candidate.fullName || candidate.partyName}
                             </div>
-                          );
-                        })}
-                      </div>
+                            <div className="col-span-3 text-right">{voteCount}</div>
+                            <div className="col-span-2 text-right">{percentage}%</div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
+                  </div>
                   
-                  <div className="flex justify-end mt-4">
+                  <div className="flex justify-between mt-4">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex items-center gap-1"
+                      onClick={loadVoteResults}
+                      disabled={isLoadingVotes}
+                    >
+                      {isLoadingVotes ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3" />
+                      )}
+                      <span>Refresh</span>
+                    </Button>
                     <Button onClick={() => setShowVoteResults(false)}>Close</Button>
                   </div>
                 </div>

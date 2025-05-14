@@ -23,10 +23,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils"
 import { format, set } from "date-fns"
 import { CalendarIcon, Clock, Loader2, CheckCircle2 } from "lucide-react"
-import { teamService, TeamMember as ApiTeamMember } from "@/services/team-service"
-import { sessionService } from "@/services/session-service"
+import { teamService } from "@/services/team-service"
 import { taskService, Task } from "@/services/task-service"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useTeam, ExtendedTeamMember } from "./team-context"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 // Predefined productive colors
 const TASK_COLORS = [
@@ -42,39 +43,27 @@ const TASK_COLORS = [
   { name: "Indigo", value: "#4f46e5", bg: "bg-indigo-100" },
 ]
 
-interface TeamMember {
-  _id: string
-  username: string
-  email: string
-  fullName?: string
-  role?: string
-  status?: string
-}
-
 interface TaskDialogProps {
   isOpen: boolean
   onClose: () => void
-  selectedMembers: string[]
-  sessionId: string
   taskToEdit?: Task
 }
 
-export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId, taskToEdit }: TaskDialogProps) {
+export default function TaskDialog({ isOpen, onClose, taskToEdit }: TaskDialogProps) {
+  const { sessionId, teamMembers, selectedMembers, fetchTasks } = useTeam()
+  
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [color, setColor] = useState(TASK_COLORS[9].value) // Default to Indigo
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium")
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [time, setTime] = useState<{ hours: string; minutes: string }>({ hours: "12", minutes: "00" })
-  const [assignedMembers, setAssignedMembers] = useState<string[]>(selectedMembers)
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [assignedMembers, setAssignedMembers] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const isEditMode = !!taskToEdit
 
   useEffect(() => {
-    if (isOpen && sessionId) {
-      fetchTeamMembers()
-      
+    if (isOpen) {
       // If in edit mode, populate form with task data
       if (taskToEdit) {
         setTitle(taskToEdit.title)
@@ -110,67 +99,7 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
         resetForm()
       }
     }
-  }, [isOpen, sessionId, taskToEdit, selectedMembers])
-
-  const fetchTeamMembers = async () => {
-    if (!sessionId) return
-    
-    setIsLoading(true)
-    try {
-      let teamId;
-      
-      try {
-        // First, try to get the team ID associated with the session
-        teamId = await sessionService.getSessionTeam(sessionId)
-        console.log(`Found team ID: ${teamId} for session: ${sessionId}`)
-      } catch (error: any) {
-        console.warn(`Could not get team ID from session service: ${error.message}`)
-        console.log('Falling back to using sessionId as teamId')
-        teamId = sessionId // Fallback to using sessionId directly
-      }
-      
-      if (!teamId) {
-        throw new Error(`No team found for session ${sessionId}`)
-      }
-      
-      // Use the teamService to get team members
-      const teamMembersData = await teamService.getTeamMembers(teamId)
-      
-      // Process the team data to create a unified array with proper roles
-      const processedMembers: TeamMember[] = []
-      
-      // Add the leader with a Leader role
-      if (teamMembersData.leader) {
-        if (typeof teamMembersData.leader === 'object' && teamMembersData.leader !== null) {
-          processedMembers.push({
-            ...teamMembersData.leader,
-            role: 'Leader'
-          })
-        }
-      }
-      
-      // Add members with a Member role
-      if (teamMembersData.members && Array.isArray(teamMembersData.members)) {
-        teamMembersData.members.forEach((member) => {
-          if (typeof member === 'object' && member !== null) {
-            processedMembers.push({
-              ...member,
-              role: 'Member'
-            })
-          }
-        })
-      }
-      
-      setTeamMembers(processedMembers)
-    } catch (err) {
-      console.error("Failed to fetch team members:", err)
-      toast.error("Error", {
-        description: "Failed to load team members. Some functionality may be limited.",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  }, [isOpen, taskToEdit, selectedMembers])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -179,6 +108,14 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
     if (assignedMembers.length === 0) {
       toast.error("Member Required", {
         description: "Please select at least one team member to assign this task to.",
+      });
+      return;
+    }
+    
+    // Validate that we have a session ID
+    if (!sessionId) {
+      toast.error("Session Error", {
+        description: "No session ID found. Please try again or contact support.",
       });
       return;
     }
@@ -198,27 +135,26 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
     const taskData = {
       title,
       description,
-      priority,
-      dueDate: dueDateTime ? dueDateTime.toISOString() : undefined,
-      assignedMembers,
       color,
-      sessionId: sessionId, // Fix: changed 'session' to 'sessionId'
+      priority,
+      dueDate: dueDateTime?.toISOString(),
+      assignedMembers
     }
     
     if (isEditMode && taskToEdit) {
       // Update existing task
       taskService.updateTask(taskToEdit._id, taskData)
-        .then(updatedTask => {
-          toast.success("Task updated", {
-            description: `Task "${title}" has been updated successfully.`,
+        .then(() => {
+          toast.success("Task Updated", {
+            description: "The task has been updated successfully."
           })
-          resetForm()
+          fetchTasks() // Refresh tasks after updating
           onClose()
         })
-        .catch(error => {
-          console.error("Error updating task:", error)
-          toast.error("Error", {
-            description: "Failed to update task. Please try again.",
+        .catch((error) => {
+          console.error("Failed to update task:", error)
+          toast.error("Update Failed", {
+            description: error.message || "Failed to update the task. Please try again.",
           })
         })
         .finally(() => {
@@ -230,19 +166,17 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
         ...taskData,
         session: sessionId
       })
-        .then(createdTask => {
-          toast.success("Task created", {
-            description: `Task "${title}" has been created and assigned to ${
-              assignedMembers.length
-            } member${assignedMembers.length !== 1 ? "s" : ""}.`,
+        .then(() => {
+          toast.success("Task Created", {
+            description: "The task has been created and assigned to the selected members."
           })
-          resetForm()
+          fetchTasks() // Refresh tasks after creating
           onClose()
         })
-        .catch(error => {
-          console.error("Error creating task:", error)
-          toast.error("Error", {
-            description: "Failed to create task. Please try again.",
+        .catch((error) => {
+          console.error("Failed to create task:", error)
+          toast.error("Creation Failed", {
+            description: error.message || "Failed to create the task. Please try again.",
           })
         })
         .finally(() => {
@@ -258,10 +192,11 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
     setPriority("medium")
     setDate(new Date())
     setTime({ hours: "12", minutes: "00" })
+    setAssignedMembers([])
   }
 
   const handleRemoveMember = (memberId: string) => {
-    setAssignedMembers(assignedMembers.filter((id) => id !== memberId))
+    setAssignedMembers(assignedMembers.filter(id => id !== memberId))
   }
 
   const handleAddMember = (memberId: string) => {
@@ -271,230 +206,259 @@ export default function TaskDialog({ isOpen, onClose, selectedMembers, sessionId
   }
 
   const handleTimeChange = (field: 'hours' | 'minutes', value: string) => {
-    // Validate input
-    let numValue = parseInt(value, 10);
-    if (isNaN(numValue)) return;
+    let newValue = value.replace(/\D/g, '')
     
     if (field === 'hours') {
-      numValue = Math.max(0, Math.min(23, numValue));
-      setTime({ ...time, hours: numValue.toString().padStart(2, '0') });
+      const hours = parseInt(newValue, 10)
+      newValue = hours > 23 ? '23' : hours < 0 ? '00' : newValue.padStart(2, '0')
     } else {
-      numValue = Math.max(0, Math.min(59, numValue));
-      setTime({ ...time, minutes: numValue.toString().padStart(2, '0') });
+      const minutes = parseInt(newValue, 10)
+      newValue = minutes > 59 ? '59' : minutes < 0 ? '00' : newValue.padStart(2, '0')
     }
+    
+    setTime({
+      ...time,
+      [field]: newValue
+    })
   }
 
   const handleClose = () => {
-    // First reset the form to prevent stale data
-    resetForm()
-    // Then call the parent's onClose function
     onClose()
+    setTimeout(resetForm, 300) // Reset after animation completes
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>{isEditMode ? "Edit Task" : "Create New Task"}</DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit Task" : "Assign New Task"}</DialogTitle>
           <DialogDescription>
             {isEditMode 
-              ? "Update task details and assignments." 
+              ? "Make changes to the existing task and save when you're done."
               : "Create a new task and assign it to team members."}
           </DialogDescription>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-6 py-4">
+        
+        <form onSubmit={handleSubmit} className="space-y-5 py-4">
+          {/* Task Title */}
           <div className="space-y-2">
             <Label htmlFor="title">Task Title</Label>
             <Input
               id="title"
-              placeholder="Enter task title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter task title"
               required
-              className="w-full"
             />
           </div>
-
+          
+          {/* Task Description */}
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              placeholder="Enter task description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe what needs to be done"
               rows={3}
-              className="resize-none"
             />
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Color Selection */}
+          
+          {/* Task Priority & Color */}
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Task Color</Label>
+              <Label htmlFor="priority">Priority</Label>
+              <Select value={priority} onValueChange={(value: any) => setPriority(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Color</Label>
               <div className="grid grid-cols-5 gap-2">
-                {TASK_COLORS.map((taskColor) => (
-                  <button
+                {TASK_COLORS.slice(0, 10).map((taskColor) => (
+                  <Button
                     key={taskColor.value}
                     type="button"
-                    className={cn(
-                      "h-8 w-8 rounded-full border-2 transition-all",
-                      color === taskColor.value ? "border-primary ring-2 ring-primary/20" : "border-transparent"
-                    )}
-                    style={{ backgroundColor: taskColor.value }}
+                    variant="outline"
+                    className={`h-8 w-full p-0 border-2 ${color === taskColor.value ? "ring-2 ring-offset-1" : ""}`}
+                    style={{ backgroundColor: taskColor.value, borderColor: taskColor.value }}
                     onClick={() => setColor(taskColor.value)}
-                    title={taskColor.name}
                   >
-                    {color === taskColor.value && (
-                      <CheckCircle2 className="h-4 w-4 text-white mx-auto" />
-                    )}
-                  </button>
+                    <span className="sr-only">{taskColor.name}</span>
+                  </Button>
                 ))}
               </div>
             </div>
-
-            {/* Priority Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="priority">Priority</Label>
-              <Tabs 
-                defaultValue={priority} 
-                onValueChange={(value) => setPriority(value as "low" | "medium" | "high")}
-                className="w-full"
-              >
-                <TabsList className="grid grid-cols-3 w-full">
-                  <TabsTrigger value="low" className="data-[state=active]:bg-green-100 data-[state=active]:text-green-900">
-                    Low
-                  </TabsTrigger>
-                  <TabsTrigger value="medium" className="data-[state=active]:bg-amber-100 data-[state=active]:text-amber-900">
-                    Medium
-                  </TabsTrigger>
-                  <TabsTrigger value="high" className="data-[state=active]:bg-red-100 data-[state=active]:text-red-900">
-                    High
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
           </div>
-
+          
           {/* Due Date & Time */}
           <div className="space-y-2">
-            <Label>Due Date & Time</Label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex justify-between">
+              <Label>Due Date & Time (Optional)</Label>
+              {date && (
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-auto p-0 text-xs text-muted-foreground"
+                  onClick={() => setDate(undefined)}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+            
+            <div className="flex gap-2">
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}
+                    className={cn(
+                      "justify-start text-left font-normal flex-1",
+                      !date && "text-muted-foreground"
+                    )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {date ? format(date, "PPP") : "Select date"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={setDate}
+                    initialFocus
+                  />
                 </PopoverContent>
               </Popover>
-
-              <div className="flex items-center gap-2">
-                <div className="relative flex items-center">
-                  <Clock className="absolute left-3 h-4 w-4 text-muted-foreground" />
+              
+              {date && (
+                <div className="flex items-center gap-1 w-40">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
                   <Input
-                    type="text"
-                    inputMode="numeric"
+                    className="w-12 text-center"
                     value={time.hours}
                     onChange={(e) => handleTimeChange('hours', e.target.value)}
-                    className="pl-9 pr-3 w-20 text-center"
-                    placeholder="HH"
+                    maxLength={2}
+                  />
+                  <span className="text-muted-foreground">:</span>
+                  <Input
+                    className="w-12 text-center"
+                    value={time.minutes}
+                    onChange={(e) => handleTimeChange('minutes', e.target.value)}
+                    maxLength={2}
                   />
                 </div>
-                <span className="text-xl font-medium">:</span>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  value={time.minutes}
-                  onChange={(e) => handleTimeChange('minutes', e.target.value)}
-                  className="w-20 text-center"
-                  placeholder="MM"
-                />
-              </div>
+              )}
             </div>
           </div>
-
+          
           {/* Assigned Members */}
           <div className="space-y-2">
-            <Label>Assigned Members</Label>
-            {isLoading ? (
-              <div className="flex items-center justify-center p-4">
-                <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
-                <span>Loading team members...</span>
-              </div>
-            ) : (
-              <>
-                <div className="flex flex-wrap gap-2 mb-3 min-h-10 p-2 border rounded-md bg-muted/20">
-                  {assignedMembers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No members assigned</p>
-                  ) : (
-                    assignedMembers.map((memberId) => {
-                      const member = teamMembers.find((m) => m._id === memberId)
-                      return (
-                        member && (
-                          <Badge key={member._id} variant="secondary" className="flex items-center gap-1 px-3 py-1.5">
-                            {member.fullName || member.username}
-                            <button
-                              type="button"
-                              className="ml-1 rounded-full hover:bg-muted p-0.5"
-                              onClick={() => handleRemoveMember(member._id)}
-                            >
-                              ×
-                            </button>
-                          </Badge>
-                        )
-                      )
-                    })
-                  )}
-                </div>
-
-                <Select onValueChange={handleAddMember}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Add team member" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {teamMembers
-                      .filter((member) => !assignedMembers.includes(member._id))
-                      .map((member) => (
-                        <SelectItem key={member._id} value={member._id}>
-                          <div className="flex items-center gap-2">
-                            <span>{member.fullName || member.username}</span>
-                            {member.role && (
-                              <Badge variant="outline" className="text-xs">
-                                {member.role}
-                              </Badge>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </>
-            )}
-          </div>
-
-          <DialogFooter className="pt-4">
-            <Button variant="outline" onClick={handleClose} type="button" disabled={isLoading}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isEditMode ? "Updating..." : "Creating..."}
-                </>
+            <Label>Assigned Team Members</Label>
+            
+            {/* Assigned members list */}
+            <div className="flex flex-wrap gap-2 mb-3">
+              {assignedMembers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No members assigned yet</p>
               ) : (
-                isEditMode ? "Update Task" : "Create Task"
+                assignedMembers.map(memberId => {
+                  const member = teamMembers.find(m => m._id === memberId)
+                  if (!member) return null
+                  
+                  return (
+                    <Badge key={member._id} variant="secondary" className="gap-1">
+                      {member.fullName || member.username}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-3.5 w-3.5 ml-1 rounded-full"
+                        onClick={() => handleRemoveMember(member._id)}
+                      >
+                        <span className="sr-only">Remove {member.username}</span>
+                        ×
+                      </Button>
+                    </Badge>
+                  )
+                })
               )}
-            </Button>
-          </DialogFooter>
+            </div>
+            
+            {/* Member selection */}
+            <div className="border rounded-md divide-y max-h-[200px] overflow-y-auto">
+              {teamMembers.length === 0 ? (
+                <div className="p-3 text-center text-sm text-muted-foreground">
+                  No team members available
+                </div>
+              ) : (
+                teamMembers.map(member => (
+                  <div key={member._id} className="p-2 flex items-center justify-between hover:bg-muted/50">
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={member.avatar} alt={member.username} />
+                        <AvatarFallback>
+                          {member.username?.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="text-sm font-medium">{member.fullName || member.username}</p>
+                        <p className="text-xs text-muted-foreground">{member.role}</p>
+                      </div>
+                    </div>
+                    
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={assignedMembers.includes(member._id) ? "default" : "outline"}
+                      className="h-7 gap-1"
+                      onClick={() => {
+                        if (assignedMembers.includes(member._id)) {
+                          handleRemoveMember(member._id)
+                        } else {
+                          handleAddMember(member._id)
+                        }
+                      }}
+                    >
+                      {assignedMembers.includes(member._id) ? (
+                        <>
+                          <CheckCircle2 className="h-3 w-3" />
+                          <span className="text-xs">Assigned</span>
+                        </>
+                      ) : (
+                        <span className="text-xs">Assign</span>
+                      )}
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </form>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose} disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={isLoading || !title}>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {isEditMode ? "Updating..." : "Creating..."}
+              </>
+            ) : (
+              isEditMode ? "Update Task" : "Create Task"
+            )}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

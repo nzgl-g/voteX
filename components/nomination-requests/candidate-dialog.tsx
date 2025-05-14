@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { X, Download, FileText, ImageIcon, File } from "lucide-react"
+import { X, Download, FileText, ImageIcon, File, CheckCircle, XCircle } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -12,9 +12,17 @@ interface CandidateDialogProps {
   candidate: Candidate
   open: boolean
   onOpenChange: (open: boolean) => void
+  onAccept?: (id: string) => void
+  onReject?: (id: string) => void
 }
 
-export function CandidateDialog({ candidate, open, onOpenChange }: CandidateDialogProps) {
+export function CandidateDialog({ 
+  candidate, 
+  open, 
+  onOpenChange,
+  onAccept,
+  onReject
+}: CandidateDialogProps) {
   const [activeTab, setActiveTab] = useState<"info" | "attachments">("info")
 
   const getFileIcon = (filename: string) => {
@@ -125,6 +133,37 @@ export function CandidateDialog({ candidate, open, onOpenChange }: CandidateDial
             ))}
           </div>
         </div>
+
+        {/* Action buttons for pending candidates */}
+        {candidate.status === "pending" && (onAccept || onReject) && (
+          <div className="flex justify-end gap-4 mt-6">
+            {onReject && (
+              <Button 
+                variant="outline" 
+                className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
+                onClick={() => {
+                  onReject(candidate.id);
+                  onOpenChange(false);
+                }}
+              >
+                <XCircle className="h-4 w-4 mr-2" />
+                Reject Candidate
+              </Button>
+            )}
+            {onAccept && (
+              <Button 
+                className="bg-green-600 hover:bg-green-700"
+                onClick={() => {
+                  onAccept(candidate.id);
+                  onOpenChange(false);
+                }}
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Accept Candidate
+              </Button>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

@@ -23,8 +23,8 @@ contract VoteSessionFactory {
      * @param sessionId Unique identifier for the session
      * @param participants List of participant names/identifiers
      * @param endTimestamp Unix timestamp when the session will end
-     * @param mode Vote mode (0: Single, 1: Multiple, 2: Ranked)
-     * @param maxChoices Maximum number of choices allowed in multiple/ranked mode
+     * @param mode Vote mode (0: Single, 1: Multiple)
+     * @param maxChoices Maximum number of choices allowed in multiple mode
      * @return sessionAddress Address of the newly created session contract
      */
     function createVoteSession(

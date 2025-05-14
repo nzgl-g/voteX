@@ -1,18 +1,34 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { UserPlus, UserMinus, Edit, CheckCircle, AlertCircle, Clock } from "lucide-react"
+import { UserPlus, UserMinus, Edit, CheckCircle, AlertCircle, Clock, RefreshCw } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useParams } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { formatDistanceToNow } from "date-fns"
+import { toast } from "sonner"
+import { useTeam } from "./team-context"
 
-// In a real application, you would have a proper API service for logs
-// This is a placeholder for demonstration
-const fetchActivityLogs = async (sessionId: string) => {
-  // In a real app, this would be an API call like:
-  // return await api.get(`/sessions/${sessionId}/logs`)
+// Types for log activity
+interface LogActivity {
+  id: string
+  type: 'member_added' | 'member_removed' | 'task_created' | 'task_completed' | 'task_updated' | 'change_requested'
+  user: {
+    name: string
+    avatar?: string
+  }
+  target: string
+  timestamp: string
+}
+
+// Mock log service (replace with actual API implementation)
+const fetchActivityLogs = async (sessionId: string): Promise<LogActivity[]> => {
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 500))
   
-  // For now, we'll return mock data
+  // In a real app, you would call your API:
+  // return await fetch(`/api/sessions/${sessionId}/logs`).then(res => res.json())
+  
   return [
     {
       id: "1",
@@ -22,7 +38,7 @@ const fetchActivityLogs = async (sessionId: string) => {
         avatar: "/placeholder.svg?height=32&width=32",
       },
       target: "Alice Jones",
-      timestamp: "2023-06-05T10:30:00",
+      timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 min ago
     },
     {
       id: "2",
@@ -32,7 +48,7 @@ const fetchActivityLogs = async (sessionId: string) => {
         avatar: "/placeholder.svg?height=32&width=32",
       },
       target: "Fix login bug",
-      timestamp: "2023-06-04T15:45:00",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
     },
     {
       id: "3",
@@ -42,7 +58,7 @@ const fetchActivityLogs = async (sessionId: string) => {
         avatar: "/placeholder.svg?height=32&width=32",
       },
       target: "Update user interface",
-      timestamp: "2023-06-03T09:15:00",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(), // 5 hours ago
     },
     {
       id: "4",
@@ -52,7 +68,7 @@ const fetchActivityLogs = async (sessionId: string) => {
         avatar: "/placeholder.svg?height=32&width=32",
       },
       target: "Mike Wilson",
-      timestamp: "2023-06-02T14:20:00",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
     },
     {
       id: "5",
@@ -62,7 +78,7 @@ const fetchActivityLogs = async (sessionId: string) => {
         avatar: "/placeholder.svg?height=32&width=32",
       },
       target: "Prepare presentation",
-      timestamp: "2023-06-01T11:10:00",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(), // 2 days ago
     },
     {
       id: "6",
@@ -72,69 +88,52 @@ const fetchActivityLogs = async (sessionId: string) => {
         avatar: "/placeholder.svg?height=32&width=32",
       },
       target: "Team settings",
-      timestamp: "2023-05-31T16:30:00",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(), // 3 days ago
     },
   ]
 }
 
 export default function LogBlock() {
-  const [activityLogs, setActivityLogs] = useState<any[]>([])
+  const { sessionId, refreshCounter } = useTeam()
+  const [activityLogs, setActivityLogs] = useState<LogActivity[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const params = useParams()
-  const sessionId = params.id as string
-  
-  // Auto-refresh reference
-  const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const lastDataRef = useRef<any[]>([])
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // Function to load logs with loading state
-  const loadLogs = useCallback(async () => {
-    setIsLoading(true)
+  // Function to load logs
+  const loadLogs = useCallback(async (showLoadingState = true) => {
+    if (!sessionId) return
+    
+    if (showLoadingState) {
+      setIsLoading(true)
+    } else {
+      setIsRefreshing(true)
+    }
+    
     try {
       const logs = await fetchActivityLogs(sessionId)
       setActivityLogs(logs)
-      lastDataRef.current = logs
     } catch (error) {
       console.error("Failed to fetch activity logs:", error)
+      if (showLoadingState) {
+        toast.error("Error loading logs", {
+          description: "Failed to load activity logs. Please try again.",
+        })
+      }
     } finally {
       setIsLoading(false)
+      setIsRefreshing(false)
     }
   }, [sessionId])
 
-  // Quiet fetch function that doesn't set loading state
-  const quietFetchLogs = useCallback(async () => {
-    try {
-      const logs = await fetchActivityLogs(sessionId)
-      
-      // Check if data has changed
-      const dataChanged = JSON.stringify(logs) !== JSON.stringify(lastDataRef.current)
-      
-      if (dataChanged) {
-        setActivityLogs(logs)
-        lastDataRef.current = logs
-      }
-    } catch (error) {
-      console.error("Auto-refresh logs failed:", error)
-      // Don't show error for quiet refresh
-    }
-  }, [sessionId])
-
+  // Load logs on mount and when refreshCounter changes
   useEffect(() => {
-    // Initial load
     loadLogs()
-    
-    // Set up auto-refresh interval
-    autoRefreshIntervalRef.current = setInterval(() => {
-      quietFetchLogs()
-    }, 15000) // 15 seconds
-    
-    // Cleanup function
-    return () => {
-      if (autoRefreshIntervalRef.current) {
-        clearInterval(autoRefreshIntervalRef.current)
-      }
-    }
-  }, [loadLogs, quietFetchLogs])
+  }, [loadLogs, refreshCounter])
+
+  // Handle manual refresh
+  const handleRefresh = () => {
+    loadLogs(false)
+  }
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -155,7 +154,7 @@ export default function LogBlock() {
     }
   }
 
-  const getActivityText = (log: any) => {
+  const getActivityText = (log: LogActivity) => {
     switch (log.type) {
       case "member_added":
         return `added ${log.target} to the team`
@@ -174,17 +173,30 @@ export default function LogBlock() {
     }
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleString()
+  const formatTimeAgo = (dateString: string) => {
+    try {
+      return formatDistanceToNow(new Date(dateString), { addSuffix: true })
+    } catch (error) {
+      return "some time ago"
+    }
   }
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Activity Log</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <CardTitle className="text-lg font-medium">Activity Log</CardTitle>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={handleRefresh} 
+          disabled={isLoading || isRefreshing}
+          className="h-8 w-8"
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <span className="sr-only">Refresh</span>
+        </Button>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 max-h-[400px] overflow-y-auto">
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
@@ -204,13 +216,13 @@ export default function LogBlock() {
         ) : (
           activityLogs.map((log) => (
             <div key={log.id} className="flex items-start gap-4 border-b pb-4 last:border-0 last:pb-0">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
                 {getActivityIcon(log.type)}
               </div>
-              <div className="flex-1 space-y-1">
+              <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <Avatar className="h-6 w-6">
-                    <AvatarImage src={log.user.avatar || "/placeholder.svg"} alt={log.user.name} />
+                    <AvatarImage src={log.user.avatar} alt={log.user.name} />
                     <AvatarFallback>
                       {log.user.name
                         .split(" ")
@@ -218,10 +230,10 @@ export default function LogBlock() {
                         .join("")}
                     </AvatarFallback>
                   </Avatar>
-                  <p className="text-sm font-medium">{log.user.name}</p>
+                  <p className="text-sm font-medium leading-none">{log.user.name}</p>
                   <p className="text-sm text-muted-foreground">{getActivityText(log)}</p>
                 </div>
-                <p className="text-xs text-muted-foreground">{formatDate(log.timestamp)}</p>
+                <p className="text-xs text-muted-foreground mt-1">{formatTimeAgo(log.timestamp)}</p>
               </div>
             </div>
           ))

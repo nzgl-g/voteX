@@ -88,6 +88,7 @@ const sessionSchema = new mongoose.Schema({
   results: { type: mongoose.Schema.Types.Mixed, default: null },
   contractAddress: { type: String, default: null },
 
+  // NOT USED ANYMORE THE NEW METHODE IS VISIBILITY
   securityMethod: {
     type: String,
     enum: ["Secret Phrase", "Area Restriction", null],
@@ -100,7 +101,7 @@ const sessionSchema = new mongoose.Schema({
   },
   verificationMethod: {
     type: String,
-    enum: ["KYC", "standard", null],
+    enum: ["kyc", "standard"],
     default: null,
   },
   candidateRequests: [

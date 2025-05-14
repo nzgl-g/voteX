@@ -23,7 +23,7 @@ export default function Step2VotingType({ formData, updateFormData, subscription
     updateFormData({ voteType: type })
   }
 
-  const handleVotingModeSelect = (mode: "single" | "multiple" | "ranked") => {
+  const handleVotingModeSelect = (mode: "single" | "multiple") => {
     updateFormData({ votingMode: mode })
   }
 
@@ -172,7 +172,25 @@ export default function Step2VotingType({ formData, updateFormData, subscription
                         min={1}
                         max={10}
                         value={formData.maxSelections}
-                        onChange={(e) => updateFormData({ maxSelections: Number.parseInt(e.target.value) || 1 })}
+                        onChange={(e) => {
+                          // Allow empty input for better UX while typing
+                          if (e.target.value === '') {
+                            // Don't update formData yet, just allow the input field to be empty
+                            e.target.value = '';
+                            return;
+                          }
+                          
+                          const value = Number.parseInt(e.target.value);
+                          if (!isNaN(value) && value >= 1) {
+                            updateFormData({ maxSelections: value });
+                          }
+                        }}
+                        onBlur={(e) => {
+                          // When focus leaves the input, ensure we have a valid value
+                          if (e.target.value === '' || isNaN(Number(e.target.value))) {
+                            e.target.value = String(formData.maxSelections);
+                          }
+                        }}
                         className="mt-1"
                       />
                     </div>
@@ -184,44 +202,7 @@ export default function Step2VotingType({ formData, updateFormData, subscription
                 </div>
               </Card>
 
-              {/* Ranked Choice */}
-              <Card
-                className={cn(
-                  "p-5 cursor-pointer transition-all hover:shadow-md",
-                  formData.votingMode === "ranked"
-                    ? "border-2 border-purple-500 bg-purple-50 dark:bg-purple-900/20"
-                    : "hover:border-purple-200",
-                )}
-                onClick={() => handleVotingModeSelect("ranked")}
-              >
-                <div className="flex flex-col h-full">
-                  <h3 className="font-bold text-lg mb-2">Ranked Choices</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-                    Voters rank options in order of preference
-                  </p>
-
-                  {formData.votingMode === "ranked" && (
-                    <div className="mt-auto">
-                      <Label htmlFor="maxRanks" className="text-sm">
-                        Maximum ranks allowed:
-                      </Label>
-                      <Input
-                        id="maxRanks"
-                        type="number"
-                        min={1}
-                        max={10}
-                        value={formData.maxRanks}
-                        onChange={(e) => updateFormData({ maxRanks: Number.parseInt(e.target.value) || 1 })}
-                        className="mt-1"
-                      />
-                    </div>
-                  )}
-
-                  {formData.votingMode === "ranked" && (
-                    <CheckCircle2 className="h-5 w-5 text-purple-500 mt-3 self-end" />
-                  )}
-                </div>
-              </Card>
+              {/* Ranked Choice option removed */}
             </div>
           </div>
         )}

@@ -19,17 +19,19 @@ import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import { Search, Mail, User, Check } from "lucide-react"
 import { teamService } from "@/services/team-service"
-import { sessionService } from "@/services/session-service"
 import { userService, User as UserType } from "@/services/user-service"
 import { invitationService } from "@/services/invitation-service"
+import { useTeam } from "./team-context"
+import baseApi from "@/services/base-api"
 
 interface AddMemberModalProps {
   isOpen: boolean
   onClose: () => void
-  sessionId: string
 }
 
-export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMemberModalProps) {
+export default function AddMemberModal({ isOpen, onClose }: AddMemberModalProps) {
+  const { sessionId, teamId, fetchTeamMembers } = useTeam()
+  
   const [inviteEmail, setInviteEmail] = useState("")
   const [searchEmail, setSearchEmail] = useState("")
   const [message, setMessage] = useState(
@@ -69,61 +71,48 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
     
     setIsLoading(true)
     try {
-      let teamId;
+      // Use teamId from context if available, otherwise get it from the session
+      const targetTeamId = teamId;
       
-      try {
-        // First, try to get the team ID associated with the session
-        teamId = await sessionService.getSessionTeam(sessionId)
-        console.log(`Found team ID: ${teamId} for session: ${sessionId}`)
-      } catch (error: any) {
-        console.warn(`Could not get team ID from session service: ${error.message}`)
-        console.log('Falling back to using sessionId as teamId')
-        teamId = sessionId // Fallback to using sessionId directly
+      if (!targetTeamId) {
+        toast.error("Team Error", {
+          description: "No team ID found. Please try again or contact support.",
+        });
+        return;
       }
       
-      if (!teamId) {
-        throw new Error(`No team found for session ${sessionId}`)
-      }
-      
-      // Check if an invitation is already pending for this email
-      try {
-        const isPending = await invitationService.isInvitationPending(inviteEmail, teamId);
-        if (isPending) {
-          toast.info("Invitation Already Sent", {
-            description: `An invitation has already been sent to ${inviteEmail}.`,
-          });
-          
-          // Reset form and close modal
-          setInviteEmail("");
-          setMessage("Hi there! I'd like to invite you to join our team on our project management platform.");
-          onClose();
-          return;
-        }
-      } catch (error) {
-        // Continue even if the check fails - the backend will catch duplicate invitations anyway
-        console.warn("Failed to check pending invitation status:", error);
-      }
-      
-      // Use the team service to send the invitation
-      const response = await teamService.inviteUserToTeam(teamId, inviteEmail)
+      // Direct API call to match server expectations
+      // Server expects a POST to /teams/:teamId/invite with email in the body
+      const response = await baseApi.post(`/teams/${targetTeamId}/invite`, {
+        email: inviteEmail
+      });
       
       toast.success("Invitation Sent", {
         description: `Invitation sent to ${inviteEmail} successfully.`,
       });
       
+      // Refresh team members
+      fetchTeamMembers();
+      
       // Reset form and close modal
-      setInviteEmail("")
-      setMessage("Hi there! I'd like to invite you to join our team on our project management platform.")
-      onClose()
+      setInviteEmail("");
+      setMessage("Hi there! I'd like to invite you to join our team on our project management platform.");
+      onClose();
     } catch (error: any) {
-      console.error("Failed to send invitation:", error)
+      console.error("Failed to send invitation:", error);
       
       // Handle specific error messages with user-friendly responses
-      let errorMessage = error.message || "Failed to send invitation. Please try again.";
+      let errorMessage = "Failed to send invitation. Please try again.";
       
-      if (errorMessage.includes("invitation has already been sent")) {
+      if (error.response && error.response.data) {
+        errorMessage = error.response.data;
+      }
+      
+      if (errorMessage.includes("invitation has already been sent") || 
+          errorMessage.includes("Pending invitation already exists")) {
         errorMessage = `An invitation has already been sent to ${inviteEmail}.`;
-      } else if (errorMessage.includes("already a member")) {
+      } else if (errorMessage.includes("already a member") || 
+                errorMessage.includes("already part of the team")) {
         errorMessage = `${inviteEmail} is already a member of this team.`;
       } else if (errorMessage.includes("User not found")) {
         errorMessage = `No user with the email ${inviteEmail} was found in the system.`;
@@ -133,7 +122,7 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
         description: errorMessage,
       });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
@@ -194,80 +183,9 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
     }
     
     setSelectedUser(user);
+    setInviteEmail(user.email);
     setSearchEmail(user.username);
     setShowDropdown(false);
-  }
-
-  const handleSearchSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedUser) {
-      toast.error("No User Selected", {
-        description: "Please select a user from the search results.",
-      });
-      return;
-    }
-    
-    setIsLoading(true);
-    
-    try {
-      let teamId;
-      
-      try {
-        teamId = await sessionService.getSessionTeam(sessionId);
-      } catch (error) {
-        console.warn("Could not get team ID from session service:", error);
-        teamId = sessionId; // Fallback
-      }
-      
-      if (!teamId) {
-        throw new Error(`No team found for session ${sessionId}`);
-      }
-      
-      // Check if already a member
-      const teamData = await teamService.getTeamById(teamId);
-      const isLeader = teamData.leader._id === selectedUser._id;
-      const isMember = teamData.members.some(m => m._id === selectedUser._id);
-      
-      if (isLeader || isMember) {
-        toast.error("Already a Member", {
-          description: `${selectedUser.username} is already a member of this team.`,
-        });
-        return;
-      }
-      
-      // Check for pending invitation
-      try {
-        const isPending = await invitationService.isInvitationPending(selectedUser.email, teamId);
-        if (isPending) {
-          toast.info("Invitation Already Sent", {
-            description: `An invitation has already been sent to ${selectedUser.username}.`,
-          });
-          return;
-        }
-      } catch (error) {
-        console.warn("Failed to check pending invitation status:", error);
-      }
-      
-      // Send invitation
-      await teamService.inviteUserToTeam(teamId, selectedUser.email);
-      
-      toast.success("Invitation Sent", {
-        description: `Invitation sent to ${selectedUser.username} successfully.`,
-      });
-      
-      // Reset form and close modal
-      setSelectedUser(null);
-      setSearchEmail("");
-      onClose();
-    } catch (error: any) {
-      console.error("Failed to send invitation:", error);
-      toast.error("Invitation Failed", {
-        description: error.message || "Failed to send invitation. Please try again.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
   }
 
   return (
@@ -275,126 +193,148 @@ export default function AddMemberModal({ isOpen, onClose, sessionId }: AddMember
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Add Team Member</DialogTitle>
-          <DialogDescription>Invite a new member to join your team</DialogDescription>
+          <DialogDescription>
+            Invite a new team member to collaborate on this project.
+          </DialogDescription>
         </DialogHeader>
         
         <Tabs defaultValue="email">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid grid-cols-2 mb-4">
             <TabsTrigger value="email">Invite by Email</TabsTrigger>
             <TabsTrigger value="search">Search Users</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="email" className="space-y-4 pt-4">
-            <form onSubmit={handleInviteSubmit} className="space-y-4">
-              <div className="grid gap-2">
+          <TabsContent value="email">
+            <form className="space-y-4" onSubmit={handleInviteSubmit}>
+              <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
-                <div className="relative">
-                  <Mail className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Enter email address"
-                    className="pl-8"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              
-              <div className="grid gap-2">
-                <Label htmlFor="message">Invitation Message (Optional)</Label>
-                <Textarea
-                  id="message"
-                  placeholder="Add a personal message to your invitation"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  className="min-h-[100px]"
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter email address"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  required
                 />
               </div>
               
+              <div className="space-y-2">
+                <Label htmlFor="message">Invitation Message (Optional)</Label>
+                <Textarea
+                  id="message"
+                  placeholder="Enter a message to include with the invitation"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={3}
+                  className="resize-none"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Note: Message will be sent as a notification to the user.
+                </p>
+              </div>
+              
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={onClose}>
+                <Button variant="outline" type="button" onClick={onClose} disabled={isLoading}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={!inviteEmail || isLoading}>
+                <Button type="submit" disabled={isLoading || !inviteEmail}>
                   {isLoading ? "Sending..." : "Send Invitation"}
                 </Button>
               </DialogFooter>
             </form>
           </TabsContent>
           
-          <TabsContent value="search" className="space-y-4 pt-4">
-            <form onSubmit={handleSearchSubmit} className="space-y-4">
-              <div className="grid gap-2">
+          <TabsContent value="search">
+            <div className="space-y-4">
+              <div className="space-y-2">
                 <Label htmlFor="search">Search Users</Label>
                 <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="search"
                     placeholder="Search by username or email"
-                    className="pl-8"
                     value={searchEmail}
                     onChange={(e) => handleSearchChange(e.target.value)}
+                    className="pl-9"
                   />
+                  
+                  {showDropdown && (
+                    <div className="absolute z-10 mt-1 w-full rounded-md border bg-popover shadow-md">
+                      {isSearching ? (
+                        <div className="flex items-center justify-center p-4">
+                          <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-primary"></div>
+                          <span className="ml-2 text-sm">Searching...</span>
+                        </div>
+                      ) : searchEmail.length < 3 ? (
+                        <div className="p-3 text-sm text-muted-foreground">
+                          Enter at least 3 characters to search
+                        </div>
+                      ) : searchResults.length === 0 ? (
+                        <div className="p-3 text-sm text-muted-foreground">
+                          No users found matching "{searchEmail}"
+                        </div>
+                      ) : (
+                        <div className="max-h-52 overflow-auto py-1">
+                          {searchResults.map((user) => (
+                            <div
+                              key={user._id}
+                              className="flex cursor-pointer items-center justify-between px-3 py-2 hover:bg-accent"
+                              onClick={() => handleUserSelect(user)}
+                            >
+                              <div className="flex items-center">
+                                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center mr-2">
+                                  <User className="h-4 w-4 text-primary" />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium">{user.username}</div>
+                                  <div className="text-xs text-muted-foreground">{user.email}</div>
+                                </div>
+                              </div>
+                              {selectedUser && selectedUser._id === user._id && (
+                                <Check className="h-4 w-4 text-primary" />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                
-                {showDropdown && (
-                  <div className="border rounded-md mt-1 max-h-[200px] overflow-y-auto">
-                    {isSearching ? (
-                      <div className="p-2 text-center text-sm text-muted-foreground">Searching...</div>
-                    ) : searchResults.length === 0 ? (
-                      <div className="p-2 text-center text-sm text-muted-foreground">
-                        {searchEmail.length < 3 ? "Type at least 3 characters to search" : "No users found"}
-                      </div>
-                    ) : (
-                      <ul className="divide-y">
-                        {searchResults.map((user) => (
-                          <li
-                            key={user._id}
-                            className={`p-2 flex items-center gap-2 cursor-pointer hover:bg-muted ${
-                              selectedUser?._id === user._id ? "bg-muted" : ""
-                            }`}
-                            onClick={() => handleUserSelect(user)}
-                          >
-                            <div className="flex-shrink-0">
-                              <User className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="font-medium">{user.username}</div>
-                              <div className="text-sm text-muted-foreground">{user.email}</div>
-                            </div>
-                            {selectedUser?._id === user._id && <Check className="h-4 w-4 text-primary" />}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
               </div>
               
               {selectedUser && (
-                <div className="border rounded-md p-3 bg-muted/30">
-                  <div className="text-sm font-medium">Selected User</div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <User className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <div>{selectedUser.username}</div>
-                      <div className="text-sm text-muted-foreground">{selectedUser.email}</div>
+                <div className="rounded-md border p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <User className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <div className="font-medium">{selectedUser.username}</div>
+                        <div className="text-xs text-muted-foreground">{selectedUser.email}</div>
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
               
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={onClose}>
+                <Button variant="outline" type="button" onClick={onClose} disabled={isLoading}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={!selectedUser || isLoading}>
+                <Button 
+                  type="button" 
+                  disabled={isLoading || !selectedUser}
+                  onClick={(e) => {
+                    if (selectedUser) {
+                      handleInviteSubmit(e as any)
+                    }
+                  }}
+                >
                   {isLoading ? "Sending..." : "Send Invitation"}
                 </Button>
               </DialogFooter>
-            </form>
+            </div>
           </TabsContent>
         </Tabs>
       </DialogContent>

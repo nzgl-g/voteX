@@ -69,6 +69,21 @@ export interface CandidateApplication {
   paper?: string;
 }
 
+export interface CandidateInvitation {
+  _id: string;
+  sessionId: string;
+  userId: string;
+  invitedBy: string;
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt?: string;
+}
+
+export interface ApplicationStatus {
+  exists: boolean;
+  status?: 'pending' | 'approved' | 'rejected';
+  message?: string;
+}
+
 class CandidateService {
   /**
    * Get all candidates for a session
@@ -84,90 +99,169 @@ class CandidateService {
   }
 
   /**
+   * Check if user has an existing application for this session
+   */
+  async checkApplicationStatus(sessionId: string): Promise<ApplicationStatus> {
+    try {
+      const response = await baseApi.get<{ exists: boolean; status?: string; message?: string }>(
+        `/sessions/${sessionId}/candidate/check-application`
+      );
+      
+      return {
+        exists: response.data.exists,
+        status: response.data.status as 'pending' | 'approved' | 'rejected',
+        message: response.data.message
+      };
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Error checking application status:", error);
+      }
+      
+      // If endpoint doesn't exist yet, we'll assume no application exists
+      if (error.response?.status === 404) {
+        return { exists: false };
+      }
+      
+      const errorMessage = error.response?.data?.message || 'Failed to check application status';
+      throw new Error(errorMessage);
+    }
+  }
+
+  /**
    * Get all candidate requests for a session
    */
   async getCandidateRequests(sessionId: string): Promise<CandidateRequest[]> {
     try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Fetching candidate requests for session ${sessionId}...`);
-      }
+      console.log(`[Candidate Service] Fetching candidate requests for session ${sessionId}`);
+      
+      // Get candidate requests from the server
       const response = await baseApi.get<any[]>(`/sessions/${sessionId}/candidate/candidate-requests`);
       
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Received ${response.data.length} candidate requests`);
+      // Log to debug what's in the response
+      if (response.data && response.data.length > 0) {
+        console.log(`[Candidate Service] First request email data:`, {
+          directEmail: response.data[0].email,
+          userEmail: response.data[0].user?.email,
+          fullName: response.data[0].fullName,
+          userObject: response.data[0].user
+        });
       }
       
-      // Process and transform the response data to match our expected structure
+      // If there's no data, return empty array
+      if (!response.data || response.data.length === 0) {
+        console.log('[Candidate Service] No candidate requests found');
+        return [];
+      }
+      
+      // Generate unique IDs if missing
+      let uniqueIdCounter = 1;
+      
+      // Process each candidate request
       const transformedRequests = response.data.map((request) => {
-        let userId: string = "";
-        let sessionId: string = "";
-        
-        // Handle different potential formats for user field
-        if (typeof request.user === 'string') {
-          userId = request.user;
-        } else if (request.user && request.user.$oid) {
-          userId = request.user.$oid;
-        } else if (request.user && request.user._id) {
-          userId = typeof request.user._id === 'string' ? request.user._id : request.user._id.$oid || request.user._id;
+        // Ensure each request has a unique ID
+        const requestId = request._id || 
+                         (request._id?.$oid) || 
+                         `temp-id-${uniqueIdCounter++}`;
+                         
+        // Extract user ID from request
+        let userId = "";
+        if (request.user) {
+          if (typeof request.user === 'string') {
+            userId = request.user;
+          } else if (request.user.$oid) {
+            userId = request.user.$oid;
+          } else if (request.user._id) {
+            userId = typeof request.user._id === 'string' ? 
+                    request.user._id : 
+                    request.user._id.$oid || String(request.user._id);
+          }
         }
         
-        // Handle different potential formats for session field
-        if (typeof request.session === 'string') {
-          sessionId = request.session;
-        } else if (request.session && request.session.$oid) {
-          sessionId = request.session.$oid;
-        } else if (request.session && request.session._id) {
-          sessionId = typeof request.session._id === 'string' ? request.session._id : request.session._id.$oid || request.session._id;
+        // Create a user data object from the information we have
+        // We don't try to fetch from the API since there's no /users/:id endpoint
+        let userData = {
+          _id: userId || `unknown-user-${uniqueIdCounter}`,
+          fullName: request.fullName || "Unknown User",
+          email: request.email || (request.user && typeof request.user === 'object' && request.user.email) || 
+                 (request.user && typeof request.user === 'string' ? `User: ${request.user}` : "No Email Available")
+        };
+        
+        // Extract session ID
+        let sessionId = "";
+        if (request.session) {
+          if (typeof request.session === 'string') {
+            sessionId = request.session;
+          } else if (request.session.$oid) {
+            sessionId = request.session.$oid;
+          } else if (request.session._id) {
+            sessionId = typeof request.session._id === 'string' ? 
+                       request.session._id : 
+                       request.session._id.$oid || String(request.session._id);
+          }
+        }
+
+        // Format date of birth
+        let dateOfBirth = "N/A";
+        if (request.dobPob && request.dobPob.dateOfBirth) {
+          // If dateOfBirth is in MongoDB date format ($date field)
+          if (typeof request.dobPob.dateOfBirth === 'object' && request.dobPob.dateOfBirth.$date) {
+            dateOfBirth = new Date(request.dobPob.dateOfBirth.$date).toISOString().split('T')[0];
+          } else {
+            // Regular date string
+            try {
+              dateOfBirth = new Date(request.dobPob.dateOfBirth).toISOString().split('T')[0];
+            } catch (e) {
+              dateOfBirth = String(request.dobPob.dateOfBirth) || "N/A";
+            }
+          }
         }
         
-        // Build a standardized request object
+        // Ensure arrays are actually arrays
+        const nationalities = Array.isArray(request.nationalities) ? 
+                            request.nationalities : 
+                            (request.nationalities ? [request.nationalities] : []);
+                            
+        const promises = Array.isArray(request.promises) ? 
+                       request.promises : 
+                       (request.promises ? [request.promises] : []);
+        
+        // Create standardized request object
         const standardizedRequest: CandidateRequest = {
-          _id: request._id || request._id.$oid || "",
+          _id: requestId,
           status: request.status || "pending",
-          fullName: request.fullName || "",
+          fullName: request.fullName || userData.fullName,
           partyName: request.partyName || "",
-          biography: request.biography,
-          experience: request.experience,
-          nationalities: request.nationalities,
-          promises: request.promises,
-          paper: request.paper,
+          biography: request.biography || "",
+          experience: request.experience || "",
+          nationalities: nationalities,
+          promises: promises,
+          paper: request.paper || null,
           approvedAt: request.approvedAt,
           rejectedAt: request.rejectedAt,
           createdAt: request.requestedAt || request.createdAt,
-          // Create user object with minimum required info
-          user: {
-            _id: userId,
-            fullName: request.fullName || "Unknown User",  // Use request fullName as fallback
-            email: request.email || "user@example.com"     // Placeholder if not available
+          dobPob: {
+            dateOfBirth: dateOfBirth,
+            placeOfBirth: request.dobPob?.placeOfBirth || "N/A"
           },
-          // Create session object with minimum required info
+          user: userData,
           session: {
-            _id: sessionId,
-            name: "Current Session",                     // Default value
-            type: "election"                             // Assume election since this is for candidates
+            _id: sessionId || request.session || sessionId,
+            name: request.session?.name || "Current Session",
+            type: request.session?.type || "election"
           }
         };
-        
-        // For debugging
-        if (process.env.NODE_ENV === 'development') {
-          console.log("Original request:", request);
-          console.log("Transformed request:", standardizedRequest);
-        }
         
         return standardizedRequest;
       });
       
-      return transformedRequests;
+      // Remove any duplicate requests (based on _id)
+      const uniqueRequests = transformedRequests.filter((request, index, self) => 
+        request._id && index === self.findIndex(r => r._id === request._id)
+      );
+      
+      return uniqueRequests;
     } catch (error: any) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error("Candidate request fetch error:", error);
-        console.error("Error details:", {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data,
-          message: error.message
-        });
-      }
+      console.error("[Candidate Service] Candidate request fetch error:", error);
       
       // If it's a 404, it likely means there are no candidate requests yet
       if (error.response?.status === 404) {
@@ -176,22 +270,6 @@ class CandidateService {
       
       const errorMessage = error.response?.data?.message || 'Failed to fetch candidate requests';
       throw new Error(errorMessage);
-    }
-  }
-
-  /**
-   * Check if user has already applied for this session
-   */
-  async hasUserApplied(sessionId: string): Promise<boolean> {
-    try {
-      const response = await baseApi.get<{ hasApplied: boolean }>(`/sessions/${sessionId}/candidate/has-applied`);
-      return response.data.hasApplied;
-    } catch (error: any) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error("Error checking if user has applied:", error);
-      }
-      // Default to false on error to let the user try to apply
-      return false;
     }
   }
 
@@ -260,6 +338,43 @@ class CandidateService {
       return response.data;
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || 'Failed to send candidate invitation';
+      throw new Error(errorMessage);
+    }
+  }
+  
+  /**
+   * Accept a candidate invitation
+   */
+  async acceptCandidateInvitation(inviteId: string, candidateData: CandidateApplication): Promise<{ message: string }> {
+    try {
+      const response = await baseApi.post<{ message: string }>(
+        `/sessions/candidate/invite/${inviteId}/accept`,
+        candidateData
+      );
+      return response.data;
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Error accepting candidate invitation:", error);
+      }
+      const errorMessage = error.response?.data?.message || 'Failed to accept candidate invitation';
+      throw new Error(errorMessage);
+    }
+  }
+
+  /**
+   * Reject a candidate invitation
+   */
+  async rejectCandidateInvitation(inviteId: string): Promise<{ message: string }> {
+    try {
+      const response = await baseApi.post<{ message: string }>(
+        `/sessions/candidate/invite/${inviteId}/reject`
+      );
+      return response.data;
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Error rejecting candidate invitation:", error);
+      }
+      const errorMessage = error.response?.data?.message || 'Failed to reject candidate invitation';
       throw new Error(errorMessage);
     }
   }

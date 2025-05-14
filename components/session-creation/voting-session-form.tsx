@@ -38,28 +38,27 @@ export type FormData = {
   banner: string | File | null
 
   // Step 2
-  voteType: "poll" | "election" | "tournament" | null
-  votingMode: "single" | "multiple" | "ranked" | null
+  voteType: "poll" | "election" | "tournament"
+  votingMode: "single" | "multiple"
   maxSelections: number
-  maxRanks: number
 
   // Step 3
-  startDate: Date | null
-  endDate: Date | null
+  startDate: Date
+  endDate: Date
   hasNomination: boolean
   nominationStartDate: Date | null
   nominationEndDate: Date | null
 
   // Step 4
-  verificationType: "standard" | "kyc" | null
+  verificationType: "standard" | "kyc"
 
   // Step 5
-  visibility: "public" | "private" | null
-  secretPhrase: string
+  visibility: "public" | "private"
+  secretPhrase: string | null
   csvFile: File | null
 
   // Step 6
-  resultVisibility: "post-completion" | "real-time" | null
+  resultVisibility: "post-completion" | "real-time"
 
   // Step 7
   pollOptions: PollOption[]
@@ -74,15 +73,14 @@ const initialFormData: FormData = {
   banner: null,
 
   // Step 2
-  voteType: null,
-  votingMode: null,
+  voteType: "poll",
+  votingMode: "single",
   maxSelections: 3,
-  maxRanks: 3,
 
   // Step 3
   startDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // Default to tomorrow
   endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default to a week from now
-  hasNomination: false,
+  hasNomination: false,  // Will be automatically set to true if voteType is "election"
   nominationStartDate: null,
   nominationEndDate: null,
 
@@ -130,8 +128,16 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
       // Check if any values are actually changing
       const hasChanges = Object.entries(data).some(([key, value]) => prev[key as keyof FormData] !== value)
 
+      // Create updated form data
+      const updatedData = hasChanges ? { ...prev, ...data } : prev;
+      
+      // If changing to election type, automatically set hasNomination to true
+      if (data.voteType === "election") {
+        updatedData.hasNomination = true;
+      }
+
       // Only update if there are actual changes
-      return hasChanges ? { ...prev, ...data } : prev
+      return hasChanges ? updatedData : prev;
     })
   }
 
@@ -170,9 +176,11 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
       errors.push("Poll requires at least two options");
     }
     
-    if (formData.voteType === 'election' && !formData.hasNomination && 
-        (!formData.candidates || formData.candidates.length === 0)) {
-      errors.push("Election requires at least one candidate or nomination phase");
+    if (formData.voteType === 'election') {
+      // Validate nomination phase dates for elections
+      if (!formData.nominationStartDate || !formData.nominationEndDate) {
+        errors.push("Election requires nomination start and end dates");
+      }
     }
     
     // If we have no verification method selected
@@ -213,7 +221,8 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
         type: formData.voteType as 'election' | 'poll' | 'tournament',
         subtype: formData.votingMode as 'single' | 'multiple' | 'ranked',
         
-        accessLevel: formData.visibility === 'private' ? 'Private' : 'Public',
+        accessLevel: formData.visibility === 'private' ? 'Private' : 'Public', // Capitalize for backend
+        resultVisibility: formData.resultVisibility,
         
         subscription: {
           name: subscription,
@@ -224,58 +233,71 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
         },
         
         sessionLifecycle: {
-          // Always include creation timestamp
-          createdAt: new Date().toISOString(),
+          // Removed createdAt as the backend will set this
           
-          // Only use scheduledAt for nomination phase in election type
-          scheduledAt: formData.hasNomination && formData.voteType === 'election'
+          // Set scheduledAt based on session type
+          scheduledAt: formData.voteType === 'election' 
             ? {
-                start: formData.nominationStartDate ? formData.nominationStartDate.toISOString() : null,
-                end: formData.nominationEndDate ? formData.nominationEndDate.toISOString() : null
+                // For elections, scheduledAt is the nomination period
+                start: formData.nominationStartDate ? formData.nominationStartDate.toISOString() : new Date().toISOString(),
+                end: formData.nominationEndDate ? formData.nominationEndDate.toISOString() : new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()
               }
-            : { start: null, end: null },
-            
-          // Always include start and end dates for the voting period
-          startedAt: formData.startDate ? formData.startDate.toISOString() : new Date().toISOString(),
-          endedAt: formData.endDate ? formData.endDate.toISOString() : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+            : {
+                // For polls and tournaments, scheduledAt is the voting period
+                start: formData.startDate ? formData.startDate.toISOString() : new Date().toISOString(),
+                end: formData.endDate ? formData.endDate.toISOString() : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+              }
         },
         
         // Contract address starts as null - will be set when session is deployed to blockchain
         contractAddress: null,
         
-        // Security settings
-        securityMethod: formData.visibility === 'private' ? 'Secret Phrase' : null,
+        // Security settings - match exactly what works in Postman
+        securityMethod: null, // Always null as per working Postman request
         secretPhrase: formData.visibility === 'private' ? formData.secretPhrase : null,
-        verificationMethod: formData.verificationType === 'kyc' ? 'KYC' : null,
+        verificationMethod: formData.verificationType,
         
         // Default required fields
         candidateRequests: [],
         participants: [],
         allowDirectEdit: false,
-        allowsOfficialPapers: false,
-        results: null,
+        allowsOfficialPapers: false
       };
       
       // Add type-specific data
       if (formData.voteType === 'poll') {
+        // Match the structure from the working Postman request for options
         sessionData.options = formData.pollOptions.map(option => ({
           name: option.title,
-          description: option.description || "", // Ensure not null
-          totalVotes: 0
+          description: option.description || ""
         }));
+        
+        // Set maxChoices based on voting mode
         sessionData.maxChoices = formData.votingMode === 'multiple' ? formData.maxSelections : 1;
       } else if (formData.voteType === 'election') {
+        // Initialize candidates array
         sessionData.candidates = [];
-        // If not in nomination phase, add candidates
+        
+        // Only add candidates if not in nomination phase
         if (!formData.hasNomination && formData.candidates.length > 0) {
-          sessionData.candidates = formData.candidates.map(candidate => ({
-            user: candidate.id, // This would normally be a user ID
-            fullName: candidate.name,
-            biography: candidate.biography || "", // Ensure not null
-            partyName: 'Independent', // Required field
-            totalVotes: 0
-          }));
+          // Map candidates to the expected structure
+          sessionData.candidates = formData.candidates.map(candidate => {
+            // Use a default user ID if not provided
+            const userId = candidate.id && /^[0-9a-fA-F]{24}$/.test(candidate.id) 
+              ? candidate.id 
+              : "000000000000000000000000";
+              
+            return {
+              user: userId,
+              fullName: candidate.name,
+              biography: candidate.biography || "",
+              partyName: 'Independent'
+              // No need to include totalVotes, requiresReview or other fields that aren't in the Postman example
+            };
+          });
         }
+        
+        // Set maxChoices based on voting mode
         sessionData.maxChoices = formData.votingMode === 'multiple' ? formData.maxSelections : 1;
       }
       
@@ -306,6 +328,7 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
         router.push(`/team-leader/session/${response._id}`);
       }
     } catch (error) {
+      console.log(formData);
       console.error("Error creating session:", error);
       toast({
         title: "Error",
@@ -327,15 +350,13 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
         if (formData.voteType === "poll") {
           return !!formData.startDate && !!formData.endDate
         } else if (formData.voteType === "election") {
-          if (formData.hasNomination) {
-            return (
-                !!formData.startDate &&
-                !!formData.endDate &&
-                !!formData.nominationStartDate &&
-                !!formData.nominationEndDate
-            )
-          }
-          return !!formData.startDate && !!formData.endDate
+          // For elections, always require nomination dates and voting dates
+          return (
+            !!formData.startDate &&
+            !!formData.endDate &&
+            !!formData.nominationStartDate &&
+            !!formData.nominationEndDate
+          )
         }
         return false
       case 3: // Verification
@@ -350,8 +371,9 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
       case 6: // Session Data
         if (formData.voteType === "poll") {
           return formData.pollOptions.length > 0
-        } else if (formData.voteType === "election" && !formData.hasNomination) {
-          return formData.candidates.length > 0
+        } else if (formData.voteType === "election") {
+          // For elections with nomination phase, no need for initial candidates
+          return true
         }
         return true
       default:
@@ -415,7 +437,7 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
                     onClick={() => index < currentStep && goToStep(index)}
                   >
                     <div 
-                      className={`relative z-10 size-8 sm:size-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                      className={`relative z-10 size-10 rounded-full flex items-center justify-center transition-all duration-300 ${
                         index < currentStep 
                           ? "bg-primary text-primary-foreground" 
                           : index === currentStep 
@@ -424,13 +446,13 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
                       }`}
                     >
                       {index < currentStep ? (
-                        <Check className="h-4 w-4 sm:h-5 sm:w-5" />
+                        <Check className="h-5 w-5" />
                       ) : (
-                        <span className="text-xs sm:text-sm font-medium">{index + 1}</span>
+                        <span className="text-sm font-medium">{index + 1}</span>
                       )}
                     </div>
                     <span 
-                      className={`mt-2 text-xs font-medium max-w-[60px] sm:max-w-[80px] text-center transition-colors hidden sm:block ${
+                      className={`mt-2 text-xs font-medium max-w-[80px] text-center transition-colors hidden sm:block ${
                         index <= currentStep ? "text-primary" : "text-muted-foreground/60"
                       }`}
                     >

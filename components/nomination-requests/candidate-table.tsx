@@ -132,7 +132,7 @@ export function CandidateTable({ candidates, onAccept, onReject }: CandidateTabl
               </TableRow>
             ) : (
               filteredCandidates.map((candidate) => (
-                <TableRow key={candidate.id}>
+                <TableRow key={candidate.id || `candidate-${Math.random().toString(36).substring(2, 11)}`}>
                   {visibleColumns.name && <TableCell className="font-medium">{candidate.fullName}</TableCell>}
                   {visibleColumns.email && <TableCell>{candidate.email}</TableCell>}
                   {visibleColumns.status && (
@@ -189,7 +189,13 @@ export function CandidateTable({ candidates, onAccept, onReject }: CandidateTabl
       </div>
 
       {selectedCandidate && (
-        <CandidateDialog candidate={selectedCandidate} open={dialogOpen} onOpenChange={setDialogOpen} />
+        <CandidateDialog 
+          candidate={selectedCandidate} 
+          open={dialogOpen} 
+          onOpenChange={setDialogOpen}
+          onAccept={onAccept}
+          onReject={onReject}
+        />
       )}
     </div>
   )

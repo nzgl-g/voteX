@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
     DropdownMenu,
@@ -8,12 +8,13 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-    DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { Settings, LogOut, User, LayoutDashboard, Vote } from "lucide-react";
 import { SettingsDialog } from "@/components/user-settings/settings-dialog";
 import { authService, sessionService } from "@/services";
 import { useRouter, usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 export interface UserProfileProps {
     userName?: string;
@@ -23,12 +24,40 @@ export interface UserProfileProps {
     className?: string;
 }
 
+const MenuItem = ({
+                      icon: Icon,
+                      label,
+                      onClick,
+                      destructive = false,
+                  }: {
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+    onClick: () => void;
+    destructive?: boolean;
+}) => (
+    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+        <DropdownMenuItem
+            onClick={onClick}
+            className={cn(
+                "group flex items-center px-3 py-2 rounded-lg my-1",
+                "transition-colors duration-200 ease-out",
+                destructive
+                    ? "text-destructive hover:bg-destructive/10 focus:bg-destructive/10"
+                    : "hover:bg-accent/80 hover:text-accent-foreground"
+            )}
+        >
+            <Icon className="mr-3 h-4 w-4 text-current group-hover:scale-110 transition-transform" />
+            <span className="text-sm">{label}</span>
+        </DropdownMenuItem>
+    </motion.div>
+);
+
 export function UserProfile({
                                 userName = "User",
                                 userEmail,
                                 userAvatar,
                                 variant = "dropdown",
-                                className = ""
+                                className = "",
                             }: UserProfileProps) {
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [hasSessions, setHasSessions] = useState(false);
@@ -40,11 +69,9 @@ export function UserProfile({
         const checkUserSessions = async () => {
             try {
                 const sessions = await sessionService.getUserSessions();
-                if (sessions && sessions.length > 0) {
+                if (sessions?.length > 0) {
                     setHasSessions(true);
-                    if (sessions[0]._id) {
-                        setSessionId(sessions[0]._id);
-                    }
+                    setSessionId(sessions[0]._id || null);
                 }
             } catch (error) {
                 console.error("Error fetching user sessions:", error);
@@ -56,119 +83,117 @@ export function UserProfile({
         }
     }, []);
 
-    const initials = userName
-        ? userName
-            .split(" ")
-            .map((n) => n[0])
-            .join("")
-            .toUpperCase()
-        : "U";
+    const initials = useMemo(
+        () =>
+            userName
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+                .toUpperCase(),
+        [userName]
+    );
 
     const handleLogout = () => {
         authService.logout();
-        router.push('/');
+        router.push("/");
     };
 
-    const navigateToVoterPortal = () => {
-        router.push('/voter');
-    };
-
+    const navigateToVoterPortal = () => router.push("/voter");
     const navigateToDashboard = () => {
-        if (sessionId) {
-            router.push(`/team-leader/monitoring/${sessionId}`);
-        }
+        if (sessionId) router.push(`/team-leader/monitoring/${sessionId}`);
     };
 
-    // Animation and styling constants
-    const avatarAnimation = "transition-all duration-300 ease-in-out hover:scale-110 active:scale-95";
-    const menuItemAnimation = "transition-colors duration-200 ease-out hover:bg-accent/80 hover:text-accent-foreground";
-    const iconAnimation = "transition-transform duration-200 group-hover:scale-110 mr-2 h-4 w-4";
+    const isVoterPage = pathname?.startsWith("/voter");
+    const isTeamLeaderPage = pathname?.startsWith("/team-leader");
 
-    // Dropdown variant
+    const UserAvatar = (
+        <Avatar className="h-8 w-8 transition-all duration-300 hover:scale-110 active:scale-95">
+            <AvatarImage src={userAvatar} alt={userName} />
+            <AvatarFallback className="relative flex size-full items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary to-secondary">
+        <span className="relative font-semibold text-white drop-shadow-sm">
+          {initials}
+        </span>
+            </AvatarFallback>
+        </Avatar>
+    );
+
+    const UserInfo = (
+        <div className="flex flex-col space-y-0.5 leading-none overflow-hidden">
+            <p className="font-medium truncate">{userName}</p>
+            {userEmail && (
+                <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
+            )}
+        </div>
+    );
+
     if (variant === "dropdown") {
         return (
             <>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <button className={`flex items-center space-x-2 rounded-full p-1 bg-background hover:bg-accent hover:text-accent-foreground transition-all duration-300 ease-out transform hover:scale-105 active:scale-95 outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background ${className}`}>
-                            <Avatar className={`h-8 w-8 cursor-pointer ${avatarAnimation}`}>
-                                <AvatarImage src={userAvatar} alt={userName} />
-                                <AvatarFallback className="relative flex size-full items-center justify-center overflow-hidden rounded-full">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-primary/70 to-secondary/70 blur-md opacity-80" />
-                                    <div className="absolute inset-0 bg-gradient-to-tl from-background/10 to-background/5 mix-blend-overlay" />
-                                    <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary opacity-70" />
-                                    <span className="relative font-semibold z-10 text-white drop-shadow-sm">{initials}</span>
-                                </AvatarFallback>
-                            </Avatar>
-                        </button>
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className={cn(
+                                "flex items-center p-1 rounded-full bg-background",
+                                "hover:bg-accent hover:text-accent-foreground",
+                                "outline-none focus:ring-2 focus:ring-primary",
+                                "transition-all duration-200 ease-out",
+                                className
+                            )}
+                        >
+                            {UserAvatar}
+                        </motion.button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
                         align="end"
-                        className="w-56 p-1 rounded-xl shadow-lg border border-border/50 backdrop-blur-sm bg-popover/95"
+                        className="w-64 p-2 rounded-xl shadow-xl border border-border/50 bg-popover/95 backdrop-blur-sm"
                         sideOffset={8}
                     >
                         <div className="flex items-center gap-3 p-2">
-                            <Avatar className={`h-10 w-10 ${avatarAnimation}`}>
+                            <Avatar className="h-10 w-10">
                                 <AvatarImage src={userAvatar} alt={userName} />
-                                <AvatarFallback className="relative flex size-full items-center justify-center overflow-hidden rounded-full">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-primary/70 to-secondary/70 blur-md opacity-80" />
-                                    <div className="absolute inset-0 bg-gradient-to-tl from-background/10 to-background/5 mix-blend-overlay" />
-                                    <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary opacity-70" />
-                                    <span className="relative font-semibold z-10 text-white drop-shadow-sm">{initials}</span>
+                                <AvatarFallback className="bg-gradient-to-br from-primary to-secondary">
+                                    {initials}
                                 </AvatarFallback>
                             </Avatar>
-                            <div className="flex flex-col space-y-0.5 leading-none overflow-hidden">
-                                <p className="font-medium truncate">{userName}</p>
-                                {userEmail && (
-                                    <p className="text-xs text-muted-foreground truncate">
-                                        {userEmail}
-                                    </p>
-                                )}
-                            </div>
+                            {UserInfo}
                         </div>
-                        <DropdownMenuSeparator className="bg-border/50" />
-                        {!pathname?.startsWith('/voter') && (
-                            <DropdownMenuItem
+
+                        <DropdownMenuSeparator className="bg-border/50 my-2" />
+
+                        {!isVoterPage && (
+                            <MenuItem
+                                icon={Vote}
+                                label="Go to Voter Portal"
                                 onClick={navigateToVoterPortal}
-                                className={`group ${menuItemAnimation}`}
-                            >
-                                <Vote className={iconAnimation} />
-                                <span className="group-hover:translate-x-1 transition-transform duration-200">
-                                    Go to Voter Portal
-                                </span>
-                            </DropdownMenuItem>
+                            />
                         )}
-                        {hasSessions && !pathname?.startsWith('/team-leader') && (
-                            <DropdownMenuItem
+
+                        {hasSessions && !isTeamLeaderPage && (
+                            <MenuItem
+                                icon={LayoutDashboard}
+                                label="Go to Dashboard"
                                 onClick={navigateToDashboard}
-                                className={`group ${menuItemAnimation}`}
-                            >
-                                <LayoutDashboard className={iconAnimation} />
-                                <span className="group-hover:translate-x-1 transition-transform duration-200">
-                                    Go to Dashboard
-                                </span>
-                            </DropdownMenuItem>
+                            />
                         )}
-                        <DropdownMenuSeparator className="bg-border/50" />
-                        <DropdownMenuItem
+
+                        <DropdownMenuSeparator className="bg-border/50 my-2" />
+
+                        <MenuItem
+                            icon={Settings}
+                            label="Settings"
                             onClick={() => setSettingsOpen(true)}
-                            className={`group ${menuItemAnimation}`}
-                        >
-                            <Settings className={iconAnimation} />
-                            <span className="group-hover:translate-x-1 transition-transform duration-200">
-                                Settings
-                            </span>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator className="bg-border/50" />
-                        <DropdownMenuItem
+                        />
+
+                        <DropdownMenuSeparator className="bg-border/50 my-2" />
+
+                        <MenuItem
+                            icon={LogOut}
+                            label="Log out"
                             onClick={handleLogout}
-                            className={`group text-destructive focus:text-destructive ${menuItemAnimation}`}
-                        >
-                            <LogOut className={iconAnimation} />
-                            <span className="group-hover:translate-x-1 transition-transform duration-200">
-                                Log out
-                            </span>
-                        </DropdownMenuItem>
+                            destructive
+                        />
                     </DropdownMenuContent>
                 </DropdownMenu>
 
@@ -182,98 +207,79 @@ export function UserProfile({
         <>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <button className={`flex w-full items-center gap-3 rounded-lg p-2 text-left transition-all duration-300 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-sm group ${className}`}>
-                        <Avatar className={`h-8 w-8 rounded-lg ${avatarAnimation}`}>
-                            <AvatarImage src={userAvatar} alt={userName} />
-                            <AvatarFallback className="relative flex size-full items-center justify-center overflow-hidden rounded-lg">
-                                <div className="absolute inset-0 bg-gradient-to-br from-primary/70 to-secondary/70 blur-md opacity-80" />
-                                <div className="absolute inset-0 bg-gradient-to-tl from-background/10 to-background/5 mix-blend-overlay" />
-                                <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary opacity-70" />
-                                <span className="relative font-semibold z-10 text-white drop-shadow-sm">{initials}</span>
-                            </AvatarFallback>
-                        </Avatar>
+                    <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className={cn(
+                            "flex w-full items-center gap-3 rounded-lg p-2 text-left",
+                            "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                            "transition-all duration-200 group",
+                            className
+                        )}
+                    >
+                        {UserAvatar}
                         <div className="grid flex-1 text-left text-sm leading-tight overflow-hidden">
-                            <span className="truncate font-medium transition-all duration-200 group-hover:translate-x-0.5">
-                                {userName}
-                            </span>
+              <span className="truncate font-medium transition-all duration-200 group-hover:translate-x-0.5">
+                {userName}
+              </span>
                             {userEmail && (
                                 <span className="truncate text-xs text-muted-foreground transition-all duration-200 group-hover:translate-x-0.5">
-                                    {userEmail}
-                                </span>
+                  {userEmail}
+                </span>
                             )}
                         </div>
-                    </button>
+                    </motion.button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                    className="w-56 rounded-xl shadow-lg border border-border/50 backdrop-blur-sm bg-popover/95"
+                    className="w-64 rounded-xl shadow-xl border border-border/50 bg-popover/95 backdrop-blur-sm"
                     align="start"
                     side="right"
                     sideOffset={8}
                 >
-                    <DropdownMenuLabel className="p-0 font-normal">
-                        <div className="flex items-center gap-3 p-2">
-                            <Avatar className={`h-10 w-10 rounded-lg ${avatarAnimation}`}>
-                                <AvatarImage src={userAvatar} alt={userName} />
-                                <AvatarFallback className="relative flex size-full items-center justify-center overflow-hidden rounded-lg">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-primary/70 to-secondary/70 blur-md opacity-80" />
-                                    <div className="absolute inset-0 bg-gradient-to-tl from-background/10 to-background/5 mix-blend-overlay" />
-                                    <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary opacity-70" />
-                                    <span className="relative font-semibold z-10 text-white drop-shadow-sm">{initials}</span>
-                                </AvatarFallback>
-                            </Avatar>
-                            <div className="grid flex-1 text-left text-sm leading-tight overflow-hidden">
-                                <span className="truncate font-medium">{userName}</span>
-                                {userEmail && (
-                                    <span className="truncate text-xs text-muted-foreground">
-                                        {userEmail}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator className="bg-border/50" />
-                    {!pathname?.startsWith('/voter') && (
-                        <DropdownMenuItem
+                    <div className="flex items-center gap-3 p-2">
+                        <Avatar className="h-10 w-10 rounded-lg">
+                            <AvatarImage src={userAvatar} alt={userName} />
+                            <AvatarFallback className="bg-gradient-to-br from-primary to-secondary">
+                                {initials}
+                            </AvatarFallback>
+                        </Avatar>
+                        {UserInfo}
+                    </div>
+
+                    <DropdownMenuSeparator className="bg-border/50 my-2" />
+
+                    {!isVoterPage && (
+                        <MenuItem
+                            icon={Vote}
+                            label="Go to Voter Portal"
                             onClick={navigateToVoterPortal}
-                            className={`group ${menuItemAnimation}`}
-                        >
-                            <Vote className={iconAnimation} />
-                            <span className="group-hover:translate-x-1 transition-transform duration-200">
-                                Go to Voter Portal
-                            </span>
-                        </DropdownMenuItem>
+                        />
                     )}
-                    {hasSessions && !pathname?.startsWith('/team-leader') && (
-                        <DropdownMenuItem
+
+                    {hasSessions && !isTeamLeaderPage && (
+                        <MenuItem
+                            icon={LayoutDashboard}
+                            label="Go to Dashboard"
                             onClick={navigateToDashboard}
-                            className={`group ${menuItemAnimation}`}
-                        >
-                            <LayoutDashboard className={iconAnimation} />
-                            <span className="group-hover:translate-x-1 transition-transform duration-200">
-                                Go to Dashboard
-                            </span>
-                        </DropdownMenuItem>
+                        />
                     )}
-                    <DropdownMenuSeparator className="bg-border/50" />
-                    <DropdownMenuItem
+
+                    <DropdownMenuSeparator className="bg-border/50 my-2" />
+
+                    <MenuItem
+                        icon={Settings}
+                        label="Settings"
                         onClick={() => setSettingsOpen(true)}
-                        className={`group ${menuItemAnimation}`}
-                    >
-                        <Settings className={iconAnimation} />
-                        <span className="group-hover:translate-x-1 transition-transform duration-200">
-                            Settings
-                        </span>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator className="bg-border/50" />
-                    <DropdownMenuItem
+                    />
+
+                    <DropdownMenuSeparator className="bg-border/50 my-2" />
+
+                    <MenuItem
+                        icon={LogOut}
+                        label="Log out"
                         onClick={handleLogout}
-                        className={`group text-destructive focus:text-destructive ${menuItemAnimation}`}
-                    >
-                        <LogOut className={iconAnimation} />
-                        <span className="group-hover:translate-x-1 transition-transform duration-200">
-                            Log out
-                        </span>
-                    </DropdownMenuItem>
+                        destructive
+                    />
                 </DropdownMenuContent>
             </DropdownMenu>
 

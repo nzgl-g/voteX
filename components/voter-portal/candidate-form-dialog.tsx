@@ -20,7 +20,6 @@ interface CandidateFormDialogProps {
 }
 
 interface FormData {
-    fullName: string;
     dateOfBirth: Date | undefined;
     placeOfBirth: string;
     nationalities: string;
@@ -29,8 +28,10 @@ interface FormData {
     experience: string;
     partyName: string;
     officialPaper: File | null;
-    paperBase64: string | null;
 }
+
+// Maximum file size in bytes (2MB)
+const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
 const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
     open,
@@ -39,7 +40,6 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
     sessionTitle
 }) => {
     const [formData, setFormData] = useState<FormData>({
-        fullName: '',
         dateOfBirth: undefined,
         placeOfBirth: '',
         nationalities: '',
@@ -48,7 +48,6 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
         experience: '',
         partyName: '',
         officialPaper: null,
-        paperBase64: null,
     });
 
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -65,45 +64,20 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
         setFormData((prev) => ({ ...prev, dateOfBirth: date }));
     };
 
-    // Convert file to base64
-    const fileToBase64 = (file: File): Promise<string> => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => {
-                if (typeof reader.result === 'string') {
-                    // Remove the data URL prefix (e.g., "data:image/jpeg;base64,")
-                    const base64String = reader.result.split(',')[1];
-                    resolve(base64String);
-                } else {
-                    reject(new Error('Failed to convert file to base64'));
-                }
-            };
-            reader.onerror = error => reject(error);
-        });
-    };
-
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
             
-            // Check file size (5MB limit)
-            if (file.size > 5 * 1024 * 1024) {
-                toast.error("File size exceeds 5MB limit");
+            // Check file size (2MB limit)
+            if (file.size > MAX_FILE_SIZE) {
+                toast.error(`File size exceeds 2MB limit. Please choose a smaller file.`);
                 return;
             }
             
-            try {
-                const base64String = await fileToBase64(file);
-                setFormData(prev => ({
-                    ...prev,
-                    officialPaper: file,
-                    paperBase64: base64String
-                }));
-            } catch (error) {
-                console.error("Error converting file to base64:", error);
-                toast.error("Failed to process file");
-            }
+            setFormData(prev => ({
+                ...prev,
+                officialPaper: file
+            }));
         }
     };
 
@@ -124,23 +98,16 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
         if (e.dataTransfer.files && e.dataTransfer.files[0]) {
             const file = e.dataTransfer.files[0];
             
-            // Check file size (5MB limit)
-            if (file.size > 5 * 1024 * 1024) {
-                toast.error("File size exceeds 5MB limit");
+            // Check file size (2MB limit)
+            if (file.size > MAX_FILE_SIZE) {
+                toast.error(`File size exceeds 2MB limit. Please choose a smaller file.`);
                 return;
             }
             
-            try {
-                const base64String = await fileToBase64(file);
-                setFormData(prev => ({
-                    ...prev,
-                    officialPaper: file,
-                    paperBase64: base64String
-                }));
-            } catch (error) {
-                console.error("Error converting file to base64:", error);
-                toast.error("Failed to process file");
-            }
+            setFormData(prev => ({
+                ...prev,
+                officialPaper: file
+            }));
         }
     };
 
@@ -155,35 +122,53 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
                 return;
             }
 
-            // Create an application data object that matches the backend model
-            const applicationData = {
-                fullName: formData.fullName,
+            // Create application data with just the required fields
+            const applicationData: any = {
                 biography: formData.biography,
                 experience: formData.experience,
                 nationalities: formData.nationalities.split(',').map(n => n.trim()),
                 dobPob: {
-                    dateOfBirth: formData.dateOfBirth ? format(formData.dateOfBirth, 'yyyy-MM-dd') : 'Unknown',
+                    dateOfBirth: formData.dateOfBirth ? format(formData.dateOfBirth, 'yyyy-MM-dd') : '',
                     placeOfBirth: formData.placeOfBirth
                 },
                 promises: formData.promises.split('\n').map(p => p.trim()).filter(p => p),
-                partyName: formData.partyName,
-                paper: formData.paperBase64 || undefined
+                partyName: formData.partyName
             };
 
-            // Submit the application using the candidate service
-            await candidateService.applyAsCandidate(sessionId, applicationData);
+            // If there's a file, include the filename as paper for now
+            if (formData.officialPaper) {
+                // Just store the filename as a placeholder
+                applicationData.paper = `file:${formData.officialPaper.name}`;
+            }
+
+            // Submit the application
+            const response = await candidateService.applyAsCandidate(sessionId, applicationData);
 
             // Show success notification
             toast.success("Candidate registration submitted successfully!", {
-                description: `You have registered as a candidate for ${sessionTitle}`,
+                description: response.message || `You have registered as a candidate for ${sessionTitle}`,
             });
 
             // Close dialog
             onOpenChange(false);
         } catch (error: any) {
-            toast.error("Failed to submit registration", {
-                description: error.message || "Please try again later or contact support.",
-            });
+            // Handle 413 Payload Too Large error specifically
+            if (error.message.includes('413') || error.message.includes('Payload Too Large')) {
+                toast.error("File too large", {
+                    description: "The uploaded file exceeds the server's size limit. Try simplifying your form data."
+                });
+            }
+            // Handle specific error cases
+            else if (error.message.includes("already a candidate") || 
+                error.message.includes("already applied") ||
+                error.message.includes("application is still pending") ||
+                error.message.includes("previous request was rejected")) {
+                toast.error(error.message);
+            } else {
+                toast.error("Failed to submit registration", {
+                    description: error.message || "Please try again later or contact support.",
+                });
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -201,18 +186,6 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
 
                 <form onSubmit={handleSubmit} className="space-y-6 py-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="fullName">Full Name <span className="text-red-500">*</span></Label>
-                            <Input
-                                id="fullName"
-                                name="fullName"
-                                value={formData.fullName}
-                                onChange={handleInputChange}
-                                placeholder="Enter your full name"
-                                required
-                            />
-                        </div>
-
                         <div className="space-y-2">
                             <Label htmlFor="dateOfBirth">Date of Birth <span className="text-red-500">*</span></Label>
                             <Popover>
@@ -243,9 +216,7 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
                                 </PopoverContent>
                             </Popover>
                         </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="placeOfBirth">Place of Birth <span className="text-red-500">*</span></Label>
                             <Input
@@ -257,18 +228,18 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
                                 required
                             />
                         </div>
+                    </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="nationalities">Nationalities <span className="text-red-500">*</span></Label>
-                            <Input
-                                id="nationalities"
-                                name="nationalities"
-                                value={formData.nationalities}
-                                onChange={handleInputChange}
-                                placeholder="Enter your nationality/nationalities"
-                                required
-                            />
-                        </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="nationalities">Nationalities <span className="text-red-500">*</span></Label>
+                        <Input
+                            id="nationalities"
+                            name="nationalities"
+                            value={formData.nationalities}
+                            onChange={handleInputChange}
+                            placeholder="Enter your nationality/nationalities (comma separated)"
+                            required
+                        />
                     </div>
 
                     <div className="space-y-2">
@@ -353,11 +324,14 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
                                 ) : (
                                     <>
                                         <p className="text-sm font-medium">Drag and drop your file here or click to browse</p>
-                                        <p className="text-xs text-muted-foreground">PDF, JPG, PNG (Max. 5MB)</p>
+                                        <p className="text-xs text-muted-foreground">PDF, JPG, PNG (Max. 2MB)</p>
                                     </>
                                 )}
                             </div>
                         </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Note: Files are currently processed as placeholders. Full file upload will be implemented in a future update.
+                        </p>
                     </div>
 
                     <DialogFooter className="pt-4">

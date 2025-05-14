@@ -33,11 +33,13 @@ export function SiteHeader({ title }: SiteHeaderProps) {
     return (
         <header 
             className={cn(
-                "bg-background/80 backdrop-blur-sm sticky top-0 z-50 flex h-16 items-center gap-3 px-4 border-b transition-all duration-200 ease-in-out",
-                scrolled && "shadow-md h-14 border-b-primary/10"
+                "bg-background/90 backdrop-blur-md sticky top-0 z-40 flex items-center gap-3 px-6 border-b transition-all duration-300 ease-in-out",
+                scrolled 
+                    ? "h-14 shadow-[0_2px_10px_rgba(0,0,0,0.07)] border-b-primary/10" 
+                    : "h-16 border-b-border/40"
             )}
         >
-            <SidebarTrigger className="text-muted-foreground hover:text-primary" />
+            <SidebarTrigger className="text-muted-foreground hover:text-primary transition-colors duration-200" />
             <Separator
                 orientation="vertical"
                 className="mr-2 data-[orientation=vertical]:h-5"
@@ -52,7 +54,7 @@ export function SiteHeader({ title }: SiteHeaderProps) {
                 </BreadcrumbList>
             </Breadcrumb>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
                 <NotificationButton />
                 <ThemeToggle />
             </div>

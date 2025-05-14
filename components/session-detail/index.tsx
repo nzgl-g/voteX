@@ -10,8 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { CandidateTable } from "@/components/nomination-requests/candidate-table"
-import { Candidate as NominationCandidate } from "@/components/nomination-requests/data"
+import { Candidate as NominationCandidate, CandidateStatus } from "@/components/nomination-requests/data"
 import sessionService, { Session, Election, Poll, Candidate, PollOption } from "@/services/session-service"
+import candidateService from "@/services/candidate-service"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { toast } from "sonner"
 import { BlockchainSync } from "@/components/voter-portal/blockchain-sync"
@@ -26,6 +27,8 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
   const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [editSection, setEditSection] = useState<'details' | 'settings' | null>(null)
+  const [candidateRequests, setCandidateRequests] = useState<any[]>([])
+  const [loadingRequests, setLoadingRequests] = useState(false)
 
   useEffect(() => {
     const fetchSessionData = async () => {
@@ -35,16 +38,24 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
         setSession(data)
         setError(null)
 
-        // Log session vote metadata for blockchain deployment
-        try {
-          const voteMetadata = await sessionService.getVoteMetadata(sessionId)
-          console.log('Vote Metadata loaded:', voteMetadata)
-          
-          // Also log blockchain deployment data for reference
-          const blockchainData = await sessionService.getBlockchainDeploymentData(sessionId)
-          console.log('Blockchain Deployment Data:', blockchainData)
-        } catch (metadataErr) {
-          console.error('Failed to load vote metadata:', metadataErr)
+        // Only attempt to get blockchain data if session is deployed or active
+        const status = getSessionStatusFromData(data);
+        if (status !== "upcoming" && status !== "nomination") {
+          try {
+            const voteMetadata = await sessionService.getVoteMetadata(sessionId)
+            console.log('Vote Metadata loaded:', voteMetadata)
+            
+            // Also log blockchain deployment data for reference
+            const blockchainData = await sessionService.getBlockchainDeploymentData(sessionId)
+            console.log('Blockchain Deployment Data:', blockchainData)
+          } catch (metadataErr) {
+            console.error('Failed to load vote metadata:', metadataErr)
+          }
+        }
+        
+        // If this is an election, also load candidate requests
+        if (data.type === 'election') {
+          loadCandidateRequests();
         }
       } catch (err: any) {
         setError(err.message || "Failed to load session data")
@@ -59,13 +70,10 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
     }
   }, [sessionId])
 
-  const getSessionStatus = (): { status: string; label: string; color: string } => {
+  // Helper function to get session status from session data
+  const getSessionStatusFromData = (session: Session | null): string => {
     if (!session || !session.sessionLifecycle) {
-      return {
-        status: "unknown",
-        label: "Unknown",
-        color: "bg-muted text-muted-foreground",
-      }
+      return "unknown";
     }
 
     const now = new Date()
@@ -84,67 +92,75 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
 
     // Check if session has been marked as ended
     if (session.sessionLifecycle.endedAt) {
-      return {
-        status: "ended",
-        label: "Ended",
-        color: "bg-zinc-800 text-zinc-200",
-      }
+      return "ended";
     }
 
     // Check if session has ended based on scheduled end time
     if (endedAt && now > endedAt) {
-      return {
-        status: "ended",
-        label: "Ended",
-        color: "bg-zinc-800 text-zinc-200",
-      }
+      return "ended";
     }
 
-    // Check if session has a contract address but also has an endedAt timestamp
-    // This indicates an ended blockchain session
-    if (session.contractAddress && endedAt) {
-      return {
-        status: "ended",
-        label: "Ended",
-        color: "bg-zinc-800 text-zinc-200",
-      }
-    }
-
-    // Check if session has a contract address (next priority)
+    // Check if session has a contract address (indicates it's deployed)
     if (session.contractAddress) {
-      return {
-        status: "started",
-        label: "Active",
-        color: "bg-emerald-600 text-white",
-      }
+      return "started";
     }
 
     // Check if session has started by startedAt field
     if (startedAt && now >= startedAt && (!endedAt || now <= endedAt)) {
-      // If it has started but no contract address yet
-      return {
-        status: "pending_deployment",
-        label: "Pending Deployment",
-        color: "bg-amber-500 text-black dark:text-zinc-900",
-      }
+      return "pending_deployment";
     }
 
     // Check for nomination phase (for election type)
     if (session.type === "election" && scheduledStart && scheduledEnd) {
       if (now >= scheduledStart && now <= scheduledEnd) {
-        return {
-          status: "nomination",
-          label: "Nominations",
-          color: "bg-amber-500 text-black dark:text-zinc-900",
-        }
+        return "nomination";
       }
     }
 
     // Default to coming soon
-    return {
-      status: "upcoming",
-      label: "Coming Soon",
-      color: "bg-blue-500 text-white",
+    return "upcoming";
+  }
+
+  const getSessionStatus = (): { status: string; label: string; color: string } => {
+    const status = getSessionStatusFromData(session);
+    
+    switch (status) {
+      case "ended":
+        return {
+          status: "ended",
+          label: "Ended",
+          color: "bg-zinc-800 text-zinc-200",
+        };
+      case "started":
+        return {
+          status: "started",
+          label: "Active",
+          color: "bg-emerald-600 text-white",
+        };
+      case "pending_deployment":
+        return {
+          status: "pending_deployment",
+          label: "Pending Deployment",
+          color: "bg-amber-500 text-black dark:text-zinc-900",
+        };
+      case "nomination":
+        return {
+          status: "nomination",
+          label: "Nominations",
+          color: "bg-amber-500 text-black dark:text-zinc-900",
+        };
+      case "upcoming":
+        return {
+          status: "upcoming",
+          label: "Coming Soon",
+          color: "bg-blue-500 text-white",
+        };
+      default:
+        return {
+          status: "unknown",
+          label: "Unknown",
+          color: "bg-muted text-muted-foreground",
+        };
     }
   }
 
@@ -471,23 +487,193 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
   }
 
   // Convert candidates to the format expected by CandidateTable
-  const mapCandidatesToTableFormat = (candidates: Candidate[] = []): NominationCandidate[] => {
-    return candidates.map(candidate => ({
-      id: candidate._id || candidate.id || "",
-      fullName: candidate.fullName,
-      email: candidate.user ? "User ID: " + candidate.user : "Unknown",
-      dateOfBirth: candidate.dobPob?.dateOfBirth || "N/A",
-      placeOfBirth: candidate.dobPob?.placeOfBirth || "N/A",
-      nationalities: candidate.nationalities || [],
-      experience: candidate.experience || "",
-      biography: candidate.biography || "",
-      promises: candidate.promises || [],
-      status: "approved", // Default status for candidates in the session
-      attachments: candidate.paper 
-        ? [{ name: "Official Paper", size: "Unknown", url: candidate.paper }] 
-        : []
-    }))
+  const mapCandidatesToTableFormat = (candidates: any[] = []): NominationCandidate[] => {
+    console.log("Mapping candidates to table format, count:", candidates?.length || 0);
+    
+    // If candidates is not an array, log and return empty array
+    if (!Array.isArray(candidates)) {
+      console.error("candidateRequests is not an array:", candidates);
+      return [];
+    }
+    
+    // Generate unique IDs for any items missing them
+    let uniqueIdCounter = 1;
+    
+    const mappedCandidates = candidates.map(candidate => {
+      // Ensure we have a valid ID for each candidate (critical for React keys)
+      const candidateId = candidate._id || candidate.id || `temp-id-${uniqueIdCounter++}`;
+      
+      // Make sure to provide valid values for required fields (especially email)
+      // The email can come from the user object or directly from candidate
+      let email = candidate.email || "No email";
+      
+      if (!candidate.email && candidate.user) {
+        if (typeof candidate.user === 'object') {
+          // If user is an object with email
+          if (candidate.user.email) {
+            email = candidate.user.email;
+          } else if (candidate.user._id) {
+            email = `User ID: ${candidate.user._id}`;
+          }
+        } else {
+          // If user is just a string ID
+          email = `User ID: ${String(candidate.user)}`;
+        }
+      }
+
+      // Format date of birth if it exists
+      let dateOfBirth = "N/A";
+      if (candidate.dobPob && candidate.dobPob.dateOfBirth) {
+        // Handle MongoDB date format ($date)
+        if (typeof candidate.dobPob.dateOfBirth === 'object' && candidate.dobPob.dateOfBirth.$date) {
+          dateOfBirth = new Date(candidate.dobPob.dateOfBirth.$date).toISOString().split('T')[0];
+        } else {
+          // Regular date string
+          try {
+            dateOfBirth = new Date(candidate.dobPob.dateOfBirth).toISOString().split('T')[0];
+          } catch (e) {
+            dateOfBirth = String(candidate.dobPob.dateOfBirth) || "N/A";
+          }
+        }
+      }
+
+      // Ensure arrays are actually arrays
+      const nationalities = Array.isArray(candidate.nationalities) ? 
+                          candidate.nationalities : 
+                          (candidate.nationalities ? [String(candidate.nationalities)] : []);
+                          
+      const promises = Array.isArray(candidate.promises) ? 
+                     candidate.promises : 
+                     (candidate.promises ? [String(candidate.promises)] : []);
+
+      return {
+        id: candidateId,
+        fullName: candidate.fullName || "Unknown",
+        email: email,
+        dateOfBirth: dateOfBirth,
+        placeOfBirth: candidate.dobPob?.placeOfBirth || "N/A",
+        nationalities: nationalities,
+        experience: candidate.experience || "",
+        biography: candidate.biography || "",
+        promises: promises,
+        status: (candidate.status as CandidateStatus) || "pending",
+        attachments: candidate.paper 
+          ? [{ name: "Official Paper", size: "Unknown", url: candidate.paper }] 
+          : []
+      };
+    });
+    
+    // Remove any duplicate candidates (based on id)
+    const uniqueCandidates = mappedCandidates.filter((candidate, index, self) => 
+      candidate.id && index === self.findIndex(c => c.id === candidate.id)
+    );
+    
+    return uniqueCandidates;
   }
+
+  // Handle accepting a candidate request
+  const handleAcceptCandidate = async (id: string) => {
+    if (!session || !session._id) return;
+    
+    try {
+      // Show loading toast
+      toast.loading(`Processing candidate request...`);
+      
+      // Call the API to accept the candidate request
+      const result = await candidateService.acceptCandidateRequest(session._id, id);
+      
+      // Show success toast
+      toast.success(result.message || "Candidate request accepted");
+      
+      // Refresh data
+      await Promise.all([
+        fetchRefreshedSessionData(),  // Refresh session data
+        loadCandidateRequests()       // Reload candidate requests
+      ]);
+    } catch (error: any) {
+      console.error("Error accepting candidate:", error);
+      toast.error(error.message || "Failed to accept candidate request");
+    }
+  }
+  
+  // Handle rejecting a candidate request
+  const handleRejectCandidate = async (id: string) => {
+    if (!session || !session._id) return;
+    
+    try {
+      // Show loading toast
+      toast.loading(`Processing candidate request...`);
+      
+      // Call the API to reject the candidate request
+      const result = await candidateService.rejectCandidateRequest(session._id, id);
+      
+      // Show success toast
+      toast.success(result.message || "Candidate request rejected");
+      
+      // Refresh data
+      await Promise.all([
+        fetchRefreshedSessionData(),  // Refresh session data
+        loadCandidateRequests()       // Reload candidate requests
+      ]);
+    } catch (error: any) {
+      console.error("Error rejecting candidate:", error);
+      toast.error(error.message || "Failed to reject candidate request");
+    }
+  }
+
+  // Debug helper for candidate requests
+  const debugCandidateRequests = () => {
+    if (!session) return null;
+    
+    const debug = {
+      hasRequests: !!session.candidateRequests,
+      requestsLength: session.candidateRequests ? session.candidateRequests.length : 0,
+      isArray: Array.isArray(session.candidateRequests),
+      type: typeof session.candidateRequests,
+      requestsContent: session.candidateRequests,
+    };
+    
+    console.log("DEBUG CANDIDATE REQUESTS:", debug);
+    
+    // Also check for the _id field in each request
+    if (Array.isArray(session.candidateRequests)) {
+      session.candidateRequests.forEach((req, index) => {
+        console.log(`Request #${index} ID:`, req._id || "MISSING ID", "Type:", typeof req);
+      });
+    }
+    
+    return (
+      <div className="p-4 bg-zinc-100 dark:bg-zinc-800 rounded text-xs overflow-auto max-h-40 my-2">
+        <pre>{JSON.stringify(debug, null, 2)}</pre>
+      </div>
+    );
+  };
+
+  // Function to load candidate requests directly
+  const loadCandidateRequests = async () => {
+    if (!sessionId) return;
+    
+    try {
+      setLoadingRequests(true);
+      console.log("Directly fetching candidate requests for session:", sessionId);
+      
+      const requests = await candidateService.getCandidateRequests(sessionId);
+      console.log("Directly received candidate requests:", requests);
+      
+      setCandidateRequests(requests);
+    } catch (error) {
+      console.error("Error loading candidate requests:", error);
+    } finally {
+      setLoadingRequests(false);
+    }
+  };
+  
+  // Load candidate requests when the nominations tab is selected
+  const handleTabChange = (value: string) => {
+    if (value === 'nominations' && session && session.type === 'election') {
+      loadCandidateRequests();
+    }
+  };
 
   if (loading) {
     return <div className="flex justify-center items-center min-h-[60vh]">Loading session data...</div>
@@ -506,8 +692,8 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
 
   return (
     <div className="container mx-auto py-6 space-y-8">
-      {/* Banner */}
-      <div className="relative h-48 md:h-64 w-full overflow-hidden rounded-lg">
+      {/* Banner with overlaid elements - Completely redesigned */}
+      <div className="relative h-64 md:h-80 w-full overflow-hidden rounded-xl shadow-lg">
         <Image
           src={session.banner || "/placeholder.svg"}
           alt={session.name}
@@ -515,25 +701,100 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
           className="object-cover"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent"></div>
+        {/* Stronger gradient overlay for better text visibility */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/30"></div>
+        
+        {/* Session Tags - Now at the top of the content area, above session name */}
+        <div className="absolute top-4 left-4 flex flex-wrap gap-2 mb-4">
+          <Badge variant="outline" className="capitalize bg-indigo-500/80 dark:bg-indigo-600/80 backdrop-blur-md text-white border-transparent">
+            {session.type}
+          </Badge>
+          <Badge variant="outline" className="capitalize bg-violet-500/80 dark:bg-violet-600/80 backdrop-blur-md text-white border-transparent">
+            {session.subtype}
+          </Badge>
+          <Badge className={`backdrop-blur-md border-transparent ${statusInfo.status === "started" ? "bg-emerald-500/80 dark:bg-emerald-600/80" : 
+                            statusInfo.status === "ended" ? "bg-zinc-500/80 dark:bg-zinc-600/80" : 
+                            statusInfo.status === "nomination" || statusInfo.status === "pending_deployment" ? "bg-amber-500/80 dark:bg-amber-600/80" : 
+                            "bg-blue-500/80 dark:bg-blue-600/80"} text-white`}>
+            {statusInfo.label}
+          </Badge>
+          <Badge variant={session.secretPhrase ? "outline" : "secondary"} 
+                 className={`backdrop-blur-md border-transparent ${session.secretPhrase ? "bg-slate-500/80 dark:bg-slate-600/80 text-white" : "bg-teal-500/80 dark:bg-teal-600/80 text-white"}`}>
+            {getSessionVisibility()}
+          </Badge>
+        </div>
+        
+        {/* Session name and description - Below the badges */}
+        <div className="absolute top-16 left-4 flex flex-col items-start justify-start text-left px-4">
+          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">{session.name}</h1>
+          {session.description && (
+            <p className="text-white/80 max-w-2xl mb-4">{session.description}</p>
+          )}
+        </div>
+        
+        {/* Organization name - Top left, adjusted position to be below description */}
+        {session.organizationName && (
+          <div className="absolute top-36 left-4 flex items-center gap-2 text-white/90">
+            <Users className="h-4 w-4" />
+            <span className="font-medium">{session.organizationName}</span>
+          </div>
+        )}
+        
+        {/* Action Buttons - Bottom right corner */}
+        <div className="absolute bottom-4 right-4 flex flex-wrap gap-3 justify-end">
+          {/* Start Session Button */}
+          {(statusInfo.status === "upcoming" || statusInfo.status === "nomination" || statusInfo.status === "pending_deployment") && (
+            <Button 
+              onClick={handleStartSession} 
+              variant="default"
+              size="sm"
+              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-medium shadow-md hover:shadow-lg rounded-lg transition-all duration-300 px-4 border border-emerald-400/20 flex items-center gap-2"
+            >
+              <Clock className="h-4 w-4" />
+              {statusInfo.status === "pending_deployment" ? "Deploy Contract" : "Start Session"}
+            </Button>
+          )}
+
+          {/* End Session Button */}
+          {statusInfo.status === "started" && !session.sessionLifecycle?.endedAt && (
+            <Button 
+              onClick={handleEndSession} 
+              variant="secondary"
+              size="sm"
+              className="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white font-medium shadow-md hover:shadow-lg rounded-lg transition-all duration-300 px-4 border border-violet-400/20 flex items-center gap-2"
+            >
+              <CheckCircle className="h-4 w-4" />
+              End Session
+            </Button>
+          )}
+
+          {/* Edit Session Button */}
+          <Button 
+            onClick={handleEditSession} 
+            variant={isEditing ? "default" : "outline"}
+            size="sm"
+            className={`${isEditing ? "bg-gradient-to-r from-blue-500 to-cyan-600" : "bg-gradient-to-r from-sky-500 to-blue-600"} hover:from-sky-600 hover:to-blue-700 text-white font-medium shadow-md hover:shadow-lg rounded-lg transition-all duration-300 px-4 border border-blue-400/20 flex items-center gap-2`}
+            disabled={statusInfo.status === "ended"}
+          >
+            <UserPlus className="h-4 w-4" />
+            {isEditing ? "Currently Editing" : "Edit Session"}
+          </Button>
+
+          {/* Delete Session Button */}
+          <Button 
+            onClick={handleDeleteSession} 
+            variant="destructive"
+            size="sm"
+            className="bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white font-medium shadow-md hover:shadow-lg rounded-lg transition-all duration-300 px-4 border border-red-400/20 flex items-center gap-2"
+          >
+            <XCircle className="h-4 w-4" />
+            Delete Session
+          </Button>
+        </div>
       </div>
 
       {/* Session Details */}
       <div id="details-section" className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="outline" className="capitalize">
-            {session.type}
-          </Badge>
-          <Badge variant="outline" className="capitalize">
-            {session.subtype}
-          </Badge>
-          <Badge className={statusInfo.color}>
-            {statusInfo.label}
-          </Badge>
-          <Badge variant={session.secretPhrase ? "outline" : "secondary"}>
-            {getSessionVisibility()}
-          </Badge>
-        </div>
 
         {isEditing && editSection === 'details' ? (
           <div className="space-y-4 border p-4 rounded-md">
@@ -647,103 +908,154 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
           </div>
         ) : (
           <>
-            <h1 className="text-3xl font-bold">{session.name}</h1>
-            {session.description && <p className="text-muted-foreground">{session.description}</p>}
-            
-            {session.organizationName && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Users className="h-4 w-4" />
-                <span>{session.organizationName}</span>
-              </div>
-            )}
+            {/* Session name, description, and organization info moved to banner overlay */}
           </>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2 mt-2">
-          <Card className="p-4">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">Session Timeline</h3>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Created: {formatDate(session.sessionLifecycle?.createdAt)}</span>
+          <div className="backdrop-blur-md bg-background/60 rounded-xl border border-border/50 shadow-lg overflow-hidden hover:shadow-muted/20 transition-all duration-300">
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-foreground">Session Timeline</h3>
               </div>
               
-              {session.sessionLifecycle?.startedAt && (
-                <div className="flex items-center gap-2">
-                  <Vote className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Started: {formatDate(session.sessionLifecycle.startedAt)}</span>
+              <div className="relative">
+                <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gradient-to-b from-muted/30 to-muted-foreground/20 z-0"></div>
+                
+                <div className="relative z-10 space-y-6 pl-8">
+                  <div className="relative">
+                    <div className="absolute -left-8 top-0 bg-muted/40 backdrop-blur-sm rounded-full p-1.5">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs uppercase tracking-wider">Created</p>
+                      <p className="text-foreground">{formatDate(session.sessionLifecycle?.createdAt)}</p>
+                    </div>
+                  </div>
+                  
+                  {session.sessionLifecycle?.startedAt && (
+                    <div className="relative">
+                      <div className="absolute -left-8 top-0 bg-muted/40 backdrop-blur-sm rounded-full p-1.5">
+                        <Vote className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs uppercase tracking-wider">Started</p>
+                        <p className="text-foreground">{formatDate(session.sessionLifecycle.startedAt)}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {session.sessionLifecycle?.endedAt && (
+                    <div className="relative">
+                      <div className="absolute -left-8 top-0 bg-muted/40 backdrop-blur-sm rounded-full p-1.5">
+                        <BarChart className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs uppercase tracking-wider">Ended</p>
+                        <p className="text-foreground">{formatDate(session.sessionLifecycle.endedAt)}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-              
-              {session.sessionLifecycle?.endedAt && (
-                <div className="flex items-center gap-2">
-                  <BarChart className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Ended: {formatDate(session.sessionLifecycle.endedAt)}</span>
-                </div>
-              )}
+              </div>
             </div>
-          </Card>
+          </div>
           
           {session.type === "election" && session.sessionLifecycle?.scheduledAt?.start && (
-            <Card className="p-4">
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">Nomination Phase</h3>
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <UserPlus className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Starts: {formatDate(session.sessionLifecycle.scheduledAt.start)}</span>
+            <div className="backdrop-blur-md bg-background/60 rounded-xl border border-border/50 shadow-lg overflow-hidden hover:shadow-muted/20 transition-all duration-300">
+              <div className="p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-foreground">Nomination Phase</h3>
+                  <div className="bg-muted/50 p-2 rounded-full">
+                    <UserPlus className="h-5 w-5 text-muted-foreground" />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <UserPlus className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Ends: {formatDate(session.sessionLifecycle.scheduledAt.end)}</span>
+                
+                <div className="mt-4 space-y-5">
+                  <div className="bg-muted/30 backdrop-blur-sm rounded-lg p-4 border-l-2 border-border/50">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Starts</p>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-muted-foreground" />
+                      <p className="text-foreground">{formatDate(session.sessionLifecycle.scheduledAt.start)}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-muted/30 backdrop-blur-sm rounded-lg p-4 border-l-2 border-border/50">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Ends</p>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-muted-foreground" />
+                      <p className="text-foreground">{formatDate(session.sessionLifecycle.scheduledAt.end)}</p>
+                    </div>
+                  </div>
+                  
+                  {getSessionStatusFromData(session) === "nomination" && (
+                    <div className="mt-4 text-center">
+                      <Badge className="bg-muted/70 hover:bg-muted/90 text-foreground px-3 py-1 text-sm">
+                        Nominations Active
+                      </Badge>
+                    </div>
+                  )}
                 </div>
               </div>
-            </Card>
+            </div>
           )}
         </div>
 
-        {session.contractAddress && (
-          <div className="flex items-center gap-2">
-            <ExternalLink className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">Deployed at address: {session.contractAddress}</span>
-          </div>
-        )}
-        {!session.contractAddress && statusInfo.status !== "upcoming" && (
-          <div className="text-sm text-amber-500">Not deployed yet</div>
-        )}
-
-        {/* Blockchain information */}
-        {session.contractAddress && (
-          <div className="mt-4">
-            <h3 className="text-lg font-semibold">Blockchain Details</h3>
-            <div className="mt-2 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Contract Address:</span>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-mono">{session.contractAddress.substring(0, 10)}...{session.contractAddress.substring(session.contractAddress.length - 8)}</span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-6 w-6"
-                    onClick={() => window.open(`https://sepolia.etherscan.io/address/${session.contractAddress}`, '_blank')}
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
+        {/* Blockchain information - Redesigned into a single cohesive block */}
+        {session.contractAddress ? (
+          <div className="backdrop-blur-md bg-background/60 rounded-xl border border-border/50 shadow-lg overflow-hidden hover:shadow-muted/20 transition-all duration-300 mt-4">
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-foreground">Blockchain Details</h3>
+                <div className="bg-muted/50 p-2 rounded-full">
+                  <ExternalLink className="h-5 w-5 text-muted-foreground" />
                 </div>
               </div>
               
-              {session.results?.lastBlockchainSync && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Last Blockchain Sync:</span>
-                  <span className="text-sm">{new Date(session.results.lastBlockchainSync).toLocaleString()}</span>
+              <div className="space-y-4">
+                <div className="bg-muted/30 backdrop-blur-sm rounded-lg p-4 border-l-2 border-border/50">
+                  <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Contract Address</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-mono">{session.contractAddress.substring(0, 10)}...{session.contractAddress.substring(session.contractAddress.length - 8)}</span>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6"
+                      onClick={() => window.open(`https://sepolia.etherscan.io/address/${session.contractAddress}`, '_blank')}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-              )}
-              
-              {typeof session.results?.blockchainVoterCount === 'number' && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Blockchain Voter Count:</span>
-                  <span className="text-sm">{session.results.blockchainVoterCount}</span>
+                
+                {session.results?.lastBlockchainSync && (
+                  <div className="bg-muted/30 backdrop-blur-sm rounded-lg p-4 border-l-2 border-border/50">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Last Blockchain Sync</p>
+                    <span className="text-sm">{new Date(session.results.lastBlockchainSync).toLocaleString()}</span>
+                  </div>
+                )}
+                
+                {typeof session.results?.blockchainVoterCount === 'number' && (
+                  <div className="bg-muted/30 backdrop-blur-sm rounded-lg p-4 border-l-2 border-border/50">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Blockchain Voter Count</p>
+                    <span className="text-sm">{session.results.blockchainVoterCount}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : statusInfo.status !== "upcoming" && (
+          <div className="backdrop-blur-md bg-background/60 rounded-xl border border-border/50 shadow-lg overflow-hidden hover:shadow-muted/20 transition-all duration-300 mt-4">
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-foreground">Blockchain Details</h3>
+                <div className="bg-muted/50 p-2 rounded-full">
+                  <ExternalLink className="h-5 w-5 text-muted-foreground" />
                 </div>
-              )}
+              </div>
+              <div className="bg-amber-500/10 backdrop-blur-sm rounded-lg p-4 border-l-2 border-amber-500/50">
+                <p className="text-amber-500">Not deployed yet</p>
+              </div>
             </div>
           </div>
         )}
@@ -752,7 +1064,7 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
       <Separator />
 
       {/* Tabs for different sections */}
-      <Tabs defaultValue="settings" className="w-full">
+      <Tabs defaultValue="settings" className="w-full" onValueChange={handleTabChange}>
         <TabsList className="w-full mb-4">
           <TabsTrigger value="settings" id="settings-tab" className="flex-1">Settings</TabsTrigger>
           <TabsTrigger value="data" className="flex-1">Vote Data</TabsTrigger>
@@ -812,45 +1124,101 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Verification Method Card */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Verification Method</CardTitle>
-                  <CardDescription>How users are verified before voting</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Badge variant="outline" className="capitalize">
-                    {session.verificationMethod || "Standard"}
-                  </Badge>
-                </CardContent>
-              </Card>
+            <div className="space-y-8">
+              <div className="backdrop-blur-md bg-background/60 rounded-xl border border-border/50 shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300">
+                <div className="p-6">
+                  <h3 className="text-xl font-semibold mb-6 text-foreground flex items-center">
+                    <span className="bg-indigo-100 dark:bg-indigo-900/30 p-2 rounded-lg mr-3">
+                      <Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                    </span>
+                    Session Configuration
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Verification Method */}
+                    <div className="bg-gradient-to-br from-background to-muted/30 backdrop-blur-sm rounded-xl p-5 border border-border/40 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-base font-medium text-foreground">Verification Method</h4>
+                        <div className="bg-muted/50 p-2 rounded-full">
+                          <UserPlus className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-4">How users are verified before voting</p>
+                      <div className="mt-auto">
+                        <Badge 
+                          variant={session.verificationMethod === "kyc" ? "default" : "secondary"} 
+                          className={`capitalize px-3 py-1 ${
+                            session.verificationMethod === "kyc" 
+                              ? "bg-emerald-500/90 hover:bg-emerald-600/90 text-white" 
+                              : "bg-blue-500/90 hover:bg-blue-600/90 text-white"
+                          }`}
+                        >
+                          {session.verificationMethod || "Standard"}
+                        </Badge>
+                      </div>
+                    </div>
 
-              {/* Result Visibility Card */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Result Visibility</CardTitle>
-                  <CardDescription>When vote results are visible to participants</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Badge variant="outline" className="capitalize">
-                    {session.resultVisibility || "Post-completion"}
-                  </Badge>
-                </CardContent>
-              </Card>
+                    {/* Result Visibility */}
+                    <div className="bg-gradient-to-br from-background to-muted/30 backdrop-blur-sm rounded-xl p-5 border border-border/40 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-base font-medium text-foreground">Result Visibility</h4>
+                        <div className="bg-muted/50 p-2 rounded-full">
+                          <BarChart className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-4">When vote results are visible to participants</p>
+                      <div className="mt-auto">
+                        <Badge 
+                          variant={session.resultVisibility === "real-time" ? "default" : "secondary"} 
+                          className={`capitalize px-3 py-1 ${
+                            session.resultVisibility === "real-time" 
+                              ? "bg-violet-500/90 hover:bg-violet-600/90 text-white" 
+                              : "bg-amber-500/90 hover:bg-amber-600/90 text-white"
+                          }`}
+                        >
+                          {session.resultVisibility === "real-time" ? "Real-time" : "Post-completion"}
+                        </Badge>
+                      </div>
+                    </div>
 
-              {/* Session Visibility Card - determine based on secret phrase */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Session Visibility</CardTitle>
-                  <CardDescription>How the session is discovered by users</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Badge variant="outline" className="capitalize">
-                    {getSessionVisibility()}
-                  </Badge>
-                </CardContent>
-              </Card>
+                    {/* Session Visibility */}
+                    <div className="bg-gradient-to-br from-background to-muted/30 backdrop-blur-sm rounded-xl p-5 border border-border/40 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-base font-medium text-foreground">Session Visibility</h4>
+                        <div className="bg-muted/50 p-2 rounded-full">
+                          <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-4">How the session is discovered by users</p>
+                      <div className="mt-auto">
+                        <Badge 
+                          variant={session.secretPhrase ? "default" : "secondary"} 
+                          className={`capitalize px-3 py-1 ${
+                            session.secretPhrase 
+                              ? "bg-slate-500/90 hover:bg-slate-600/90 text-white" 
+                              : "bg-teal-500/90 hover:bg-teal-600/90 text-white"
+                          }`}
+                        >
+                          {getSessionVisibility()}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Additional information section */}
+                  <div className="mt-8 bg-muted/20 backdrop-blur-sm rounded-xl p-5 border border-border/30">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                      <CheckCircle className="h-4 w-4 text-emerald-500" />
+                      <span className="text-sm font-medium">Session Security</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground ml-6">
+                      This session uses {session.verificationMethod === "kyc" ? "KYC verification" : "standard verification"} and 
+                      {session.secretPhrase ? " requires a secret phrase for access" : " is publicly accessible"}. 
+                      Results are visible {session.resultVisibility === "real-time" ? "in real-time as votes are cast" : "only after the session has ended"}.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </TabsContent>
@@ -917,7 +1285,7 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
         </TabsContent>
 
         {/* Fix: Only show nominations tab for elections, not polls */}
-        {session.type === "election" && session.candidateRequests && session.candidateRequests.length > 0 && (
+        {session.type === "election" && (
           <TabsContent value="nominations" className="space-y-6">
             <Card>
               <CardHeader>
@@ -925,17 +1293,22 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
                 <CardDescription>Candidates who have applied to be part of this election</CardDescription>
               </CardHeader>
               <CardContent>
-                <CandidateTable 
-                  candidates={mapCandidatesToTableFormat(session.candidateRequests as unknown as Candidate[] || [])}
-                  onAccept={(id) => {
-                    toast.success(`Approved candidate ${id}`)
-                    // Implement accept logic here
-                  }}
-                  onReject={(id) => {
-                    toast.error(`Rejected candidate ${id}`)
-                    // Implement reject logic here
-                  }}
-                />
+                {/* Loading state */}
+                {loadingRequests ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Loading candidate requests...
+                  </div>
+                ) : candidateRequests.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No candidate requests found for this session
+                  </div>
+                ) : (
+                  <CandidateTable 
+                    candidates={mapCandidatesToTableFormat(candidateRequests)}
+                    onAccept={handleAcceptCandidate}
+                    onReject={handleRejectCandidate}
+                  />
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -944,67 +1317,7 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
 
       <Separator className="my-6" />
 
-      {/* Actions Section - Always visible at the bottom */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Actions</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {/* Start Session Button */}
-          {(statusInfo.status === "upcoming" || statusInfo.status === "nomination" || statusInfo.status === "pending_deployment") && (
-            <Button 
-              onClick={handleStartSession} 
-              size="lg"
-              className={`w-full ${
-                statusInfo.status === "pending_deployment" 
-                ? "bg-amber-600 hover:bg-amber-700" 
-                : "bg-green-600 hover:bg-green-700"
-              } text-white flex items-center justify-center gap-2`}
-            >
-              <Vote className="h-5 w-5" />
-              <span>
-                {statusInfo.status === "pending_deployment" 
-                  ? "Deploy Contract" 
-                  : "Start Session"}
-              </span>
-            </Button>
-          )}
-
-          {/* End Session Button */}
-          {statusInfo.status === "started" && !session.sessionLifecycle?.endedAt && (
-            <Button 
-              onClick={handleEndSession} 
-              size="lg"
-              variant="secondary" 
-              className="w-full flex items-center justify-center gap-2"
-            >
-              <BarChart className="h-5 w-5" />
-              <span>End Session</span>
-            </Button>
-          )}
-
-          {/* Edit Session Button */}
-          <Button 
-            onClick={handleEditSession} 
-            variant={isEditing ? "default" : "outline"} 
-            size="lg"
-            className={`w-full flex items-center justify-center gap-2 ${isEditing ? "bg-blue-500 hover:bg-blue-600 text-white" : ""}`}
-            disabled={statusInfo.status === "ended"}
-          >
-            <ExternalLink className="h-5 w-5" />
-            <span>{isEditing ? "Currently Editing" : "Edit Session"}</span>
-          </Button>
-
-          {/* Delete Session Button */}
-          <Button 
-            onClick={handleDeleteSession} 
-            variant="destructive" 
-            size="lg"
-            className="w-full flex items-center justify-center gap-2"
-          >
-            <XCircle className="h-5 w-5" />
-            <span>Delete Session</span>
-          </Button>
-        </div>
-      </div>
+      {/* Actions section removed from here and moved to the top */}
 
       {session.contractAddress && session._id && (
         <BlockchainSync sessionId={session._id} />

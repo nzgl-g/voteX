@@ -11,6 +11,8 @@ export interface SignupData {
   password: string;
   gender: string;
   fullName?: string;
+  nationality: string;
+  dateOfBirth: string;
 }
 
 export interface UserProfile {

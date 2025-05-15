@@ -40,6 +40,8 @@ type SignupFormData = {
   confirmPassword: string
   gender: string
   fullName?: string
+  nationality: string
+  dateOfBirth: string
 }
 
 interface AuthDialogProps {
@@ -189,7 +191,9 @@ export function AuthDialog({
         email: data.email,
         password: data.password,
         gender: data.gender,
-        fullName: data.fullName
+        fullName: data.fullName,
+        nationality: data.nationality,
+        dateOfBirth: data.dateOfBirth,
       })
       
       console.log('Signup successful:', result)
@@ -299,66 +303,81 @@ export function AuthDialog({
           {/* Signup Tab Content */}
           <TabsContent value="signup" className="space-y-4 mt-4">
             <form onSubmit={handleSignupSubmit(onSignupSubmit)} className="space-y-4">
-              <div className="grid gap-2">
+              <div className="space-y-1">
                 <Label htmlFor="signup-username">Username</Label>
                 <Input
                   id="signup-username"
-                  type="text"
-                  placeholder="johndoe"
-                  {...registerSignup('username', { required: 'Username is required' })}
+                  {...registerSignup("username", { required: "Username is required" })}
                 />
                 {signupErrors.username && (
-                  <p className="text-sm text-destructive">{signupErrors.username.message}</p>
+                  <p className="text-red-500 text-sm">{signupErrors.username.message}</p>
                 )}
               </div>
-              
-              <div className="grid gap-2">
+
+              <div className="space-y-1">
                 <Label htmlFor="signup-email">Email</Label>
                 <Input
                   id="signup-email"
                   type="email"
-                  placeholder="name@example.com"
-                  {...registerSignup('email', { 
-                    required: 'Email is required',
-                    pattern: {
-                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                      message: 'Invalid email address'
-                    }
-                  })}
+                  {...registerSignup("email", { required: "Email is required" })}
                 />
                 {signupErrors.email && (
-                  <p className="text-sm text-destructive">{signupErrors.email.message}</p>
+                  <p className="text-red-500 text-sm">{signupErrors.email.message}</p>
                 )}
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="signup-fullname">Full Name (Optional)</Label>
+              <div className="space-y-1">
+                <Label htmlFor="signup-fullName">Full Name</Label>
                 <Input
-                  id="signup-fullname"
-                  type="text"
-                  placeholder="John Doe"
-                  {...registerSignup('fullName')}
+                  id="signup-fullName"
+                  {...registerSignup("fullName", { required: "Full name is required" })}
                 />
+                {signupErrors.fullName && (
+                  <p className="text-red-500 text-sm">{signupErrors.fullName.message}</p>
+                )}
               </div>
 
-              <div className="grid gap-2">
+              <div className="space-y-1">
                 <Label htmlFor="signup-gender">Gender</Label>
                 <select
                   id="signup-gender"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  {...registerSignup('gender', { required: 'Gender is required' })}
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  {...registerSignup("gender", { required: "Gender is required" })}
                 >
-                  <option value="">Select gender</option>
+                  <option value="">Select Gender</option>
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
                   <option value="Prefer not to say">Prefer not to say</option>
                 </select>
                 {signupErrors.gender && (
-                  <p className="text-sm text-destructive">{signupErrors.gender.message}</p>
+                  <p className="text-red-500 text-sm">{signupErrors.gender.message}</p>
                 )}
               </div>
 
-              <div className="grid gap-2">
+              <div className="space-y-1">
+                <Label htmlFor="signup-nationality">Nationality</Label>
+                <Input
+                  id="signup-nationality"
+                  {...registerSignup("nationality", { required: "Nationality is required" })}
+                />
+                {signupErrors.nationality && (
+                  <p className="text-red-500 text-sm">{signupErrors.nationality.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="signup-dateOfBirth">Date of Birth</Label>
+                <Input
+                  id="signup-dateOfBirth"
+                  type="date"
+                  {...registerSignup("dateOfBirth", { required: "Date of Birth is required" })}
+                />
+                {signupErrors.dateOfBirth && (
+                  <p className="text-red-500 text-sm">{signupErrors.dateOfBirth.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-1">
                 <Label htmlFor="signup-password">Password</Label>
                 <Input
                   id="signup-password"
@@ -376,7 +395,7 @@ export function AuthDialog({
                 )}
               </div>
 
-              <div className="grid gap-2">
+              <div className="space-y-1">
                 <Label htmlFor="signup-confirm-password">Confirm Password</Label>
                 <Input
                   id="signup-confirm-password"

@@ -1,5 +1,13 @@
 import baseApi from './base-api';
 
+export interface Wallet {
+  walletAddress?: string;
+  chainId?: string;
+  networkName?: string;
+  balance?: string;
+  signature?: string;
+}
+
 export interface User {
   _id: string;
   username: string;
@@ -8,7 +16,11 @@ export interface User {
   gender: string;
   profilePic?: string;
   createdAt: string;
-  walletAddress?: string;
+  nationality?: string;
+  dateOfBirth?: string; // Represented as string in ISO format
+  wallet?: Wallet;
+  walletChangeTimestamp?: string; // Represented as string in ISO format
+  kycSignature?: string;
 }
 
 class UserService {

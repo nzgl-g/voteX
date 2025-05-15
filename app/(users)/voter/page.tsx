@@ -12,8 +12,8 @@ import { Plus, Key, RefreshCcw, Filter } from "lucide-react";
 
 // Services
 import { Session } from "@/services/session-service";
-import { sessionService } from "@/services/session-service";
-import { candidateService } from "@/services/candidate-service";
+import sessionService from "@/services/session-service";
+import candidateService from "@/services/candidate-service";
 
 // UI Components
 import { Button } from "@/components/ui/button";
@@ -308,9 +308,9 @@ export default function VoterPage() {
     if (!session) return;
     
     // Check if user is already a candidate
-    candidateService.hasUserApplied(session._id as string)
-      .then(hasApplied => {
-        if (hasApplied) {
+    candidateService.checkApplicationStatus(session._id as string)
+      .then(result => {
+        if (result.exists) {
           toast.info("You have already applied as a candidate for this session.");
           return;
         }
@@ -588,16 +588,45 @@ export default function VoterPage() {
         ) : filteredSessions.length > 0 ? (
           // Sessions Grid - When Sessions Match Filters
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredSessions.map((session) => (
-              <SessionCard
-                key={session._id}
-                session={session}
-                onJoinAsCandidate={handleJoinAsCandidate}
-                onCastVote={handleCastVote}
-                onShowResults={handleShowResults}
-                onViewProfile={handleViewProfile}
-              />
-            ))}
+            {filteredSessions.map((session) => {
+              // Create a properly formatted sessionLifecycle object
+              const formattedLifecycle = session.sessionLifecycle ? {
+                startedAt: session.sessionLifecycle.startedAt || undefined,
+                endedAt: session.sessionLifecycle.endedAt || undefined,
+                scheduledAt: session.sessionLifecycle.scheduledAt ? {
+                  start: session.sessionLifecycle.scheduledAt.start || undefined,
+                  end: session.sessionLifecycle.scheduledAt.end || undefined
+                } : undefined
+              } : undefined;
+              
+              const sessionForCard = {
+                _id: String(session._id),
+                name: session.name,
+                description: session.description || null,
+                organizationName: session.organizationName || null,
+                banner: session.banner || null,
+                type: session.type as 'election' | 'poll' | 'tournament',
+                subtype: (session.subtype === 'single' || session.subtype === 'multiple' || session.subtype === 'ranked') 
+                  ? session.subtype : undefined,
+                securityMethod: session.securityMethod || undefined,
+                verificationMethod: session.verificationMethod || undefined,
+                sessionLifecycle: formattedLifecycle,
+                candidates: session.type === 'election' ? session.candidates : undefined,
+                options: session.type === 'poll' ? session.options : undefined,
+                contractAddress: session.contractAddress || undefined
+              };
+              
+              return (
+                <SessionCard
+                  key={sessionForCard._id}
+                  session={sessionForCard}
+                  onJoinAsCandidate={handleJoinAsCandidate}
+                  onCastVote={handleCastVote}
+                  onShowResults={handleShowResults}
+                  onViewProfile={handleViewProfile}
+                />
+              );
+            })}
           </div>
         ) : publicSessions.length > 0 ? (
           // No Sessions Match Filters - But Sessions Exist
@@ -671,7 +700,7 @@ export default function VoterPage() {
         <CandidateFormDialog 
           open={showCandidateForm}
           onOpenChange={setShowCandidateForm}
-          sessionId={selectedSession._id as string}
+          sessionId={String(selectedSession._id)}
           sessionTitle={selectedSession.name}
         />
       )}

@@ -16,8 +16,9 @@ import {
 } from "./vote-cast/voting-dialog";
 import { toast } from "@/lib/toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { sessionService } from "@/services/session-service";
-import { KYCVerificationDialog } from "./kyc-verification-dialog";
+import sessionService from "@/services/session-service";
+import { KYCForm } from "./vote-cast/kyc-step";
+import type { KYCData as OriginalKYCData } from "./vote-cast/voting-dialog";
 import kycService from "@/services/kyc-service";
 
 export const getSessionLifecycleStatus = (session: any): SessionLifecycleStatus => {
@@ -140,8 +141,8 @@ export function SessionCard({
   const [session, setSession] = useState<any>(initialSession);
   const [isLoadingVotes, setIsLoadingVotes] = useState(false);
   const [showVoteResults, setShowVoteResults] = useState(false);
-  const [kycUserData, setKycUserData] = useState<any>({});
   const [isLoadingKYC, setIsLoadingKYC] = useState<boolean>(false);
+  const [verificationError, setVerificationError] = useState<any>(null);
 
   useEffect(() => {
     setSession(initialSession);
@@ -319,27 +320,31 @@ export function SessionCard({
     try {
       setIsLoadingKYC(true);
       
-      // Check if the session requires KYC
       const requiresKYC = await kycService.isKYCRequiredForSession(session._id);
+      console.log(`[SessionCard] Session ${session._id} requires KYC:`, requiresKYC);
       
       if (requiresKYC) {
-        // Get user KYC data
-        const userData = await kycService.getUserKYCData();
-        setKycUserData(userData);
-        
-        if (userData.isVerified) {
-          // User is already verified, proceed to voting
+        const kycStatus = await kycService.getUserKYCStatus();
+        console.log("[SessionCard] KYC Status from /kyc/status:", kycStatus);
+
+        if (kycStatus.isVerified) {
+          console.log("[SessionCard] User KYC is verified (from /kyc/status). Proceeding to vote.");
           setShowVotingDialog(true);
         } else {
-          // User needs KYC verification
+          console.log("[SessionCard] User KYC NOT verified (from /kyc/status). Showing KYCForm.");
+          // Display a more helpful message about verification
+          toast({
+            title: "Identity Verification Required",
+            description: "This voting session requires identity verification before you can cast your vote.",
+          });
           setShowKYCDialog(true);
         }
       } else {
-        // No KYC required, proceed to voting
+        console.log("[SessionCard] Session does not require KYC. Proceeding to vote.");
         setShowVotingDialog(true);
       }
     } catch (error) {
-      console.error("Error checking KYC requirements:", error);
+      console.error("Error in handleVoteBtnClick (checking KYC requirements/status):", error);
       toast({
         title: "Error",
         description: "Failed to check verification requirements. Please try again.",
@@ -351,8 +356,151 @@ export function SessionCard({
   };
   
   const handleKYCVerified = () => {
-    // After successful KYC verification, proceed to voting
-    setShowVotingDialog(true);
+    setShowKYCDialog(false);
+    
+    // Check the status again to confirm verification was saved
+    kycService.getUserKYCStatus().then(status => {
+      console.log("[SessionCard] Final KYC status check:", status);
+      
+      if (status.isVerified) {
+        console.log("[SessionCard] Status confirmed verified. Proceeding to vote.");
+        setShowVotingDialog(true);
+      } else {
+        console.log("[SessionCard] Status still shows not verified. Force proceeding to vote.");
+        // If verification was successful but status isn't updated yet, proceed anyway
+        toast({
+          title: "Proceeding to Vote",
+          description: "Your identity has been verified. You can now vote.",
+        });
+        setShowVotingDialog(true);
+      }
+    }).catch(error => {
+      console.error("[SessionCard] Error in final status check:", error);
+      // Proceed anyway since we already got a successful verification
+      setShowVotingDialog(true);
+    });
+  };
+
+  const handleKYCFormSubmit = async (data: OriginalKYCData) => {
+    console.log("[SessionCard] KYCForm submitted data:", {
+      ...data,
+      idCardDocument: data.idCardDocument ? 
+        `File: ${data.idCardDocument.name} (${Math.round(data.idCardDocument.size / 1024)} KB)` : 
+        'No file'
+    });
+
+    if (!data.idCardNumber || !data.idCardDocument) {
+        toast({
+          title: "Error",
+          description: "ID Number and ID Document are required.",
+          variant: "destructive"
+        });
+        return;
+    }
+
+    // Reset any previous verification errors
+    setVerificationError(null);
+    setIsLoadingKYC(true);
+    toast({
+      title: "Processing Verification",
+      description: "Please wait while we verify your identity.",
+    });
+
+    try {
+        const result = await kycService.submitVerification({
+            idNumber: data.idCardNumber,
+            idCardFile: data.idCardDocument, 
+        });
+
+        console.log("[SessionCard] KYC verification result:", result);
+
+        // Extract verification details from result
+        const verificationDetails = result.verificationDetails || {};
+        const decision = verificationDetails.decision || '';
+        
+        // Check if the decision is "accept"
+        if (decision === "accept" || result.success) {
+            // KYC Accepted flow
+            toast({
+              title: "Verification Successful",
+              description: "Your identity has been verified. You can now vote."
+            });
+            
+            // Store verification success details
+            setVerificationError({
+                decision: "accept",
+                reason: verificationDetails.reason || "Verification successful"
+            });
+            
+            // Wait for a moment to ensure the database has been updated
+            setTimeout(async () => {
+                try {
+                    // Check the status endpoint to see if the user is verified
+                    const updatedStatus = await kycService.getUserKYCStatus();
+                    console.log("[SessionCard] Checking status after verification:", updatedStatus);
+                    
+                    if (updatedStatus.isVerified) {
+                        console.log("[SessionCard] User verification confirmed in database");
+                        handleKYCVerified();
+                    } else {
+                        console.log("[SessionCard] User not yet showing as verified in database");
+                        
+                        // Try one more time after another short delay
+                        setTimeout(async () => {
+                            try {
+                                const finalStatus = await kycService.getUserKYCStatus();
+                                console.log("[SessionCard] Final verification status check:", finalStatus);
+                                
+                                // Proceed to voting regardless of status
+                                handleKYCVerified();
+                            } catch (e) {
+                                console.error("[SessionCard] Error in final verification check:", e);
+                                // Proceed anyway as verification was successful
+                                handleKYCVerified();
+                            }
+                        }, 3000);
+                    }
+                } catch (statusError) {
+                    console.error("[SessionCard] Error checking verification status:", statusError);
+                    // Proceed to voting anyway since verification was successful
+                    handleKYCVerified();
+                }
+            }, 2000);
+        } else {
+            // KYC Rejected flow
+            console.log("[SessionCard] Verification failed with decision:", decision);
+            
+            // Store verification error details for display
+            setVerificationError({
+                decision: decision || "deny",
+                reason: verificationDetails.reason || result.message || "Verification failed"
+            });
+            
+            toast({
+                title: "Verification Failed",
+                description: "Please check the details below and try again with a clearer image.",
+                variant: "destructive"
+            });
+        }
+    } catch (error: any) {
+        console.error("KYC verification error:", error);
+        
+        if (error.message?.includes('timeout') || error.code === 'ECONNABORTED') {
+          toast({
+            title: "Verification Timeout",
+            description: "The verification is taking longer than expected. Please try again with a smaller image file.",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Verification Error",
+            description: "An error occurred during verification. Please try again.",
+            variant: "destructive"
+          });
+        }
+    } finally {
+        setIsLoadingKYC(false);
+    }
   };
 
   const getContextualButton = () => {
@@ -558,12 +706,22 @@ export function SessionCard({
         </Card>
 
         {showKYCDialog && (
-          <KYCVerificationDialog
-            open={showKYCDialog}
-            onOpenChange={setShowKYCDialog}
-            onVerified={handleKYCVerified}
-            userData={kycUserData}
-          />
+          <Dialog open={showKYCDialog} onOpenChange={setShowKYCDialog}>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Identity Verification</DialogTitle>
+                <DialogDescription>
+                  Please verify your identity to proceed with voting.
+                  Your information will be pre-filled if available.
+                </DialogDescription>
+              </DialogHeader>
+              <KYCForm 
+                onSubmit={handleKYCFormSubmit} 
+                isVerifying={isLoadingKYC}
+                verificationError={verificationError}
+              />
+            </DialogContent>
+          </Dialog>
         )}
 
         {showVotingDialog && (

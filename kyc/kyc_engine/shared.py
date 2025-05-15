@@ -60,6 +60,7 @@ It is imperative that the image is of an ID card. If it is not, immediately exit
 - You must detect the primary language of the ID card and note it in your analysis
 - For non-Latin scripts (Arabic, Chinese, Cyrillic, etc.), extract the text in its native script AND provide a transliteration when comparing
 - When comparing names across different scripts/languages, use phonetic similarity and transliteration rules, not just exact string matching
+- You May Found Confusion in finding ID card number in the card due to lot of numbers , i tell you that the id card number alwasy execeeds 14 chars 
 
 Instructions:
 
@@ -71,6 +72,7 @@ Instructions:
       c) Phonetic similarity for cross-language comparison
    - Consider common name variations across cultures (e.g., order of names, patronymics, etc.)
    - If the names don't match closely (accounting for transliteration and cultural differences), this is a CRITICAL FAILURE.
+   - You r givven a full nae conatsin firs name and second name if they are reversed its okey , its accepted.
 
 2. **Date of Birth (DOB):**
    - Extract the date of birth as it appears on the ID card
@@ -100,6 +102,7 @@ Instructions:
    - Compare with `form_id_number`, ignoring spaces, special characters, and formatting differences
    - If no ID number can be found, mark as "not found" (not a critical failure)
    - If found but doesn't match, this is an important discrepancy but not always critical.
+   - Id card number always exceeds 14 chars
 
 **CRITICAL RULE: If either the name or DOB is found on the card but does NOT match the form data (after proper translation/transliteration), mark the entire OCR check as "fail".**
 

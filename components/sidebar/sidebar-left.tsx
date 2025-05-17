@@ -18,7 +18,7 @@ import { LucideIcon } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import { authService } from "@/services"
-import { Vote } from "lucide-react"
+import { useTheme } from "next-themes"
 import Image from "next/image"
 
 interface NavItem {
@@ -52,6 +52,19 @@ export function SidebarLeft({
         email: "" 
     });
     const [loading, setLoading] = useState(true);
+    const { resolvedTheme } = useTheme();
+    const [logoSrc, setLogoSrc] = useState("/logos/expended.svg");
+    const [mounted, setMounted] = useState(false);
+    
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+    
+    useEffect(() => {
+        if (mounted) {
+            setLogoSrc(resolvedTheme === "dark" ? "/logos/expended-dark.svg" : "/logos/expended.svg");
+        }
+    }, [resolvedTheme, mounted]);
     
     useEffect(() => {
         const fetchUserData = async () => {
@@ -103,20 +116,16 @@ export function SidebarLeft({
                 <div className="flex items-center justify-center w-full">
                     <div className="flex items-center">
                         <div className="h-8 w-auto mr-2">
-                            <Image 
-                                src="/logos/expended-dark.svg" 
-                                alt="VoteX Logo" 
-                                width={120}
-                                height={32}
-                                className="h-8 w-auto hidden dark:block" 
-                            />
-                            <Image 
-                                src="/logos/expended.svg" 
-                                alt="VoteX Logo" 
-                                width={120}
-                                height={32}
-                                className="h-8 w-auto block dark:hidden" 
-                            />
+                            {mounted && (
+                                <Image 
+                                    src={logoSrc}
+                                    alt="VoteX Logo" 
+                                    width={120}
+                                    height={32}
+                                    className="h-8 w-auto"
+                                    priority
+                                />
+                            )}
                         </div>
                     </div>
                 </div>

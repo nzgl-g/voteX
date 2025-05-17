@@ -14,6 +14,8 @@ import { useEffect, useState, Suspense } from "react";
 import { Navbar } from "@/components/landing-page/navbar";
 import { LandingSkeleton } from "@/components/landing-page/landing-skeleton";
 
+
+// TODO: Fix the redirections
 // Create a separate component for the main content
 const LandingPageContent = () => {
   const searchParams = useSearchParams();

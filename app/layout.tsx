@@ -41,12 +41,12 @@ export default function RootLayout({
                 },
               }}
             />
-                <StagewiseToolbar
+                {/*<StagewiseToolbar
                     config={{
                         plugins: [
                         ],
                     }}
-                />
+                />*/}
             {children}
         </ThemeProvider>
         </NotificationProvider>

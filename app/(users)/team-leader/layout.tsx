@@ -29,7 +29,7 @@ const data = {
         {name: "CEO Election", logo: BriefcaseBusiness, plan: "Free"},
     ],
     navMain: [
-        {title: "Monitoring", url: "/team-leader/monitoring/default", icon: LayoutDashboard },
+        /*{title: "Monitoring", url: "/team-leader/monitoring/default", icon: LayoutDashboard },*/
         {title: "Session", url: "/team-leader/session/default", icon: CalendarClock },
         {title: "Team", url: "/team-leader/team/default", icon: Users},
         {title: "Scheduler", url: "/team-leader/scheduler/default", icon: CheckSquare},

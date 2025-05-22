@@ -1,50 +1,61 @@
 const mongoose = require("mongoose");
 
-const notificationSchema = new mongoose.Schema({
-  recipients: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // Users receiving the notification
-
-  targetType: {
-    type: String,
-    enum: ["user", "team", "all"],
-    default: "user",
-  },
-  teamId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Team",
-    required: function () {
-      return this.targetType === "team";
-    },
-  },
-  type: {
-    type: String,
-    enum: [
-      "vote-started",
-      "vote-ended",
-      "team-invite",
-      "candidate-invite",
-      "team-member-accepted",
-      "team-member-declined",
-      "session-edit-request",
-      "session-edit-approved",
-      "task-assigned",
-      "task-completed",
-      "task-uncompleted",
-      "team-member-removed",
-      "support-response",
-      "system",
+const notificationSchema = new mongoose.Schema(
+  {
+    recipients: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // Users receiving the notification
+    readBy: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "User", default: [] },
     ],
-    required: true,
+
+    targetType: {
+      type: String,
+      enum: ["user", "team", "all"],
+      default: "user",
+    },
+    teamId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Team",
+      validate: {
+        validator: function (v) {
+          return (
+            this.targetType !== "team" || (this.targetType === "team" && !!v)
+          );
+        },
+        message: "teamId is required when targetType is 'team'",
+      },
+    },
+
+    type: {
+      type: String,
+      enum: [
+        "vote-started",
+        "vote-ended",
+        "team-invite",
+        "candidate-invite",
+        "team-member-accepted",
+        "team-member-declined",
+        "session-edit-request",
+        "session-edit-approved",
+        "task-assigned",
+        "task-completed",
+        "task-uncompleted",
+        "team-member-removed",
+        "support-response",
+        "system",
+      ],
+      required: true,
+    },
+    message: { type: String, required: true },
+    category: {
+      type: String,
+      enum: ["Alert", "Interaction"],
+      required: true,
+      default: "Alert",
+    },
+    link: { type: String, required: true },
   },
-  message: { type: String, required: true },
-  category: {
-    type: String,
-    enum: ["Alert", "Interaction"],
-    required: true,
-    default: "Alert",
-  },
-  link: { type: String, required: true },
-  timestamp: { type: Date, default: Date.now },
-});
+  { timestamps: true }
+);
 
 notificationSchema.statics.getUserNotifications = function (
   userId,
@@ -56,12 +67,35 @@ notificationSchema.statics.getUserNotifications = function (
     .skip(skip)
     .limit(limit);
 };
-notificationSchema.pre("save", function (next) {
-  if (this.targetType === "all") {
-    this.recipients = [];
+notificationSchema.statics.markAsRead = async function (
+  notificationId,
+  userId
+) {
+  return this.findByIdAndUpdate(
+    notificationId,
+    { $addToSet: { readBy: userId } },
+    { new: true }
+  );
+};
+notificationSchema.pre("validate", function (next) {
+  if (this.targetType === "all" && this.recipients.length > 0) {
+    return next(new Error("Recipients must be empty when targetType is 'all'"));
   }
   next();
 });
+notificationSchema.pre("validate", function (next) {
+  const interactionTypes = [
+    "team-invite",
+    "candidate-invite",
+    "session-edit-request",
+    "task-assigned",
+  ];
+  this.category = interactionTypes.includes(this.type)
+    ? "Interaction"
+    : "Alert";
+  next();
+});
+
 const Notification = mongoose.model("Notification", notificationSchema);
 
 module.exports = Notification;

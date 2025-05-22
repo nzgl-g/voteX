@@ -6,22 +6,13 @@ const sendNotification = async (
   { recipients, type, message, link, targetType, teamId, extraData = {} }
 ) => {
   const io = req.app.get("io");
-  const interactionTypes = [
-    "team-invite",
-    "candidate-invite",
-    "session-edit-request",
-    "task-assigned",
-  ];
-  const category = interactionTypes.includes(type) ? "Interaction" : "Alert";
   const notification = new Notification({
     recipients,
     type,
     message,
     link,
     targetType,
-    category,
     teamId: targetType === "team" ? teamId : undefined,
-    createdAt: new Date(),
   });
   if (targetType === "team" && !teamId) {
     throw new Error("teamId is required when targetType is 'team'");
@@ -32,7 +23,7 @@ const sendNotification = async (
     message,
     link,
     targetType,
-    category,
+    category: notification.category,
     createdAt: notification.createdAt,
     ...extraData,
   };

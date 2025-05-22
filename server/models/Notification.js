@@ -53,6 +53,10 @@ const notificationSchema = new mongoose.Schema(
       default: "Alert",
     },
     link: { type: String, required: true },
+    extraData: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
   },
   { timestamps: true }
 );

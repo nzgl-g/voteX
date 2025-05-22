@@ -13,6 +13,7 @@ const sendNotification = async (
     link,
     targetType,
     teamId: targetType === "team" ? teamId : undefined,
+    extraData,
   });
   if (targetType === "team" && !teamId) {
     throw new Error("teamId is required when targetType is 'team'");

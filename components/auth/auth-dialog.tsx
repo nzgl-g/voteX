@@ -31,7 +31,7 @@ type LoginFormData = {
   email: string
   password: string
 }
-
+// TODO: Add add user fileds to the form
 // Signup form types
 type SignupFormData = {
   username: string
@@ -142,7 +142,7 @@ export function AuthDialog({
           
           if (sessions && sessions.length > 0) {
             // User has team leader sessions, redirect to the first one
-            router.push(`/team-leader/monitoring/${sessions[0]._id}`)
+            router.push(`/team-leader/session/${sessions[0]._id}`)
           } else {
             // Check if user has team member sessions
             const memberData = await sessionService.getUserSessionsAsMember();
@@ -150,15 +150,15 @@ export function AuthDialog({
             if (memberData.sessions && memberData.sessions.length > 0) {
               // User has team member sessions, redirect to the first one
               router.push(`/team-member/session/${memberData.sessions[0]._id}`)
-            } else {
+            } else {s
               // User has no sessions, redirect to dashboard
-              router.push('/dashboard')
+              router.push('/voter')
             }
           }
         } catch (error) {
           console.error('Error fetching sessions:', error)
           // Fallback to dashboard on error
-          router.push('/dashboard')
+          router.push('/voter')
         }
       }
     } catch (error: any) {
@@ -218,7 +218,7 @@ export function AuthDialog({
         }
       } else {
         // Redirect to dashboard after signup
-        router.push('/dashboard')
+        router.push('/voter')
       }
     } catch (error: any) {
       console.error('Signup error:', error)

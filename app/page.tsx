@@ -16,6 +16,7 @@ import { LandingSkeleton } from "@/components/landing-page/landing-skeleton";
 
 
 // TODO: Fix the redirections
+// TODO: add Skeletons
 // Create a separate component for the main content
 const LandingPageContent = () => {
   const searchParams = useSearchParams();

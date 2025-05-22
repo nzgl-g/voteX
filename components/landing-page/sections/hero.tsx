@@ -15,7 +15,7 @@ export const HeroSection = () => {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showPricingDialog, setShowPricingDialog] = useState(false);
-  const [imageSrc, setImageSrc] = useState("/hero-image-light.jpeg");
+  const [imageSrc, setImageSrc] = useState("/hero-image-light.png");
   const [mounted, setMounted] = useState(false);
   
   // Function to check authentication status
@@ -74,7 +74,7 @@ export const HeroSection = () => {
   // Handle theme changes in a separate effect to avoid hydration mismatch
   useEffect(() => {
     if (mounted) {
-      setImageSrc(resolvedTheme === "dark" ? "/hero-image-dark.jpeg" : "/hero-image-light.jpeg");
+      setImageSrc(resolvedTheme === "dark" ? "/hero-image-dark.png" : "/hero-image-light.png");
     }
   }, [resolvedTheme, mounted]);
 

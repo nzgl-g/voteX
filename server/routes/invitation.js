@@ -2,6 +2,8 @@ const mongoose = require("mongoose");
 const express = require("express");
 const auth = require("../middleware/auth");
 const Invitation = require("../models/Invitation");
+const SessionParticipant = require("../models/SessionParticipants");
+const Session = require("../models/Sessions");
 const Team = require("../models/Team");
 const sendNotification = require("../helpers/sendNotification");
 const router = express.Router();
@@ -18,7 +20,6 @@ router.post("/:invitationId/accept", auth, async (req, res) => {
     if (invitation.status !== "pending") {
       return res.status(200).send("Invitation already processed");
     }
-
     // Add user to team
     const team = await Team.findById(invitation.teamId);
     if (!team) return res.status(404).send("Team not found");
@@ -26,11 +27,26 @@ router.post("/:invitationId/accept", auth, async (req, res) => {
     if (team.members.includes(req.user._id)) {
       return res.status(200).send("User already in team");
     }
-
+    const session = await Session.findOne({ team: team._id });
+    if (!session) return res.status(404).send("Related session not found");
     // Update team and invitation
     team.members.push(req.user._id);
-    invitation.status = "accepted";
 
+    invitation.status = "accepted";
+    const existingParticipant = await SessionParticipant.findOne({
+      sessionId: session._id,
+      userId: req.user._id,
+    });
+
+    if (!existingParticipant) {
+      createdParticipant = await SessionParticipant.create({
+        sessionId: session._id,
+        userId: req.user._id,
+        role: "team_member",
+      });
+      session.participants.push(createdParticipant._id);
+      await session.save();
+    }
     await Promise.all([team.save(), invitation.save()]);
     await sendNotification(req, {
       recipients: [team.createdBy],

@@ -11,9 +11,9 @@ const isTeamLeader = require("../middleware/isTeamLeader");
 const router = express.Router();
 require("dotenv").config();
 
-router.get("/", async (req, res) => {
+router.get("/", auth, async (req, res) => {
   try {
-    const sessions = await Session.find({})
+    const sessions = await Session.find({ visibility: "public" })
       .populate("team")
       .populate("createdBy")
       .exec();

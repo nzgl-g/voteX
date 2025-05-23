@@ -98,6 +98,7 @@ const sessionSchema = new mongoose.Schema({
     type: String,
     default: null,
     unique: true,
+    sparse: true,
   },
   verificationMethod: {
     type: String,

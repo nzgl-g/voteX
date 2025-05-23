@@ -1,8 +1,9 @@
 const express = require("express");
 const mongoose = require("mongoose");
-
+const logActivity = require("../helpers/logActivity");
 const Team = require("../models/Team");
 const Invitation = require("../models/Invitation");
+const Session = require("../models/Sessions");
 const User = require("../models/User");
 const auth = require("../middleware/auth");
 const isTeamLeader = require("../middleware/isTeamLeader");
@@ -122,7 +123,11 @@ router.post("/:teamId/invite", auth, isTeamLeader, async (req, res) => {
       targetType: "user",
       extraData: { invitationId: invitation._id, teamId },
     });
-
+    await logActivity({
+      sessionId: team.session,
+      userId: req.user._id,
+      action: `Sent a team invitation to ${user.username}`,
+    });
     res.status(201).json({
       message: "Invitation sent successfully",
       invitationId: invitation._id,

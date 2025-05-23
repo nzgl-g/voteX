@@ -7,7 +7,7 @@ const SessionEditRequest = require("../models/SessionEditRequest");
 const Team = require("../models/Team");
 const auth = require("../middleware/auth");
 const sendNotification = require("../helpers/sendNotification");
-const isTeamLeader = require("../middleware/isTeamLeader");
+const logActivity = require("../helpers/logActivity");
 const router = express.Router();
 require("dotenv").config();
 
@@ -310,6 +310,11 @@ router.patch("/:sessionId/edit-request", auth, async (req, res) => {
     });
     if (session.team.leader.equals(userId)) {
       await session.updateOne({ $set: updates });
+      await logActivity({
+        sessionId: sessionId,
+        userId: req.user._id,
+        action: `${req.user.username} has edited the session`,
+      });
       return res.status(200).json({ message: "Session updated successfully" });
     }
     if (session.allowDirectEdit) {
@@ -319,6 +324,11 @@ router.patch("/:sessionId/edit-request", auth, async (req, res) => {
           .json({ error: "Only team members can propose edits" });
       }
       await session.updateOne({ $set: updates });
+      await logActivity({
+        sessionId: sessionId,
+        userId: req.user._id,
+        action: `${req.user.username} has edited the session`,
+      });
       return res.status(200).json({ message: "Session updated successfully" });
     }
     const editRequest = new SessionEditRequest({
@@ -332,13 +342,15 @@ router.patch("/:sessionId/edit-request", auth, async (req, res) => {
     await sendNotification(req, {
       recipients: [session.team.leader],
       type: "session-edit-request",
-      message: `${
-        req.user.username || req.user._id
-      } has requested to edit the session.`,
+      message: `${req.user.username} has requested to edit the session.`,
       link: `/sessions/${sessionId}`,
       targetType: "user",
     });
-
+    await logActivity({
+      sessionId: sessionId,
+      userId: req.user._id,
+      action: `${req.user.username} has requested to edit the session`,
+    });
     res.status(201).json({
       message: "Edit request submitted.",
       editRequest,
@@ -409,7 +421,11 @@ router.patch("/edit-requests/:requestId/approve", auth, async (req, res) => {
       link: `/sessions/${editRequest.session._id}`,
       targetType: "user",
     });
-
+    await logActivity({
+      sessionId: editRequest.session._id,
+      userId: req.user._id,
+      action: `${req.user.username} accepted the requested session edits`,
+    });
     res
       .status(200)
       .json({ message: "Edit approved and applied", updatedSession });

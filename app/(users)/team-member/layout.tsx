@@ -10,32 +10,28 @@ import ChatBubble from "@/components/chat-bubble"
 import {SidebarInset, SidebarProvider,} from "@/components/ui/sidebar"
 
 import {
-    BriefcaseBusiness,
-    Building2,
-    Landmark,
     LifeBuoy,
     CalendarClock,
     LayoutDashboard,
     CheckSquare,
     HelpCircle,
     Settings,
+    ClipboardList, Users,
 } from "lucide-react"
 
 const data = {
-    teams: [
-        {name: "Presidential Election", logo: Landmark, plan: "Member"},
-        {name: "Local Election", logo: Building2, plan: "Member"},
-        {name: "CEO Election", logo: BriefcaseBusiness, plan: "Member"},
-    ],
+    // Teams/sessions are now handled dynamically by SessionSelector
+    // The teams array is kept empty as they will be loaded by the SessionSelector
+    teams: [],
     navMain: [
-        {title: "Monitoring", url: "/team-member/monitoring/default", icon: LayoutDashboard },
-        {title: "Session", url: "/team-member/session/default", icon: CalendarClock },
-        {title: "Scheduler", url: "/team-member/tasks/default", icon: CheckSquare},
+        {title: "Monitoring", url: "/team-member/monitoring/default", icon: LayoutDashboard},
+        {title: "Session", url: "/team-member/session/default", icon: CalendarClock},
+        {title: "Tasks", url: "/team-member/team/default", icon: Users},
         {title: "Scheduler", url: "/team-member/scheduler/default", icon: CheckSquare},
-        {title: "Scheduler", url: "/team-member/support/default", icon: CheckSquare},
+        {title: "Support", url: "/team-member/support/default", icon: LifeBuoy},
     ],
     navSecondary: [
-        {title: "Settings", url: "#", icon: Settings },
+        {title: "Settings", url: "#", icon: Settings},
         {title: "Help", url: "#", icon: HelpCircle},
     ]
 }
@@ -53,13 +49,25 @@ export default function Layout({children}: { children: ReactNode }) {
                         sessions={data.teams}
                         navMain={data.navMain}
                         navSecondary={data.navSecondary}
+                        userRole="team-member"
                     />
                     <SidebarInset>
                         {children}
                     </SidebarInset>
                 </SidebarProvider>
                 <ChatBubble/>
-                <Toaster position="bottom-center"/>
+                <Toaster 
+                    position="bottom-center"
+                    toastOptions={{
+                        style: {
+                            background: 'var(--background)',
+                            color: 'var(--foreground)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--radius)',
+                        },
+                        className: 'shadow-md',
+                    }}
+                />
             </NotificationProvider>
         </ThemeProvider>
     )

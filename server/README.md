@@ -1,496 +1,207 @@
-# VoteX Backend Architecture
+# Server Documentation
+
+This document provides a detailed explanation of the server-side application for the blockchain voting system.
 
 ## Overview
-The VoteX backend is built using Node.js, Express.js, and MongoDB. It provides RESTful API endpoints for the vote system with blockchain integration, supporting elections, polls, and tournaments.
 
-## Tech Stack
-- **Express.js**: Web framework
-- **MongoDB/Mongoose**: Database and ORM
-- **Socket.io**: Real-time communication
-- **JWT**: Authentication
-- **Ethers.js**: Blockchain integration
-- **Bcrypt**: Password hashing
-- **Nodemailer**: Email notifications
+The server is built with Node.js and Express.js. It handles user authentication, API requests from the frontend, interactions with the MongoDB database (assumed, based on typical MERN/MEAN stack patterns with Mongoose-like model files), and communication with the blockchain smart contracts. It also manages KYC processes and notifications.
 
 ## Project Structure
-```
-server/
-├── index.js               # Entry point
-├── models/                # Mongoose schemas
-├── routes/                # API endpoints
-├── middleware/            # Authentication and role checking
-├── helpers/               # Utility functions
-├── lib/                   # Core functionality
-├── validation/            # Input validation
-├── startup/               # Application initialization
-└── logs/                  # Application logs
-```
 
-## Authentication Flow
-The system uses JWT tokens for authentication:
-1. User registers or logs in
-2. Server issues a JWT token
-3. Client includes this token in the Authorization header
-4. Protected routes use the auth middleware to verify the token
+The server directory is organized as follows:
 
-## API Routes
+*   **`/index.js`**: The main entry point of the server application. It initializes the Express app, sets up middleware, connects to the database (presumably), and starts the server.
+*   **`/node_modules/`**: Contains all npm dependencies.
+*   **`/package.json`**: Lists project dependencies and scripts.
+*   **`/package-lock.json`** & **`/pnpm-lock.yaml`**: Lock files for npm and pnpm respectively, ensuring consistent dependency installation.
+*   **`.gitignore`**: Specifies intentionally untracked files that Git should ignore (e.g., `node_modules`).
+*   **`/routes/`**: Contains route handlers for different API endpoints.
+*   **`/models/`**: Defines Mongoose (or similar ORM/ODM) schemas and models for database collections.
+*   **`/middleware/`**: Houses custom middleware functions used in the request-response cycle (e.g., for authentication, authorization).
+*   **`/helpers/`**: Includes utility functions and services used across the application (e.g., email service, KYC service, notification service).
+*   **`/validation/`**: Contains schemas or functions for validating incoming request data.
+*   **`/startup/`**: Scripts related to the application's startup process (e.g., initializing routes).
+*   **`/uploads/`**: (Assumed) Directory for storing uploaded files, if any.
 
-### Authentication
+## Core Components
 
-#### POST /votex/api/signup
-Register a new user
+### 1. Entry Point (`index.js`)
 
-**Request Body**:
-```json
-{
-  "username": "testuser",
-  "password": "Password123!",
-  "email": "test@example.com",
-  "fullName": "Test User",
-  "gender": "Male"
-}
-```
+*   Initializes the Express application.
+*   Likely loads environment variables (e.g., database connection strings, secret keys).
+*   Sets up global middleware:
+    *   Body parsing (e.g., `express.json()`, `express.urlencoded()`).
+    *   CORS handling.
+    *   Logging (e.g., Morgan).
+    *   Error handling.
+*   Connects to the MongoDB database.
+*   Calls the route initializer from `/startup/routes.js`.
+*   Starts the HTTP server and listens on a configured port.
+*   May also initialize a Socket.IO server for real-time communication.
 
-**Response**:
-```json
-{
-  "user": {
-    "_id": "60d21b4667d0d8992e610c85",
-    "username": "testuser",
-    "email": "test@example.com",
-    "fullName": "Test User",
-    "gender": "Male",
-    "createdAt": "2023-06-22T10:00:00.000Z"
-  },
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
+### 2. Routes (`/routes/`)
 
-#### POST /votex/api/login
-Authenticate a user
+This directory defines the API endpoints. Each file typically corresponds to a resource or a group of related functionalities:
 
-**Request Body**:
-```json
-{
-  "email": "test@example.com",
-  "password": "Password123!"
-}
-```
+*   **`candidate.js`**: Handles routes related to candidates, such as applying for candidacy, managing candidate information, and candidate-specific actions.
+*   **`invitation.js`**: Manages routes for team invitations (e.g., sending, accepting, declining invitations).
+*   **`kyc.js`**: Endpoints for the Know Your Customer (KYC) process, likely involving document submission, status checks, and verification updates.
+*   **`login.js`**: Handles user login and authentication.
+*   **`notifications.js`**: Routes for fetching and managing user notifications.
+*   **`session.js`**: Manages voting sessions. This is a critical part and likely interacts with both the database and the blockchain. Endpoints would include:
+    *   Creating new sessions.
+    *   Fetching session details (active, upcoming, past).
+    *   Fetching session results.
+    *   Interacting with `VoteSessionFactory.sol` to create sessions on the blockchain.
+    *   Interacting with `VoteSession.sol` to cast votes, get status, and retrieve results.
+*   **`signUp.js`**: Handles new user registration.
+*   **`task.js`**: Routes related to tasks, possibly for team members or for managing parts of the voting process.
+*   **`team.js`**: Manages team-related functionalities, such as creating teams, adding/removing members, and team administration (likely for Team Leaders).
+*   **`user.js`**: Handles general user-related operations, such as fetching user profiles, updating user information, etc.
 
-**Response**:
-```json
-{
-  "user": {
-    "_id": "60d21b4667d0d8992e610c85",
-    "username": "testuser",
-    "email": "test@example.com"
-  },
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
+### 3. Models (`/models/`)
 
-### User Management
+These files define the structure of data stored in the database (likely MongoDB, using an ODM like Mongoose).
 
-#### GET /votex/api/users/me
-Get current user profile
+*   **`CandidateInvitation.js`**: Schema for invitations sent to users to become candidates in a session.
+*   **`CandidateRequest.js`**: Schema for requests made by users to become candidates.
+*   **`Invitation.js`**: Schema for team membership invitations.
+*   **`Notification.js`**: Schema for storing user notifications (e.g., KYC status, session updates, invitation alerts).
+*   **`SessionEditRequest.js`**: Schema for requests to edit an existing session's details.
+*   **`SessionParticipants.js`**: Schema potentially linking users/candidates to specific sessions as participants/voters.
+*   **`Sessions.js`**: Schema for vote sessions. This model is crucial and will store:
+    *   Session metadata (name, description, start/end times, rules).
+    *   Reference to the on-chain `sessionId` and `sessionAddress` (the deployed `VoteSession` contract address).
+    *   Status (e.g., pending, active, nomination, voting, ended, archived).
+    *   KYC requirements.
+    *   List of candidates (references to `User` or `CandidateRequest` models).
+*   **`Task.js`**: Schema for tasks.
+*   **`Team.js`**: Schema for teams, likely storing team name, leader, and members.
+*   **`User.js`**: Schema for users. This will store:
+    *   Basic user information (name, email, password hash).
+    *   Role (Team Leader, Team Member, Candidate, Voter).
+    *   Wallet address (for blockchain interactions).
+    *   KYC status and related information.
+    *   References to teams they belong to.
 
-**Headers**:
-```
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
+### 4. Middleware (`/middleware/`)
 
-**Response**:
-```json
-{
-  "_id": "60d21b4667d0d8992e610c85",
-  "username": "testuser",
-  "email": "test@example.com",
-  "fullName": "Test User",
-  "gender": "Male",
-  "profilePic": "https://example.com/profile.jpg",
-  "createdAt": "2023-06-22T10:00:00.000Z"
-}
-```
+Custom functions that process requests before they reach the route handlers.
 
-#### PUT /votex/api/users/me
-Update user profile
+*   **`auth.js`**: Authenticates users, likely by verifying JWT tokens sent in request headers. Populates `req.user` with user information if authentication is successful.
+*   **`IsAdmin.js`**: Authorization middleware to check if the authenticated user has an admin role (though "Admin" is not one of the defined user roles, this might be for a superuser or a specific type of Team Leader).
+*   **`isTeamLeader.js`**: Authorization middleware to ensure only users with the "Team Leader" role can access certain routes.
+*   **`isTeamMember.js`**: Authorization middleware to ensure only users with the "Team Member" (and possibly "Team Leader") role can access certain routes.
 
-**Headers**:
-```
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
+### 5. Helpers (`/helpers/`)
 
-**Request Body**:
-```json
-{
-  "fullName": "Updated User",
-  "profilePic": "https://example.com/new-profile.jpg"
-}
-```
+Utility modules providing reusable logic.
 
-**Response**:
-```json
-{
-  "_id": "60d21b4667d0d8992e610c85",
-  "username": "testuser",
-  "email": "test@example.com",
-  "fullName": "Updated User",
-  "profilePic": "https://example.com/new-profile.jpg"
-}
-```
+*   **`emailService.js`**: Handles sending emails (e.g., for notifications, invitations, password resets).
+*   **`kycService.js`**: Contains logic for interacting with the KYC system/API. This might involve:
+    *   Submitting user data for verification.
+    *   Checking verification status.
+    *   Handling callbacks or webhooks from the KYC provider.
+    *   The [kyc/README.md](mdc:kyc/README.md) likely details this interaction further.
+*   **`sendNotification.js`**: A generic function or service to create and possibly push notifications to users (e.g., via WebSockets, email, or storing in the `Notification` model).
+*   **`sessionValidator.js`**: Helper functions specifically for validating session-related data or logic, possibly before creating or updating sessions on the blockchain or in the database.
 
-#### PUT /votex/api/users/link-wallet
-Link blockchain wallet to user account
+### 6. Validation (`/validation/`)
 
-**Headers**:
-```
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
+Contains schemas or functions (likely using a library like Joi or Yup) to validate incoming request bodies, query parameters, or path parameters.
 
-**Request Body**:
-```json
-{
-  "walletAddress": "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
-  "chainId": "1",
-  "networkName": "Ethereum Mainnet",
-  "balance": "1.5",
-  "signature": "0xsignature...",
-  "message": "Connect wallet to VoteX"
-}
-```
+*   **`session.js`**: Validation rules for data related to creating or updating sessions.
+*   **`user.js`**: Validation rules for user registration, login, or profile updates.
 
-**Response**:
-```json
-{
-  "message": "Wallet linked successfully",
-  "wallet": {
-    "walletAddress": "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
-    "chainId": "1",
-    "networkName": "Ethereum Mainnet",
-    "balance": "1.5"
-  }
-}
-```
+### 7. Startup (`/startup/`)
 
-### Sessions
+Modules executed during the server's startup phase.
 
-#### POST /votex/api/sessions
-Create a new voting session
+*   **`routes.js`**: Initializes all API routes by associating paths with their respective router modules from the `/routes/` directory and applying global middleware like error handling for API routes.
 
-**Headers**:
-```
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
+## Key Workflows & Blockchain Interaction
 
-**Request Body (Election)**:
-```json
-{
-  "name": "Presidential Election 2024",
-  "description": "Election for the next president",
-  "organizationName": "National Election Committee",
-  "banner": "https://example.com/banner.jpg",
-  "type": "election",
-  "subtype": "single",
-  "subscription": {
-    "name": "pro",
-    "price": 99.99,
-    "voterLimit": 10000,
-    "features": ["KYC verification", "Real-time results"]
-  },
-  "sessionLifecycle": {
-    "scheduledAt": {
-      "start": "2024-01-01T00:00:00.000Z",
-      "end": "2024-01-02T00:00:00.000Z"
-    }
-  },
-  "securityMethod": "Secret Phrase",
-  "accessLevel": "Private",
-  "secretPhrase": "election2024",
-  "verificationMethod": "KYC",
-  "maxChoices": 1
-}
-```
+The server acts as an intermediary between users (via the frontend) and the blockchain.
 
-**Response**:
-```json
-{
-  "_id": "60d21b4667d0d8992e610c86",
-  "name": "Presidential Election 2024",
-  "description": "Election for the next president",
-  "type": "election",
-  "createdBy": "60d21b4667d0d8992e610c85",
-  "team": "60d21b4667d0d8992e610c87",
-  "sessionLifecycle": {
-    "createdAt": "2023-11-15T10:00:00.000Z",
-    "scheduledAt": {
-      "start": "2024-01-01T00:00:00.000Z",
-      "end": "2024-01-02T00:00:00.000Z"
-    }
-  }
-}
-```
+1.  **User Management & Authentication:**
+    *   Standard sign-up and login processes.
+    *   JWTs are likely used for session management.
+    *   Role-based access control is enforced by middleware.
 
-#### GET /votex/api/sessions/my-sessions
-Get sessions created by the authenticated user
+2.  **Team Management (Team Leader):**
+    *   Team leaders can create teams, invite members, and manage team settings.
+    *   Invitations are sent (possibly via `emailService.js` and recorded in `Invitation.js` model).
 
-**Headers**:
-```
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
+3.  **Session Creation (Team Leader/Member):**
+    *   A team leader or member initiates session creation through a frontend interface.
+    *   The backend receives the request with session parameters (participants, end time, vote mode, etc.).
+    *   Data is validated using `/validation/session.js`.
+    *   The server stores preliminary session data in the `Sessions` MongoDB collection.
+    *   **Blockchain Interaction:**
+        *   The server calls `createVoteSession` on the deployed `VoteSessionFactory` smart contract (address of which is likely configured).
+        *   It passes necessary parameters like a unique `sessionId` (possibly derived from the MongoDB `_id`), participant identifiers, end timestamp, vote mode, and max choices.
+        *   The server listens for the `SessionCreated` event from the `VoteSessionFactory` contract.
+        *   Upon successful creation on the blockchain, the server updates the `Sessions` document in MongoDB with the `sessionAddress` (the address of the newly created `VoteSession` contract) and other relevant on-chain details.
+        *   The `sendNotification.js` helper might be used to notify relevant parties.
 
-**Response**:
-```json
-[
-  {
-    "_id": "60d21b4667d0d8992e610c86",
-    "name": "Presidential Election 2024",
-    "description": "Election for the next president",
-    "type": "election",
-    "createdBy": {
-      "_id": "60d21b4667d0d8992e610c85",
-      "username": "testuser",
-      "email": "test@example.com"
-    },
-    "team": {
-      "_id": "60d21b4667d0d8992e610c87",
-      "sessionName": "Presidential Election 2024"
-    }
-  }
-]
-```
+4.  **Candidate Nomination:**
+    *   Users can apply to be candidates for sessions where nominations are open. This is handled by `routes/candidate.js` and likely involves the `CandidateRequest.js` model.
+    *   Team leaders/members can approve/reject candidate requests.
+    *   Team leaders/members might also directly invite candidates (`CandidateInvitation.js` model).
 
-#### POST /votex/api/sessions/:sessionId/vote
-Cast a vote in a session
+5.  **KYC Process:**
+    *   Users (voters, candidates) may need to undergo KYC verification.
+    *   `routes/kyc.js` and `helpers/kycService.js` manage this flow.
+    *   The `User` model stores KYC status.
+    *   The [kyc/README.md](mdc:kyc/README.md) provides more details on this sub-system.
 
-**Headers**:
-```
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
+6.  **Voting Process (Voter):**
+    *   Voters view active sessions.
+    *   Before voting, the server might check KYC status if required by the session.
+    *   **Blockchain Interaction:**
+        *   When a voter casts a vote, the request is sent to the backend (`routes/session.js`).
+        *   The backend retrieves the `sessionAddress` of the specific `VoteSession` contract from its database.
+        *   The backend (or a relayer it controls) calls the `vote(string[] choices)` function on that `VoteSession` contract, passing the voter's choices. The voter's Ethereum address (from their `User` profile) is used as `msg.sender` (either directly if the user signs the transaction, or via a relayer system).
+        *   The server might listen for the `VoteCast` event to confirm and potentially update off-chain caches or logs.
 
-**Request Body (Election)**:
-```json
-{
-  "candidateId": "60d21b4667d0d8992e610c88"
-}
-```
+7.  **Fetching Session Data & Results:**
+    *   Users can view session details and results.
+    *   **Blockchain Interaction:**
+        *   The server calls `getStatus()`, `getResults()`, `getVoterCount()`, and `checkVoted(address)` on the appropriate `VoteSession` contract instance (using its stored `sessionAddress`).
+        *   The server might also query the `VoteSessionFactory` for `getAllSessionIds()` to list all available sessions and then fetch details for each.
+    *   This data is then formatted and sent to the frontend.
 
-**Response**:
-```json
-{
-  "message": "Vote cast successfully",
-  "voteId": "60d21b4667d0d8992e610c89"
-}
-```
+8.  **Notifications:**
+    *   `helpers/sendNotification.js` and `routes/notifications.js` manage real-time or persistent notifications for various events (e.g., new session, vote ended, KYC status change, invitation received). This might involve Socket.IO for real-time updates.
 
-### Candidates
+## Environment Configuration
 
-#### POST /votex/api/sessions/:sessionId/candidate
-Apply to be a candidate in a session
+The server likely uses environment variables for configuration, such as:
 
-**Headers**:
-```
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-**Request Body**:
-```json
-{
-  "partyName": "Progressive Party",
-  "fullName": "John Smith",
-  "biography": "Political leader with 10 years of experience",
-  "experience": "Former Mayor of Springfield (2015-2020)",
-  "nationalities": ["United States"],
-  "dobPob": {
-    "dateOfBirth": "1975-05-15T00:00:00.000Z",
-    "placeOfBirth": "Chicago, IL"
-  },
-  "promises": [
-    "Improve healthcare system",
-    "Reduce taxes for middle class",
-    "Invest in renewable energy"
-  ]
-}
-```
-
-**Response**:
-```json
-{
-  "message": "Candidate application submitted successfully",
-  "requestId": "60d21b4667d0d8992e610c90"
-}
-```
-
-### Teams
-
-#### POST /votex/api/teams
-Create a new team
-
-**Headers**:
-```
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-**Request Body**:
-```json
-{
-  "sessionId": "60d21b4667d0d8992e610c86",
-  "members": [
-    "60d21b4667d0d8992e610c91",
-    "60d21b4667d0d8992e610c92"
-  ]
-}
-```
-
-**Response**:
-```json
-{
-  "_id": "60d21b4667d0d8992e610c87",
-  "session": "60d21b4667d0d8992e610c86",
-  "sessionName": "Presidential Election 2024",
-  "leader": "60d21b4667d0d8992e610c85",
-  "members": [
-    "60d21b4667d0d8992e610c91",
-    "60d21b4667d0d8992e610c92"
-  ]
-}
-```
-
-### Invitations
-
-#### POST /votex/api/invitations
-Create an invitation to join a team
-
-**Headers**:
-```
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-**Request Body**:
-```json
-{
-  "userId": "60d21b4667d0d8992e610c93",
-  "teamId": "60d21b4667d0d8992e610c87",
-  "sessionId": "60d21b4667d0d8992e610c86",
-  "role": "team_member"
-}
-```
-
-**Response**:
-```json
-{
-  "_id": "60d21b4667d0d8992e610c94",
-  "userId": "60d21b4667d0d8992e610c93",
-  "teamId": "60d21b4667d0d8992e610c87",
-  "sessionId": "60d21b4667d0d8992e610c86",
-  "role": "team_member",
-  "status": "pending",
-  "createdAt": "2023-11-15T10:00:00.000Z"
-}
-```
-
-### Tasks
-
-#### POST /votex/api/tasks
-Create a task for team members
-
-**Headers**:
-```
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-**Request Body**:
-```json
-{
-  "title": "Review candidate applications",
-  "description": "Review and approve/reject candidate applications for the election",
-  "assignedTo": "60d21b4667d0d8992e610c91",
-  "sessionId": "60d21b4667d0d8992e610c86",
-  "dueDate": "2023-12-01T00:00:00.000Z",
-  "priority": "high"
-}
-```
-
-**Response**:
-```json
-{
-  "_id": "60d21b4667d0d8992e610c95",
-  "title": "Review candidate applications",
-  "description": "Review and approve/reject candidate applications for the election",
-  "assignedTo": "60d21b4667d0d8992e610c91",
-  "assignedBy": "60d21b4667d0d8992e610c85",
-  "sessionId": "60d21b4667d0d8992e610c86",
-  "status": "pending",
-  "dueDate": "2023-12-01T00:00:00.000Z",
-  "priority": "high",
-  "createdAt": "2023-11-15T10:00:00.000Z"
-}
-```
-
-### Notifications
-
-#### GET /votex/api/notifications
-Get user notifications
-
-**Headers**:
-```
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-**Response**:
-```json
-[
-  {
-    "_id": "60d21b4667d0d8992e610c96",
-    "userId": "60d21b4667d0d8992e610c85",
-    "title": "New task assigned",
-    "message": "You have been assigned a new task: Review candidate applications",
-    "type": "task",
-    "read": false,
-    "createdAt": "2023-11-15T10:00:00.000Z",
-    "relatedId": "60d21b4667d0d8992e610c95"
-  }
-]
-```
-
-## WebSocket Events
-
-The server uses Socket.io for real-time communication:
-
-### Connection
-```javascript
-socket.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
-});
-```
-
-### Authentication
-```javascript
-socket.on('authenticate', (userId) => {
-  socket.join(userId.toString());
-});
-```
-
-### Server-to-Client Events
-- `notification`: Sent when a user receives a notification
-- `session_update`: Sent when a session status changes
-- `vote_cast`: Sent when a vote is cast in a session
+*   `PORT`: Server listening port.
+*   `MONGODB_URI`: MongoDB connection string.
+*   `JWT_SECRET`: Secret key for signing JWTs.
+*   `ETHEREUM_NODE_URL`: URL for connecting to an Ethereum node (e.g., Infura, Alchemy, or a local node).
+*   `FACTORY_CONTRACT_ADDRESS`: The deployed address of the `VoteSessionFactory` smart contract.
+*   `DEPLOYER_PRIVATE_KEY`: Private key of the account used by the server to pay for gas when interacting with smart contracts (e.g., creating sessions, relaying votes if a gasless approach for users is implemented).
+*   Email service credentials (e.g., SendGrid API key).
+*   KYC service API keys and endpoints.
 
 ## Error Handling
-The API returns appropriate HTTP status codes:
-- 200: Success
-- 400: Bad Request (client error)
-- 401: Unauthorized (authentication error)
-- 403: Forbidden (permission error)
-- 404: Not Found
-- 500: Server Error
 
-## Running the Server
-```bash
-# Install dependencies
-npm install
+A centralized error handling middleware is expected to catch and process errors, returning appropriate HTTP status codes and error messages to the client.
 
-# Start development server
-npm start
-```
+## Security Considerations (Server-Specific)
 
-The server will start on port 2000 by default, or the port specified in the .env file. 
+*   **Input Validation:** Thoroughly validate all incoming data using `/validation/` schemas to prevent injection attacks (e.g., NoSQL injection) and ensure data integrity.
+*   **Authentication & Authorization:** Securely manage user authentication (JWTs) and enforce role-based access control using middleware.
+*   **Secret Management:** Store sensitive information (API keys, private keys, JWT secret) securely, preferably using environment variables and not hardcoded in the source code.
+*   **Rate Limiting:** Implement rate limiting on sensitive endpoints to prevent abuse.
+*   **HTTPS:** Ensure the server is configured to use HTTPS in production.
+*   **Protection against common web vulnerabilities:** XSS, CSRF (though less relevant for APIs if using tokens properly).
+*   **Blockchain Interaction Security:**
+    *   Securely store and manage the private key used for sending transactions to the blockchain.
+    *   Ensure proper error handling and retries for blockchain transactions, considering potential network issues or out-of-gas errors.
+    *   Be mindful of re-entrancy if the server's logic depends on smart contract state that could be manipulated during a call (less likely for these specific contracts but a general concern).
+
+This documentation should provide a comprehensive overview of the server's architecture, components, and its crucial role in the voting system, especially its interactions with the blockchain.

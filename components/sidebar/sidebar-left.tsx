@@ -38,12 +38,14 @@ interface SidebarLeftProps extends React.ComponentProps<typeof Sidebar> {
     sessions: Session[]
     navMain: NavItem[]
     navSecondary: NavItem[]
+    userRole?: string
 }
 
 export function SidebarLeft({
                                 sessions,
                                 navMain,
                                 navSecondary,
+                                userRole,
                                 ...props
                             }: SidebarLeftProps) {
     const pathname = usePathname()
@@ -55,6 +57,16 @@ export function SidebarLeft({
     const { resolvedTheme } = useTheme();
     const [logoSrc, setLogoSrc] = useState("/logos/expended.svg");
     const [mounted, setMounted] = useState(false);
+    
+    // Determine user role from path if not provided
+    const determineUserRole = (): string => {
+        if (userRole) return userRole;
+        if (pathname.includes('team-leader')) return 'team-leader';
+        if (pathname.includes('team-member')) return 'team-member';
+        return 'team-leader'; // Default fallback
+    };
+    
+    const currentUserRole = determineUserRole();
     
     useEffect(() => {
         setMounted(true);
@@ -132,13 +144,13 @@ export function SidebarLeft({
             </SidebarHeader>
             <SidebarContent className="pt-2">
                 <div className="px-2 mb-4">
-                    <SessionSelector />
+                    <SessionSelector userRole={currentUserRole} />
                 </div>
                 <SidebarSeparator className="mb-2" />
                 <div className="px-2 mb-1">
-                    <NavMain items={getActiveItems(navMain)} />
+                    <NavMain items={getActiveItems(navMain)} userRole={currentUserRole} />
                 </div>
-                <NavSecondary items={getActiveItems(navSecondary)} className="mt-auto" />
+                <NavSecondary items={getActiveItems(navSecondary)} userRole={currentUserRole} className="mt-auto" />
                 <div className="mt-4 px-2 pb-4">
                     <UserProfile 
                         userName={userData.name}

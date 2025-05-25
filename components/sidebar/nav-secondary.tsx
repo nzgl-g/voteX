@@ -14,6 +14,7 @@ import {
 
 export function NavSecondary({
   items,
+  userRole = 'team-leader',
   ...props
 }: {
   items: {
@@ -23,6 +24,7 @@ export function NavSecondary({
     badge?: React.ReactNode
     isActive?: boolean
   }[]
+  userRole?: string
 } & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
   const pathname = usePathname()
   
@@ -34,39 +36,66 @@ export function NavSecondary({
     return pathSegments.find(segment => sessionIdPattern.test(segment)) || 'default'
   }
   
-  // Build the correct URL with the session ID
+  // Get the user's role from the path or use the provided userRole
+  const getUserRole = () => {
+    if (pathname.includes('team-leader')) return 'team-leader'
+    if (pathname.includes('team-member')) return 'team-member'
+    return userRole
+  }
+  
+  // Build the correct URL with the session ID and user role
   const buildUrl = (baseUrl: string) => {
-    // If the base URL doesn't include team-leader or team-member, return as is
-    if (!baseUrl.includes('team-leader') && !baseUrl.includes('team-member')) {
+    // If the base URL is an absolute URL (not starting with / or ./) or a hash link, return as is
+    if (baseUrl.startsWith('http') || baseUrl === '#') {
       return baseUrl
     }
     
+    // Get the user role
+    const role = getUserRole()
+    
     // Get the session ID from the current path
     const sessionId = getSessionIdFromPath()
+    
+    // If the URL already includes the role path, use it as is with the session ID
+    if (baseUrl.includes(`/${role}/`)) {
+      // Replace 'default' with the session ID if needed
+      return baseUrl.replace('default', sessionId)
+    }
     
     // Handle relative URLs (starting with ./)
     if (baseUrl.startsWith('./')) {
       // Remove the ./ prefix
       const routePath = baseUrl.substring(2)
       
-      // Split the route path to separate the route type from 'default'
-      const routeParts = routePath.split('/')
+      // Split the route path to get the route type
+      const routeType = routePath.split('/')[0]
       
-      // If the route includes 'default', replace it with the session ID
-      if (routeParts.length > 1 && routeParts[1] === 'default') {
-        return `/${routeParts[0]}/${sessionId}`
-      }
-      
-      // Return the full path with session ID
-      return `/team-leader/${routePath.replace('default', sessionId)}`
+      // Return the proper path with role and session ID
+      return `/${role}/${routeType}/${sessionId}`
     }
     
-    // For absolute URLs, extract the base route and append the session ID
-    const urlParts = baseUrl.split('/')
-    const routeType = urlParts[urlParts.length - 2] // e.g., 'monitoring', 'session'
+    // For URLs with /team-leader/ or /team-member/ but not matching the current role
+    if (baseUrl.includes('/team-leader/') || baseUrl.includes('/team-member/')) {
+      // Extract route segments
+      const segments = baseUrl.split('/')
+      const routeIndex = segments.findIndex(seg => seg === 'team-leader' || seg === 'team-member')
+      
+      if (routeIndex >= 0) {
+        // Replace the role segment
+        segments[routeIndex] = role
+        
+        // Replace 'default' with the sessionId if it exists
+        const defaultIndex = segments.indexOf('default')
+        if (defaultIndex >= 0) {
+          segments[defaultIndex] = sessionId
+        }
+        
+        return segments.join('/')
+      }
+    }
     
-    // Construct the proper URL format
-    return `/team-leader/${routeType}/${sessionId}`
+    // For simple route types with no role or session
+    return baseUrl
   }
 
   return (

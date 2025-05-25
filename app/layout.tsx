@@ -9,7 +9,8 @@ import {NotificationProvider} from "@/components/shared/notification-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
-
+// TODO: Skeletons
+// TODO:
 export const metadata: Metadata = {
   title: "Votex - Voting System",
   description: "A comprehensive voting system for various election types",
@@ -32,6 +33,7 @@ export default function RootLayout({
             disableTransitionOnChange
         >
             <Toaster 
+              position="bottom-center"
               toastOptions={{
                 style: {
                   background: 'var(--background)',
@@ -39,6 +41,7 @@ export default function RootLayout({
                   border: '1px solid var(--border)',
                   borderRadius: 'var(--radius)',
                 },
+                className: 'shadow-md',
               }}
             />
                 {/*<StagewiseToolbar

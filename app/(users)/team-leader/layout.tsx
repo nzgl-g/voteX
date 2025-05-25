@@ -2,7 +2,6 @@
 
 import {ReactNode} from "react"
 import {ThemeProvider} from "@/components/theme-provider"
-import {Toaster} from "@/components/ui/sonner"
 import { NotificationProvider } from "@/components/shared/notification-provider"
 
 import {SidebarLeft} from "@/components/sidebar/sidebar-left"
@@ -10,9 +9,6 @@ import ChatBubble from "@/components/chat-bubble"
 import {SidebarInset, SidebarProvider,} from "@/components/ui/sidebar"
 
 import {
-    BriefcaseBusiness,
-    Building2,
-    Landmark,
     LifeBuoy,
     CalendarClock,
     LayoutDashboard,
@@ -23,11 +19,9 @@ import {
 } from "lucide-react"
 
 const data = {
-    teams: [
-        {name: "Presidential Election", logo: Landmark, plan: "Enterprise"},
-        {name: "Local Election", logo: Building2, plan: "Startup"},
-        {name: "CEO Election", logo: BriefcaseBusiness, plan: "Free"},
-    ],
+    // Teams/sessions are now handled dynamically by SessionSelector
+    // The teams array is kept empty as they will be loaded by the SessionSelector
+    teams: [],
     navMain: [
         /*{title: "Monitoring", url: "/team-leader/monitoring/default", icon: LayoutDashboard },*/
         {title: "Session", url: "/team-leader/session/default", icon: CalendarClock },
@@ -54,24 +48,13 @@ export default function Layout({children}: { children: ReactNode }) {
                         sessions={data.teams}
                         navMain={data.navMain}
                         navSecondary={data.navSecondary}
+                        userRole="team-leader"
                     />
                     <SidebarInset>
                         {children}
                     </SidebarInset>
                 </SidebarProvider>
                 <ChatBubble/>
-                <Toaster 
-                    position="bottom-center"
-                    toastOptions={{
-                        style: {
-                            background: 'var(--background)',
-                            color: 'var(--foreground)',
-                            border: '1px solid var(--border)',
-                            borderRadius: 'var(--radius)',
-                        },
-                        className: 'shadow-md',
-                    }}
-                />
             </NotificationProvider>
         </ThemeProvider>
     )

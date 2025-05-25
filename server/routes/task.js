@@ -2,6 +2,7 @@ const express = require("express");
 const isTeamLeader = require("../middleware/isTeamLeader");
 const auth = require("../middleware/auth");
 const Task = require("../models/Task");
+const logActivity = require("../helpers/logActivity");
 const sendNotification = require("../helpers/sendNotification");
 const Team = require("../models/Team");
 
@@ -38,7 +39,11 @@ router.post("/", auth, isTeamLeader, async (req, res) => {
       link: `/tasks/${task._id}`,
       targetType: "user",
     });
-
+    await logActivity({
+      sessionId: task.session,
+      userId: req.user._id,
+      action: `${req.user.username} created a new task ${task.title}`,
+    });
     res.status(201).json(task);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -75,6 +80,11 @@ router.put("/:taskId", auth, isTeamLeader, async (req, res) => {
     );
     if (!updatedTask)
       return res.status(404).json({ message: "Task not found" });
+    await logActivity({
+      sessionId: updatedTask.session,
+      userId: req.user._id,
+      action: `${req.user.username}  updated a task ${updatedTask.title}`,
+    });
     res.json(updatedTask);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -140,6 +150,11 @@ router.patch("/:taskId/complete", auth, async (req, res) => {
         link: `/tasks/${task._id}`,
         targetType: "user",
       });
+      await logActivity({
+        sessionId: task.session,
+        userId: req.user._id,
+        action: `${req.user.username}  completed task ${task.title}`,
+      });
     }
     if (wasCompleted) {
       await sendNotification(req, {
@@ -148,6 +163,11 @@ router.patch("/:taskId/complete", auth, async (req, res) => {
         message: `A member has marked the task "${task.title}" as not completed.`,
         link: `/tasks/${task._id}`,
         targetType: "user",
+      });
+      await logActivity({
+        sessionId: task.session,
+        userId: req.user._id,
+        action: `${req.user.username}  marked task as not completed ${task.title}`,
       });
     }
     res.status(200).json({

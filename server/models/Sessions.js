@@ -84,7 +84,6 @@ const sessionSchema = new mongoose.Schema({
   },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   team: { type: mongoose.Schema.Types.ObjectId, ref: "Team" },
-  candidates: [candidateSchema],
   results: { type: mongoose.Schema.Types.Mixed, default: null },
   contractAddress: { type: String, default: null },
 
@@ -105,9 +104,6 @@ const sessionSchema = new mongoose.Schema({
     enum: ["kyc", "standard", null],
     default: null,
   },
-  candidateRequests: [
-    { type: mongoose.Schema.Types.ObjectId, ref: "CandidateRequest" },
-  ],
 
   participants: [
     {
@@ -124,6 +120,11 @@ const sessionSchema = new mongoose.Schema({
 sessionSchema.discriminator(
   "Election",
   new mongoose.Schema({
+    candidateRequests: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "CandidateRequest" },
+    ],
+    candidates: [candidateSchema],
+
     maxChoices: {
       type: Number,
       default: null,
@@ -135,7 +136,6 @@ sessionSchema.discriminator(
 sessionSchema.discriminator(
   "Poll",
   new mongoose.Schema({
-    // Poll-specific fields
     options: [optionSchema],
     maxChoices: {
       type: Number,

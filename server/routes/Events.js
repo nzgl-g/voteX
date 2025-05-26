@@ -44,13 +44,26 @@ router.post("/", auth, isTeamLeader, async (req, res) => {
     if (!session || !title || !startDate || !endDate) {
       return res.status(400).json({ message: "Missing required fields" });
     }
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (!allDay) {
+      const hasStartTime =
+        start.getUTCHours() !== 0 || start.getUTCMinutes() !== 0;
+      const hasEndTime = end.getUTCHours() !== 0 || end.getUTCMinutes() !== 0;
 
+      if (!hasStartTime || !hasEndTime) {
+        return res.status(400).json({
+          message:
+            "Start time and end time must include a valid time (not midnight) when allDay is false.",
+        });
+      }
+    }
     const newEvent = new Event({
       session,
       title,
       description,
-      startDate,
-      endDate,
+      startDate: start,
+      endDate: end,
       allDay,
       location,
       color,

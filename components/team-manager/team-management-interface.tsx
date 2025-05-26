@@ -8,11 +8,10 @@ import AddMemberModal from "@/components/team-manager/add-member-modal"
 import TaskDialog from "@/components/team-manager/task-dialog"
 import ChangesRequestedBlock from "@/components/team-manager/changes-requested-block"
 import { Button } from "@/components/ui/button"
-import { PlusCircle, RefreshCw, AlertCircle } from "lucide-react"
-import { useParams, useRouter } from "next/navigation"
+import { PlusCircle, RefreshCw } from "lucide-react"
+import { useParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { TeamProvider, useTeam } from "./team-context"
-import { toast } from "sonner"
 
 function TeamManagementContent() {
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false)
@@ -60,38 +59,7 @@ function TeamManagementContent() {
 // Main component wrapper with provider
 export default function TeamManagementInterface() {
   const params = useParams()
-  const router = useRouter()
-  const sessionId = typeof params?.id === 'string' ? params.id : null
-  
-  useEffect(() => {
-    // If sessionId is missing or invalid (like "sessions"), redirect or show an error
-    if (!sessionId || sessionId === "sessions") {
-      toast.error("Invalid Session ID", {
-        description: "The session ID is missing or invalid. Redirecting to sessions list."
-      })
-      
-      // Optionally redirect to a safe page
-      setTimeout(() => {
-        router.push('/team-member/session')
-      }, 2000)
-    }
-  }, [sessionId, router])
-  
-  // Don't render the provider if sessionId is invalid
-  if (!sessionId || sessionId === "sessions") {
-    return (
-      <Card className="my-8">
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-          <h2 className="text-xl font-bold mb-2">Invalid Session ID</h2>
-          <p className="text-muted-foreground mb-4">The session ID is missing or invalid.</p>
-          <Button onClick={() => router.push('/team-member/session')}>
-            Go to Sessions List
-          </Button>
-        </CardContent>
-      </Card>
-    )
-  }
+  const sessionId = params.id as string
   
   return (
     <TeamProvider sessionId={sessionId}>

@@ -50,36 +50,11 @@ class TaskService {
 
   /**
    * Get tasks assigned to the current user
-   * 
-   * Note: This adapts to use the existing session tasks endpoint
-   * and filters client-side, as the server doesn't have a dedicated 
-   * endpoint for tasks assigned to a specific user.
    */
   async getAssignedTasks(): Promise<Task[]> {
     try {
-      // Get current user
-      const currentUser = localStorage.getItem('user') ? 
-        JSON.parse(localStorage.getItem('user') || '{}') : {};
-      
-      if (!currentUser._id) {
-        throw new Error('User not authenticated');
-      }
-      
-      // Get all tasks via getTasks (could be optimized if server adds a filter)
-      const allTasks = await this.getTasks();
-      
-      // Filter tasks where the current user is in assignedMembers
-      // Handle both string comparison and ObjectId comparison
-      const assignedTasks = allTasks.filter(task => 
-        task.assignedMembers.some(memberId => {
-          // Compare as strings to handle different ID formats
-          return String(memberId) === String(currentUser._id);
-        })
-      );
-      
-      console.log(`Found ${assignedTasks.length} tasks assigned to user ${currentUser.username || currentUser._id}`);
-      
-      return assignedTasks;
+      const response = await baseApi.get<Task[]>('/tasks/assigned');
+      return response.data;
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || 'Failed to fetch assigned tasks';
       throw new Error(errorMessage);
@@ -144,30 +119,8 @@ class TaskService {
   async deleteTask(taskId: string): Promise<{ message: string }> {
     try {
       const response = await baseApi.delete<{ message: string }>(`/tasks/${taskId}`);
-      
-      // Handle empty successful response
-      if (!response.data || Object.keys(response.data).length === 0) {
-        return { message: "Task deleted successfully" };
-      }
-      
       return response.data;
     } catch (error: any) {
-      // If we got an empty error object from the API
-      if (error.message === "API Error: {}") {
-        throw new Error("Server permission error. Only team leaders can delete tasks.");
-      }
-      
-      // Handle "Failed to fetch" network errors
-      if (error.message && error.message.includes("Failed to fetch")) {
-        throw new Error("Network error: Could not connect to the server");
-      }
-      
-      // For authorization errors
-      if (error.status === 403) {
-        throw new Error("Access denied. Not authorized as team leader");
-      }
-      
-      // For other errors
       const errorMessage = error.response?.data?.message || 'Failed to delete task';
       throw new Error(errorMessage);
     }

@@ -23,8 +23,7 @@ const data = {
     navMain: [
         {title: "Monitoring", url: "/team-member/monitoring/default", icon: LayoutDashboard},
         {title: "Session", url: "/team-member/session/default", icon: CalendarClock},
-        {title: "Team", url: "/team-member/team/default", icon: Users},
-        {title: "Tasks", url: "/team-member/tasks", icon: ClipboardList},
+        {title: "Tasks", url: "/team-member/team/default", icon: Users},
         {title: "Scheduler", url: "/team-member/scheduler/default", icon: CheckSquare},
         {title: "Support", url: "/team-member/support/default", icon: LifeBuoy},
     ],

@@ -58,32 +58,15 @@ export function TeamProvider({ children, sessionId }: TeamProviderProps) {
   const [selectedMembers, setSelectedMembers] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [refreshCounter, setRefreshCounter] = useState(0)
-  const [error, setError] = useState<string | null>(null)
 
   // Handle refresh
   const handleRefresh = useCallback(() => {
     setRefreshCounter(prev => prev + 1)
   }, [])
 
-  // Validate session ID format
-  const isValidSessionId = useCallback((id: string | null): boolean => {
-    if (!id) return false
-    // Basic MongoDB ObjectId validation - 24 hex characters
-    return /^[0-9a-fA-F]{24}$/.test(id)
-  }, [])
-
   // Fetch team members
   const fetchTeamMembers = useCallback(async () => {
-    // Reset error state
-    setError(null)
-    
-    // Validate session ID before making API calls
-    if (!sessionId || !isValidSessionId(sessionId)) {
-      console.error(`Invalid session ID format: ${sessionId}`)
-      setError(`Invalid session ID format: ${sessionId}`)
-      setIsLoading(false)
-      return
-    }
+    if (!sessionId) return
     
     setIsLoading(true)
     try {
@@ -136,22 +119,17 @@ export function TeamProvider({ children, sessionId }: TeamProviderProps) {
       setTeamMembers(processedMembers)
     } catch (err: any) {
       console.error("Failed to fetch team members:", err)
-      setError(err.message || "Failed to load team members")
       toast.error("Error loading team members", {
         description: err.message || "Failed to load team members",
       })
     } finally {
       setIsLoading(false)
     }
-  }, [sessionId, isValidSessionId])
+  }, [sessionId])
 
   // Fetch tasks
   const fetchTasks = useCallback(async () => {
-    // Skip API call for invalid session IDs
-    if (!sessionId || !isValidSessionId(sessionId)) {
-      console.error(`Invalid session ID format for tasks: ${sessionId}`)
-      return
-    }
+    if (!sessionId) return
     
     setIsLoading(true)
     try {
@@ -165,25 +143,17 @@ export function TeamProvider({ children, sessionId }: TeamProviderProps) {
     } finally {
       setIsLoading(false)
     }
-  }, [sessionId, isValidSessionId])
+  }, [sessionId])
 
   // Initial data fetch and refresh setup
   useEffect(() => {
-    if (sessionId && isValidSessionId(sessionId)) {
+    if (sessionId) {
       Promise.all([
         fetchTeamMembers(),
         fetchTasks()
       ]).catch(console.error)
-    } else {
-      // Set empty state for invalid session ID
-      setTeamMembers([])
-      setTasks([])
-      setIsLoading(false)
-      if (sessionId) {
-        setError(`Invalid session ID format: ${sessionId}`)
-      }
     }
-  }, [sessionId, refreshCounter, fetchTeamMembers, fetchTasks, isValidSessionId])
+  }, [sessionId, refreshCounter, fetchTeamMembers, fetchTasks])
 
   // Context value
   const value: TeamContextValue = {

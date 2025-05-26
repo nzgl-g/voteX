@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 
 // Icons
-import { Plus, Key, RefreshCcw, Filter } from "lucide-react";
+import { Plus, Key, RefreshCcw, Filter, AlertTriangle } from "lucide-react";
 
 // Services
 import { Session } from "@/services/session-service";
@@ -281,6 +281,27 @@ export default function VoterPage() {
     }
   };
 
+  /**
+   * Silently refreshes the sessions list without showing any toast notifications
+   * Used for auto-refresh functionality
+   */
+  const silentRefresh = async () => {
+    try {
+      if (refreshing) return;
+      
+      // Don't set the refreshing state to avoid UI changes
+      const allSessions = await sessionService.getAllSessions();
+      
+      if (allSessions && Array.isArray(allSessions)) {
+        processSessions(allSessions);
+        console.log(`Silently refreshed ${allSessions.length} sessions`);
+      }
+    } catch (err) {
+      // Silently log errors without showing to the user
+      console.error("Silent refresh error:", err);
+    }
+  };
+
   //-----------------------------------------------------
   // EFFECTS
   //-----------------------------------------------------
@@ -293,6 +314,17 @@ export default function VoterPage() {
   // Initial fetch on component mount
   useEffect(() => {
     fetchSessions();
+  }, []);
+
+  // Auto-refresh sessions every 30 seconds using silent refresh
+  useEffect(() => {
+    const autoRefreshInterval = setInterval(() => {
+      console.log('Auto-refreshing sessions silently...');
+      silentRefresh();
+    }, 30000); // 30 seconds in milliseconds
+    
+    // Clean up interval on component unmount
+    return () => clearInterval(autoRefreshInterval);
   }, []);
 
   //-----------------------------------------------------
@@ -442,6 +474,7 @@ export default function VoterPage() {
           {/* Page Title */}
           <div className="flex-1">
             <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">Available Sessions</h1>
+            <p className="text-muted-foreground mt-1">Discover and participate in active voting sessions</p>
           </div>
           
           {/* Action Buttons */}
@@ -568,25 +601,58 @@ export default function VoterPage() {
         
         {/* Content Area - Conditional Rendering Based on State */}
         {loading ? (
-          // Loading State
-          <div className="grid place-items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          // Loading State with Skeleton Cards
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array(6).fill(0).map((_, index) => (
+              <div key={index} className="flex flex-col gap-3 p-0 rounded-lg border bg-background shadow">
+                {/* Banner Skeleton */}
+                <div className="relative h-36 w-full overflow-hidden rounded-t-lg">
+                  <div className="w-full h-full">
+                    <div className="bg-accent animate-pulse w-full h-full rounded-t-lg" />
+                  </div>
+                  <div className="absolute top-3 left-3 flex gap-2">
+                    <div className="bg-accent animate-pulse w-16 h-5 rounded-full" />
+                    <div className="bg-accent animate-pulse w-20 h-5 rounded-full" />
+                  </div>
+                </div>
+                
+                {/* Content Skeleton */}
+                <div className="flex flex-col gap-2 px-4 pb-2">
+                  <div className="bg-accent animate-pulse w-3/4 h-6 rounded-md" />
+                  <div className="bg-accent animate-pulse w-full h-4 rounded-md" />
+                  <div className="bg-accent animate-pulse w-2/3 h-4 rounded-md" />
+                  
+                  <div className="mt-2 space-y-2">
+                    <div className="bg-accent animate-pulse w-1/2 h-3 rounded-md" />
+                    <div className="bg-accent animate-pulse w-3/4 h-3 rounded-md" />
+                  </div>
+                </div>
+                
+                {/* Button Skeleton */}
+                <div className="mt-auto px-4 pb-4 pt-1">
+                  <div className="bg-accent animate-pulse w-full h-9 rounded-md" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : error ? (
-          // Error State
-          <div className="text-center py-12">
-            <p className="text-destructive">{error}</p>
+          // Error State with Improved Visual
+          <div className="flex flex-col items-center justify-center py-16 px-4 bg-destructive/5 rounded-lg border border-destructive/20">
+            <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+            <h3 className="text-xl font-semibold mb-2">Error Loading Sessions</h3>
+            <p className="text-muted-foreground mb-6 text-center max-w-md">{error}</p>
             <Button 
               onClick={refreshSessions} 
               variant="outline" 
-              className="mt-4"
+              className="gap-2"
               disabled={refreshing}
             >
+              <RefreshCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               Try Again
             </Button>
           </div>
         ) : filteredSessions.length > 0 ? (
-          // Sessions Grid - When Sessions Match Filters
+          // Sessions Grid with Improved Layout
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredSessions.map((session) => {
               // Create a properly formatted sessionLifecycle object
@@ -629,44 +695,44 @@ export default function VoterPage() {
             })}
           </div>
         ) : publicSessions.length > 0 ? (
-          // No Sessions Match Filters - But Sessions Exist
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">No sessions match your current filters.</p>
+          // No Sessions Match Filters - Improved Visual
+          <div className="flex flex-col items-center justify-center py-16 px-4 bg-muted/20 rounded-lg border border-muted">
+            <Filter className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-xl font-semibold mb-2">No Matching Sessions</h3>
+            <p className="text-muted-foreground mb-6 text-center max-w-md">Your current filter settings don't match any available sessions. Try adjusting your filters or clear them to see all sessions.</p>
             <Button 
               onClick={() => {
                 setTypeFilter('all');
                 setStatusFilter('all');
               }} 
               variant="outline" 
-              className="mt-4"
+              className="gap-2"
             >
+              <Filter className="h-4 w-4" />
               Clear Filters
             </Button>
           </div>
         ) : (
-          // Empty State - No Sessions Available
-          <div className="flex flex-col items-center justify-center h-[50vh] max-w-md mx-auto text-center">
-            <div className="rounded-full bg-primary/10 p-6 mb-6">
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                width="48" 
-                height="48" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className="text-primary"
-              >
-                <circle cx="12" cy="8" r="5" />
-                <path d="M20 21a8 8 0 0 0-16 0" />
-                <path d="M12 11v4" />
-                <path d="M12 19h.01" />
-              </svg>
-            </div>
+          // Empty State - No Sessions Available - Improved Visual
+          <div className="flex flex-col items-center justify-center py-16 px-4 bg-muted/20 rounded-lg border border-muted">
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              width="80" 
+              height="80" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="1.5" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              className="text-primary mb-6"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M8 12h8" />
+              <path d="M12 8v8" opacity="0" />
+            </svg>
             <h3 className="text-xl font-semibold mb-2">No Sessions Yet</h3>
-            <p className="text-muted-foreground mb-6">There are no active voting sessions available at this time. Check back later or refresh to see new sessions.</p>
+            <p className="text-muted-foreground mb-6 text-center max-w-md">There are no active voting sessions available at this time. Check back later or refresh to see new sessions.</p>
             <Button 
               onClick={refreshSessions} 
               variant="outline" 

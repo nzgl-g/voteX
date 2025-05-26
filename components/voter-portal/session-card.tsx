@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
 } from "@/components/ui/card";
-import { SessionCardProps, SessionLifecycleStatus } from "./types";
+import { SessionCardProps, SessionLifecycleStatus, SessionCardSkeletonProps } from "./types";
 import {
   VotingDialog,
   VotingOption,
@@ -20,6 +20,7 @@ import sessionService from "@/services/session-service";
 import { KYCForm } from "./vote-cast/kyc-step";
 import type { KYCData as OriginalKYCData } from "./vote-cast/voting-dialog";
 import kycService from "@/services/kyc-service";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const getSessionLifecycleStatus = (session: any): SessionLifecycleStatus => {
   if (!session || !session.sessionLifecycle) {
@@ -504,109 +505,131 @@ export function SessionCard({
   };
 
   const getContextualButton = () => {
-    const buttonBaseClasses = "w-full transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-1";
-
     const getVariantClasses = (variant: string) => {
-      const base = "flex items-center justify-center font-medium rounded-lg px-4 py-2.5 shadow-sm";
-      switch(variant) {
-        case "default":
-          return `${base} bg-primary hover:bg-primary/90 text-white focus:ring-primary/30`;
-        case "outline":
-          return `${base} border border-primary/50 bg-background text-primary hover:bg-primary/5 focus:ring-primary/30`;
-        case "secondary":
-          return `${base} bg-secondary hover:bg-secondary/90 text-white focus:ring-secondary/30`;
-        case "destructive":
-          return `${base} bg-destructive hover:bg-destructive/90 text-white focus:ring-destructive/30`;
+      switch (variant) {
+        case 'primary':
+          return 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg';
+        case 'secondary':
+          return 'bg-secondary hover:bg-secondary/90 text-secondary-foreground shadow-sm hover:shadow-md';
+        case 'outline':
+          return 'border border-input bg-background hover:bg-accent hover:text-accent-foreground shadow-sm hover:shadow-md';
+        case 'ghost':
+          return 'hover:bg-accent hover:text-accent-foreground';
+        case 'destructive':
+          return 'bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-sm hover:shadow-md';
+        case 'emerald':
+          return 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md hover:shadow-lg';
+        case 'amber':
+          return 'bg-amber-500 hover:bg-amber-400 text-black shadow-md hover:shadow-lg';
+        case 'blue':
+          return 'bg-blue-600 hover:bg-blue-500 text-white shadow-md hover:shadow-lg';
         default:
-          return base;
+          return '';
       }
     };
 
-    if (lifecycleStatus.status === "nomination" && session.type === "election") {
+    if (lifecycleStatus.status === 'ended') {
       return (
-          <Button
-              className={`${buttonBaseClasses} ${getVariantClasses("secondary")}`}
-              onClick={() => onJoinAsCandidate(session)}
-          >
-            <UserPlus className="h-4 w-4 mr-2" />
-            <span>Join as Candidate</span>
-          </Button>
-      );
-    }
-
-    if (lifecycleStatus.status === "started") {
-      return (
-        <Button
-          className={`${buttonBaseClasses} ${getVariantClasses("default")}`}
-          onClick={handleVoteBtnClick}
-          disabled={isLoadingKYC}
+        <button
+          onClick={handleShowResults}
+          className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 w-full ${getVariantClasses('outline')}`}
         >
-          {isLoadingKYC ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Vote className="h-4 w-4 mr-2" />
-          )}
-          <span>{isLoadingKYC ? "Preparing..." : "Cast Your Vote"}</span>
-        </Button>
+          <BarChart3 className="h-4 w-4 mr-2" />
+          View Results
+        </button>
       );
     }
 
-    if (lifecycleStatus.status === "ended") {
+    if (lifecycleStatus.status === 'nomination' && session.type === 'election') {
       return (
-          <Button
-              className={`${buttonBaseClasses} ${getVariantClasses("secondary")}`}
-              onClick={() => onShowResults(session)}
-          >
-            <BarChart3 className="h-4 w-4 mr-2" />
-            <span>Show Results</span>
-          </Button>
+        <button
+          onClick={() => onJoinAsCandidate(session)}
+          className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 w-full ${getVariantClasses('amber')}`}
+        >
+          <UserPlus className="h-4 w-4 mr-2" />
+          Join as Candidate
+        </button>
       );
     }
 
-    return (
-        <Button
-            className={`${buttonBaseClasses} ${getVariantClasses("outline")}`}
-            onClick={() => onViewProfile(session)}
+    if (lifecycleStatus.status === 'started') {
+      return (
+        <button
+          onClick={() => onCastVote(session)}
+          className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 w-full ${getVariantClasses('emerald')}`}
+        >
+          <Vote className="h-4 w-4 mr-2" />
+          Cast Vote
+        </button>
+      );
+    }
+
+    if (lifecycleStatus.status === 'upcoming') {
+      return (
+        <button
+          onClick={() => onViewProfile(session)}
+          className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 w-full ${getVariantClasses('blue')}`}
         >
           <Eye className="h-4 w-4 mr-2" />
-          <span>View Details</span>
-        </Button>
+          View Details
+        </button>
+      );
+    }
+
+    // Default button for any other status
+    return (
+      <button
+        onClick={() => onViewProfile(session)}
+        className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 w-full ${getVariantClasses('outline')}`}
+      >
+        <Eye className="h-4 w-4 mr-2" />
+        View Details
+      </button>
     );
   };
   
   const getAdditionalBadges = () => {
     const badges = [];
     
-    if (session.securityMethod === 'Secret Phrase') {
-      badges.push(
-        <Badge key="security" variant="outline" className="px-2 py-1 text-xs bg-purple-600/10 text-purple-600 border-purple-600/30 flex items-center gap-1">
-          <LockIcon className="h-3 w-3" />
-          Private
-        </Badge>
-      );
-    } else {
-      badges.push(
-        <Badge key="security" variant="outline" className="px-2 py-1 text-xs bg-green-600/10 text-green-600 border-green-600/30 flex items-center gap-1">
-          <UnlockIcon className="h-3 w-3" />
-          Public
-        </Badge>
-      );
+    // Security method badge
+    if (session.securityMethod) {
+      if (session.securityMethod === "public") {
+        badges.push(
+          <Badge key="security" variant="outline" className="px-2 py-0.5 text-xs font-normal flex items-center gap-1 border-green-200 text-green-700 dark:border-green-800 dark:text-green-400 bg-green-50 dark:bg-green-950/30 shadow-sm">
+            <UnlockIcon className="h-3 w-3" />
+            Public
+          </Badge>
+        );
+      } else if (session.securityMethod === "private") {
+        badges.push(
+          <Badge key="security" variant="outline" className="px-2 py-0.5 text-xs font-normal flex items-center gap-1 border-amber-200 text-amber-700 dark:border-amber-800 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 shadow-sm">
+            <LockIcon className="h-3 w-3" />
+            Private
+          </Badge>
+        );
+      }
     }
     
-    if (session.verificationMethod === 'kyc' || session.verificationMethod === 'KYC') {
-      badges.push(
-        <Badge key="verification" variant="outline" className="px-2 py-1 text-xs bg-blue-600/10 text-blue-600 border-blue-600/30 flex items-center gap-1">
-          <BadgeCheck className="h-3 w-3" />
-          KYC
-        </Badge>
-      );
+    // Verification method badge
+    if (session.verificationMethod) {
+      if (session.verificationMethod === "kyc") {
+        badges.push(
+          <Badge key="verification" variant="outline" className="px-2 py-0.5 text-xs font-normal flex items-center gap-1 border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 shadow-sm">
+            <BadgeCheck className="h-3 w-3" />
+            KYC Required
+          </Badge>
+        );
+      }
     }
     
+    // Blockchain badge if contract address exists
     if (session.contractAddress) {
       badges.push(
-        <Badge key="blockchain" variant="outline" className="px-2 py-1 text-xs bg-emerald-600/10 text-emerald-600 border-emerald-600/30 flex items-center gap-1" title={session.contractAddress}>
-          <ExternalLink className="h-3 w-3" />
-          On-Chain
+        <Badge key="blockchain" variant="outline" className="px-2 py-0.5 text-xs font-normal flex items-center gap-1 border-purple-200 text-purple-700 dark:border-purple-800 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/30 shadow-sm">
+          <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2 12L6 8M6 8L12 2L18 8M6 8V20C6 21.1046 6.89543 22 8 22H16C17.1046 22 18 21.1046 18 20V8M18 8L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Blockchain
         </Badge>
       );
     }
@@ -626,46 +649,50 @@ export function SessionCard({
   return (
       <>
         <Card
-            className="flex flex-col gap-3 p-0 group relative overflow-hidden rounded-lg border bg-background shadow transition-all hover:shadow-md"
+            className="flex flex-col gap-3 p-0 group relative overflow-hidden rounded-xl border bg-background shadow-sm transition-all hover:shadow-md dark:shadow-primary/5 hover:border-primary/20"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-          {isHovered && (
-            <div className="absolute top-3 right-3 z-10">
-              <Button 
-                size="icon" 
-                variant="secondary" 
-                className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm shadow-sm transition-all hover:bg-background"
-                onClick={() => onViewProfile(session)}
-              >
-                <ExternalLink className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
+          {/* Quick Action Button */}
+          <div className={`absolute top-3 right-3 z-10 transition-opacity duration-200 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+            <Button 
+              size="icon" 
+              variant="secondary" 
+              className="h-8 w-8 rounded-full bg-background/90 backdrop-blur-sm shadow-sm transition-all hover:bg-background hover:scale-105"
+              onClick={() => onViewProfile(session)}
+            >
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          </div>
           
-          <div className="relative h-36 w-full overflow-hidden">
+          {/* Banner Image with Gradient Overlay */}
+          <div className="relative h-40 w-full overflow-hidden rounded-t-xl">
             <Image
                 src={session.banner || "/placeholder.svg"}
                 alt={session.name || "Session"}
                 fill
-                className="object-cover"
+                className="object-cover transition-transform duration-500 group-hover:scale-105"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                priority={false}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent"></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent"></div>
             
+            {/* Type and Status Badges */}
             <div className="absolute top-3 left-3 flex gap-2">
-              <Badge className="capitalize px-2.5 py-0.5 text-xs font-medium bg-blue-600 text-white dark:bg-blue-400 dark:text-black">
+              <Badge className="capitalize px-2.5 py-0.5 text-xs font-medium bg-blue-600 text-white dark:bg-blue-400 dark:text-black shadow-sm">
                 {session.type || "Unknown"}
               </Badge>
               
-              <Badge variant="outline" className={`${lifecycleStatus.color} px-2.5 py-0.5 text-xs font-medium flex items-center`}>
+              <Badge variant="outline" className={`${lifecycleStatus.color} px-2.5 py-0.5 text-xs font-medium flex items-center shadow-sm backdrop-blur-sm`}>
                 {lifecycleStatus.icon}
                 {lifecycleStatus.label}
               </Badge>
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 px-4">
-            <h3 className="text-lg font-semibold line-clamp-1">
+          {/* Session Information */}
+          <div className="flex flex-col gap-2 px-5 pt-1">
+            <h3 className="text-lg font-semibold line-clamp-1 group-hover:text-primary transition-colors">
               {session.name || "Unnamed Session"}
             </h3>
             
@@ -675,17 +702,22 @@ export function SessionCard({
               </p>
             )}
 
-            <div className="mt-1 space-y-1.5 text-sm">
+            {/* Session Details */}
+            <div className="mt-1 space-y-2 text-sm">
               {session.organizationName && (
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Users className="h-3.5 w-3.5 text-muted-foreground/70" />
+                  <div className="bg-muted rounded-full p-1">
+                    <Users className="h-3 w-3 text-muted-foreground/70" />
+                  </div>
                   <span className="truncate">{session.organizationName}</span>
                 </div>
               )}
               
               {session.sessionLifecycle?.startedAt && (
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Clock className="h-3.5 w-3.5 text-muted-foreground/70" />
+                  <div className="bg-muted rounded-full p-1">
+                    <Clock className="h-3 w-3 text-muted-foreground/70" />
+                  </div>
                   <span className="truncate">
                     Voting: {formatDate(session.sessionLifecycle.startedAt)}
                     {session.sessionLifecycle?.endedAt &&
@@ -694,13 +726,15 @@ export function SessionCard({
                 </div>
               )}
               
-              <div className="flex flex-wrap gap-1.5">
+              {/* Additional Badges */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
                 {getAdditionalBadges()}
               </div>
             </div>
           </div>
 
-          <div className="mt-auto px-4 pb-4 pt-1">
+          {/* Action Button */}
+          <div className="mt-auto px-5 pb-5 pt-3">
             {getContextualButton()}
           </div>
         </Card>
@@ -816,5 +850,56 @@ export function SessionCard({
           </DialogContent>
         </Dialog>
       </>
+  );
+}
+
+export function SessionCardSkeleton({ count = 3 }: SessionCardSkeletonProps) {
+  return (
+    <>
+      {Array(count).fill(0).map((_, index) => (
+        <Card key={index} className="overflow-hidden relative group">
+          {/* Banner Image Skeleton */}
+          <div className="relative h-40 w-full overflow-hidden rounded-t-xl">
+            <Skeleton className="h-full w-full" />
+            
+            {/* Type and Status Badges Skeleton */}
+            <div className="absolute top-3 left-3 flex gap-2">
+              <Skeleton className="h-5 w-16 rounded-full" />
+              <Skeleton className="h-5 w-24 rounded-full" />
+            </div>
+          </div>
+
+          {/* Session Information Skeleton */}
+          <div className="flex flex-col gap-2 px-5 pt-1">
+            <Skeleton className="h-6 w-3/4" />
+            <Skeleton className="h-4 w-full" />
+
+            {/* Session Details Skeleton */}
+            <div className="mt-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-5 w-5 rounded-full" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-5 w-5 rounded-full" />
+                <Skeleton className="h-4 w-2/3" />
+              </div>
+              
+              {/* Additional Badges Skeleton */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                <Skeleton className="h-5 w-16 rounded-full" />
+                <Skeleton className="h-5 w-20 rounded-full" />
+              </div>
+            </div>
+          </div>
+
+          {/* Action Button Skeleton */}
+          <div className="mt-auto px-5 pb-5 pt-3">
+            <Skeleton className="h-9 w-full" />
+          </div>
+        </Card>
+      ))}
+    </>
   );
 }

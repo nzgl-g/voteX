@@ -1,8 +1,6 @@
 "use client"
 
 import {ReactNode} from "react"
-import {ThemeProvider} from "@/components/theme-provider"
-import { NotificationProvider } from "@/components/shared/notification-provider"
 
 import {SidebarLeft} from "@/components/sidebar/sidebar-left"
 import ChatBubble from "@/components/chat-bubble"
@@ -37,25 +35,23 @@ const data = {
 
 export default function Layout({children}: { children: ReactNode }) {
     return (
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-            <NotificationProvider>
-                <SidebarProvider style={{
-                    // Using string type assertion to avoid TypeScript errors with custom CSS properties
-                    "--sidebar-width": "16rem",
-                    "--sidebar-width-mobile": "15rem",
-                } as React.CSSProperties}>
-                    <SidebarLeft variant={"inset"}
-                        sessions={data.teams}
-                        navMain={data.navMain}
-                        navSecondary={data.navSecondary}
-                        userRole="team-leader"
-                    />
-                    <SidebarInset>
-                        {children}
-                    </SidebarInset>
-                </SidebarProvider>
-                <ChatBubble/>
-            </NotificationProvider>
-        </ThemeProvider>
+        <>
+            <SidebarProvider style={{
+                // Using string type assertion to avoid TypeScript errors with custom CSS properties
+                "--sidebar-width": "16rem",
+                "--sidebar-width-mobile": "15rem",
+            } as React.CSSProperties}>
+                <SidebarLeft variant={"inset"}
+                    sessions={data.teams}
+                    navMain={data.navMain}
+                    navSecondary={data.navSecondary}
+                    userRole="team-leader"
+                />
+                <SidebarInset>
+                    {children}
+                </SidebarInset>
+            </SidebarProvider>
+            <ChatBubble/>
+        </>
     )
 }

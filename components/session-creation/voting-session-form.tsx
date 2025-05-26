@@ -4,8 +4,7 @@ import { useState } from "react"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ArrowRight, Check } from "lucide-react"
-import { Toaster } from "@/components/ui/toaster"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "@/lib/toast"
 import { useRouter } from "next/navigation"
 import { sessionService, Session } from "@/services/session-service"
 
@@ -120,7 +119,6 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
   const [currentStep, setCurrentStep] = useState(0)
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const { toast } = useToast()
   const router = useRouter()
 
   const updateFormData = (data: Partial<FormData>) => {
@@ -188,9 +186,13 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
       errors.push("Please select a verification method");
     }
     
-    // If private visibility is selected but no secret phrase
-    if (formData.visibility === 'private' && !formData.secretPhrase) {
-      errors.push("Secret phrase is required for private sessions");
+    // For private sessions, make sure a secret phrase is provided
+    if (formData.visibility === 'private') {
+      if (!formData.secretPhrase) {
+        errors.push("Secret phrase is required for private sessions");
+      } else if (formData.secretPhrase.length < 6) {
+        errors.push("Secret phrase must be at least 6 characters");
+      }
     }
     
     return errors;
@@ -201,124 +203,105 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
       // Validate form data
       const validationErrors = validateSessionData();
       if (validationErrors.length > 0) {
-        toast({
-          title: "Validation Error",
-          description: validationErrors.join("\n"),
-          variant: "destructive",
-        });
+        toast.error(validationErrors.join("\n"));
         return;
       }
       
       setIsSubmitting(true);
       
-      // Map the form data to the Session interface format - ensure it exactly matches backend model
+      // Map the form data to match EXACTLY what the server expects based on Sessions.js model
       const sessionData: any = {
         name: formData.title,
-        description: formData.description || "", // Ensure not null
-        organizationName: formData.organization || "", // Ensure not null
-        banner: null, // We'll handle file uploads separately
+        description: formData.description || "", 
+        organizationName: formData.organization || "",
+        banner: null, // File uploads handled separately
         
-        type: formData.voteType as 'election' | 'poll' | 'tournament',
-        subtype: formData.votingMode as 'single' | 'multiple' | 'ranked',
+        type: formData.voteType,
+        subtype: formData.votingMode,
         
-        accessLevel: formData.visibility === 'private' ? 'Private' : 'Public', // Capitalize for backend
+        // Ensure visibility is properly set to match backend expectations
+        visibility: formData.visibility.toLowerCase(),
         resultVisibility: formData.resultVisibility,
         
         subscription: {
           name: subscription,
           price: subscription === 'free' ? 0 : 49.99,
           voterLimit: subscription === 'free' ? 100 : 5000,
-          features: [], // Required array field
+          features: [],
           isRecommended: false
         },
         
         sessionLifecycle: {
-          // Removed createdAt as the backend will set this
-          
-          // Set scheduledAt based on session type
-          scheduledAt: formData.voteType === 'election' 
-            ? {
-                // For elections, scheduledAt is the nomination period
-                start: formData.nominationStartDate ? formData.nominationStartDate.toISOString() : new Date().toISOString(),
-                end: formData.nominationEndDate ? formData.nominationEndDate.toISOString() : new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()
-              }
-            : {
-                // For polls and tournaments, scheduledAt is the voting period
-                start: formData.startDate ? formData.startDate.toISOString() : new Date().toISOString(),
-                end: formData.endDate ? formData.endDate.toISOString() : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-              }
+          // Backend sets createdAt automatically
+          scheduledAt: {
+            start: formData.startDate.toISOString(),
+            end: formData.endDate.toISOString()
+          },
+          // These should be null initially
+          startedAt: null,
+          endedAt: null
         },
         
-        // Contract address starts as null - will be set when session is deployed to blockchain
         contractAddress: null,
         
-        // Security settings - match exactly what works in Postman
-        securityMethod: null, // Always null as per working Postman request
+        // Security settings - use exact enum values from Sessions.js
+        securityMethod: formData.visibility === 'private' ? 'Secret Phrase' : null,
         secretPhrase: formData.visibility === 'private' ? formData.secretPhrase : null,
         verificationMethod: formData.verificationType,
         
-        // Default required fields
+        // Required empty arrays/defaults
         candidateRequests: [],
         participants: [],
         allowDirectEdit: false,
-        allowsOfficialPapers: false
+        allowsOfficialPapers: false,
+        team: null // Server will set this
       };
       
       // Add type-specific data
       if (formData.voteType === 'poll') {
-        // Match the structure from the working Postman request for options
+        // Match the optionSchema structure exactly
         sessionData.options = formData.pollOptions.map(option => ({
           name: option.title,
-          description: option.description || ""
+          description: option.description || null,
+          totalVotes: 0 // Default as per schema
         }));
         
-        // Set maxChoices based on voting mode
         sessionData.maxChoices = formData.votingMode === 'multiple' ? formData.maxSelections : 1;
       } else if (formData.voteType === 'election') {
-        // Initialize candidates array
+        // Initialize candidates array to match candidateSchema
         sessionData.candidates = [];
         
-        // Only add candidates if not in nomination phase
         if (!formData.hasNomination && formData.candidates.length > 0) {
-          // Map candidates to the expected structure
-          sessionData.candidates = formData.candidates.map(candidate => {
-            // Use a default user ID if not provided
-            const userId = candidate.id && /^[0-9a-fA-F]{24}$/.test(candidate.id) 
+          sessionData.candidates = formData.candidates.map(candidate => ({
+            user: candidate.id && /^[0-9a-fA-F]{24}$/.test(candidate.id) 
               ? candidate.id 
-              : "000000000000000000000000";
-              
-            return {
-              user: userId,
-              fullName: candidate.name,
-              biography: candidate.biography || "",
-              partyName: 'Independent'
-              // No need to include totalVotes, requiresReview or other fields that aren't in the Postman example
-            };
-          });
+              : "000000000000000000000000", // Default ObjectId
+            assignedReviewer: null,
+            partyName: 'Independent',
+            totalVotes: 0,
+            requiresReview: false,
+            paper: null,
+            fullName: candidate.name,
+            biography: candidate.biography || "",
+            experience: "",
+            nationalities: [],
+            dobPob: {
+              dateOfBirth: null,
+              placeOfBirth: ""
+            },
+            promises: []
+          }));
         }
         
-        // Set maxChoices based on voting mode
         sessionData.maxChoices = formData.votingMode === 'multiple' ? formData.maxSelections : 1;
       }
       
       console.log('Creating session with data:', JSON.stringify(sessionData, null, 2));
       
-      // Debug date values
-      console.log('Date debugging:');
-      console.log('Start date from form:', formData.startDate);
-      console.log('End date from form:', formData.endDate);
-      console.log('Nomination start from form:', formData.nominationStartDate);
-      console.log('Nomination end from form:', formData.nominationEndDate);
-      console.log('Session lifecycle in payload:', sessionData.sessionLifecycle);
-      
       // Call the session service to create the session
       const response = await sessionService.createSession(sessionData);
       
-      toast({
-        title: "Success!",
-        description: "Your voting session has been created successfully.",
-        variant: "default",
-      });
+      toast.success("Your voting session has been created successfully.");
 
       // If onSuccess was provided, call it with the new session ID
       if (onSuccess && response._id) {
@@ -328,13 +311,8 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
         router.push(`/team-leader/session/${response._id}`);
       }
     } catch (error) {
-      console.log(formData);
       console.error("Error creating session:", error);
-      toast({
-        title: "Error",
-        description: "Failed to create the session. Please try again.",
-        variant: "destructive",
-      });
+      toast.error(`Failed to create the session: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -511,7 +489,6 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
             )}
           </div>
         </div>
-        <Toaster />
       </div>
   )
 }

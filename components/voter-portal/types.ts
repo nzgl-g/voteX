@@ -37,6 +37,10 @@ export interface SessionLifecycleStatus {
     icon?: ReactNode;
 }
 
+export interface SessionCardSkeletonProps {
+    count?: number;
+}
+
 // Props for SessionCard component
 export interface SessionCardProps {
     session: {

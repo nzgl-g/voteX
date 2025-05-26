@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  # Frontend NextJS Application
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        - NODE_ENV=production
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=${API_URL}
+      - NEXT_PUBLIC_WS_URL=${WS_URL}
+    volumes:
+      - ./app:/app/app
+      - ./components:/app/components
+      - ./public:/app/public
+      - ./styles:/app/styles
+    networks:
+      - vote-network
+
+  # Backend Express Service
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      args:
+        - NODE_ENV=production
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=${MONGODB_URI}
+      - KYC_SERVICE_URL=${KYC_SERVICE_URL}
+      - BLOCKCHAIN_SERVICE_URL=${BLOCKCHAIN_SERVICE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    networks:
+      - vote-network
+
+  # KYC Python Service
+  kyc:
+    build:
+      context: ./kyc
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - FLASK_ENV=production
+    volumes:
+      - ./kyc:/app
+      - kyc_data:/app/uploads
+    networks:
+      - vote-network
+
+  # Blockchain Service
+  blockchain:
+    build:
+      context: ./blockchain
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./blockchain:/app
+      - /app/node_modules
+    networks:
+      - vote-network
+
+  # MongoDB
+  mongo:
+    image: mongo:latest
+    restart: always
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - vote-network
+
+networks:
+  vote-network:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  kyc_data: 

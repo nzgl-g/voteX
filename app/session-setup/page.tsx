@@ -8,7 +8,6 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { UserProfile } from "@/components/shared/user-profile";
 import { NotificationButton } from "@/components/shared/notification-button";
 import { authService } from "@/services";
-import { toast } from "sonner";
 import VotingSessionForm from "@/components/session-creation/voting-session-form";
 import { motion } from "framer-motion";
 import { useTheme } from "next-themes";
@@ -21,14 +20,15 @@ export default function SessionSetupPage() {
       name: "User", 
       email: "" 
   });
-  const { theme } = useTheme();
+  const { theme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  const [logoSrc, setLogoSrc] = useState("/logo/expended.png");
 
-  const getLogo = () => {
-    if (theme === 'dark') {
-      return "/logo/expended-dark.png";
-    }
-    return "/logo/expended.png";
-  };
+  // Only update logo after component mounts to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+    setLogoSrc(resolvedTheme === 'dark' ? "/logo/expended-dark.png" : "/logo/expended.png");
+  }, [resolvedTheme]);
   
   useEffect(() => {
     // Get plan from URL parameters
@@ -62,7 +62,6 @@ export default function SessionSetupPage() {
   }, [searchParams]);
 
   const handleSessionCreated = () => {
-    toast.success("Session created successfully!");
     router.push("/voter");
   };
   
@@ -72,20 +71,24 @@ export default function SessionSetupPage() {
         initial={{ y: -32, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: "spring", stiffness: 120, damping: 16 }}
-        className="mb-4 sticky top-4 z-50 mx-auto w-full container max-w-7xl xl:max-w-[1400px] rounded-full bg-background/80 shadow-lg backdrop-blur-md flex items-center justify-between px-4 py-2 border border-border transition-all"
+        className="mb-4 sticky top-4 z-50 mx-auto w-full container max-w-7xl xl:max-w-[1400px] rounded-xl bg-background/80 shadow-lg backdrop-blur-md flex items-center justify-between px-4 py-2 border border-border transition-all"
         style={{ boxShadow: '0 4px 24px 0 rgba(0,0,0,0.04)' }}
       >
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center">
             <div className="relative h-8 w-32 flex items-center justify-center">
-              <Image
-                src={getLogo()}
-                alt="Vote System Logo"
-                width={128}
-                height={32}
-                className="object-contain select-none"
-                priority
-              />
+              {mounted ? (
+                <Image
+                  src={logoSrc}
+                  alt="Vote System Logo"
+                  width={128}
+                  height={32}
+                  className="object-contain select-none"
+                  priority
+                />
+              ) : (
+                <div className="w-32 h-8 bg-muted/30 animate-pulse rounded" />
+              )}
             </div>
           </Link>
         </div>

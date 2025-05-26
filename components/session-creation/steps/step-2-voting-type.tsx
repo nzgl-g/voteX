@@ -173,22 +173,27 @@ export default function Step2VotingType({ formData, updateFormData, subscription
                         max={10}
                         value={formData.maxSelections}
                         onChange={(e) => {
-                          // Allow empty input for better UX while typing
-                          if (e.target.value === '') {
-                            // Don't update formData yet, just allow the input field to be empty
-                            e.target.value = '';
+                          // Only allow positive integer inputs
+                          const inputValue = e.target.value;
+                          
+                          // Allow empty input temporarily for better UX while typing
+                          if (inputValue === '') {
                             return;
                           }
                           
-                          const value = Number.parseInt(e.target.value);
-                          if (!isNaN(value) && value >= 1) {
+                          // Ensure input is a positive integer
+                          const value = parseInt(inputValue, 10);
+                          if (!isNaN(value) && value > 0 && Number.isInteger(value)) {
                             updateFormData({ maxSelections: value });
                           }
                         }}
                         onBlur={(e) => {
-                          // When focus leaves the input, ensure we have a valid value
-                          if (e.target.value === '' || isNaN(Number(e.target.value))) {
-                            e.target.value = String(formData.maxSelections);
+                          // When focus leaves the input, ensure we have a valid positive integer
+                          const value = parseInt(e.target.value, 10);
+                          if (e.target.value === '' || isNaN(value) || value <= 0 || !Number.isInteger(value)) {
+                            // Reset to current valid value or default to 1
+                            e.target.value = String(formData.maxSelections || 1);
+                            updateFormData({ maxSelections: formData.maxSelections || 1 });
                           }
                         }}
                         className="mt-1"

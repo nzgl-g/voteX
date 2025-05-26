@@ -241,6 +241,34 @@ class SessionService {
       if (!sessionData.subtype) console.warn('Warning: Missing subtype field in session data');
       if (!sessionData.subscription?.name) console.warn('Warning: Missing subscription.name in session data');
       
+      // Ensure visibility is lowercase to match backend expectations
+      if (sessionData.visibility) {
+        sessionData.visibility = sessionData.visibility.toLowerCase() as 'public' | 'private';
+      }
+      
+      // Ensure session lifecycle dates are properly formatted
+      if (sessionData.sessionLifecycle?.scheduledAt) {
+        const { start, end } = sessionData.sessionLifecycle.scheduledAt;
+        if (start && typeof start === 'string') {
+          try {
+            // Validate the date format
+            new Date(start).toISOString();
+          } catch (e) {
+            console.error('Invalid start date format:', start);
+            throw new Error('Invalid start date format');
+          }
+        }
+        if (end && typeof end === 'string') {
+          try {
+            // Validate the date format
+            new Date(end).toISOString();
+          } catch (e) {
+            console.error('Invalid end date format:', end);
+            throw new Error('Invalid end date format');
+          }
+        }
+      }
+      
       const response = await baseApi.post<Session>('/sessions', sessionData);
       console.log('Session created successfully with ID:', response.data._id);
       return response.data;
@@ -252,9 +280,20 @@ class SessionService {
         console.error('Error response status:', error.response.status);
         console.error('Error response data:', JSON.stringify(error.response.data, null, 2));
         errorMessage = error.response.data?.message || error.response.data?.error || errorMessage;
+        
+        // Enhanced error handling based on status code
+        if (error.response.status === 400) {
+          errorMessage = `Validation error: ${errorMessage}`;
+        } else if (error.response.status === 401) {
+          errorMessage = 'Authentication required. Please log in again.';
+        } else if (error.response.status === 403) {
+          errorMessage = 'You do not have permission to create a session.';
+        } else if (error.response.status === 500) {
+          errorMessage = 'Server error occurred. Please try again later.';
+        }
       } else if (error.request) {
         console.error('No response received:', error.request);
-        errorMessage = 'No response received from server';
+        errorMessage = 'No response received from server. Please check your connection.';
       } else {
         console.error('Error message:', error.message);
         errorMessage = error.message || errorMessage;

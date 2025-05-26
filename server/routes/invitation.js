@@ -50,7 +50,7 @@ router.post("/:invitationId/accept", auth, async (req, res) => {
     }
     await Promise.all([team.save(), invitation.save()]);
     await sendNotification(req, {
-      recipients: [team.createdBy],
+      recipients: [team.leader],
       type: "team-member-accepted",
       message: `${req.user._id} accepted your team invitation.`,
       link: `/teams/${team._id}`,
@@ -88,7 +88,7 @@ router.post("/:invitationId/decline", auth, async (req, res) => {
     const team = await Team.findById(invitation.teamId);
     if (team) {
       await sendNotification(req, {
-        recipients: [team.createdBy],
+        recipients: [team.leader],
         type: "team-member-declined",
         message: `${req.user.username} declined your team invitation.`,
         link: `/teams/${team._id}`,

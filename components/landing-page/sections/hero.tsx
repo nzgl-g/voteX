@@ -8,15 +8,26 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { PricingDialog } from "@/components/pricing-dialog";
+import { AuthDialog } from "@/components/auth/auth-dialog";
 import { authService } from "@/services";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { UserProfile } from "@/components/shared/user-profile";
+import { motion } from "framer-motion";
 
 export const HeroSection = () => {
-  const { resolvedTheme } = useTheme();
+  const { resolvedTheme, theme } = useTheme();
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showPricingDialog, setShowPricingDialog] = useState(false);
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [imageSrc, setImageSrc] = useState("/hero-image-light.png");
   const [mounted, setMounted] = useState(false);
+  const [voterButtonLoading, setVoterButtonLoading] = useState(false);
+  const [redirectAfterAuth, setRedirectAfterAuth] = useState<string | null>(null);
+  const [userData, setUserData] = useState<{ name: string; email: string; avatar?: string }>({ 
+    name: "User", 
+    email: "" 
+  });
   
   // Function to check authentication status
   const checkAuth = () => {
@@ -27,6 +38,13 @@ export const HeroSection = () => {
       return auth;
     }
     return false;
+  };
+
+  const getLogo = () => {
+    if (theme === 'dark') {
+      return "/logo/expended-dark.png";
+    }
+    return "/logo/expended.png";
   };
   
   useEffect(() => {
@@ -69,6 +87,24 @@ export const HeroSection = () => {
         router.push('/voter');
       }
     }
+
+    // Fetch user data if authenticated
+    const fetchUserData = async () => {
+      if (isAuth) {
+        try {
+          const userProfile = await authService.fetchUserProfile();
+          setUserData({
+            name: userProfile.fullName || userProfile.username || "User",
+            email: userProfile.email || "",
+            avatar: userProfile.profilePic || undefined
+          });
+        } catch (error) {
+          console.error("Failed to fetch user profile:", error);
+        }
+      }
+    };
+    
+    fetchUserData();
   }, [router]);
   
   // Handle theme changes in a separate effect to avoid hydration mismatch
@@ -80,6 +116,41 @@ export const HeroSection = () => {
 
   return (
       <section className="container w-full">
+        <motion.header
+          initial={{ y: -32, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 120, damping: 16 }}
+          className="mb-4 sticky top-4 z-50 mx-auto w-full container max-w-7xl xl:max-w-[1400px] rounded-full bg-background/80 shadow-lg backdrop-blur-md flex items-center justify-between px-4 py-2 border border-border transition-all"
+          style={{ boxShadow: '0 4px 24px 0 rgba(0,0,0,0.04)' }}
+        >
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center">
+              <div className="relative h-8 w-32 flex items-center justify-center">
+                <Image
+                  src={getLogo()}
+                  alt="Vote System Logo"
+                  width={128}
+                  height={32}
+                  className="object-contain select-none"
+                  priority
+                />
+              </div>
+            </Link>
+          </div>
+          <div className="flex items-center gap-2 bg-muted/40 rounded-full px-2 py-1 transition-all">
+            <ThemeToggle className="!rounded-full !bg-transparent !shadow-none !border-0" />
+            {isAuthenticated && (
+              <UserProfile 
+                userName={userData.name}
+                userEmail={userData.email}
+                userAvatar={userData.avatar}
+                variant="dropdown"
+                className="!rounded-full !bg-transparent !shadow-none !border-0"
+              />
+            )}
+          </div>
+        </motion.header>
+        
         <div className="grid place-items-center lg:max-w-screen-xl gap-8 mx-auto py-20 md:py-32">
           <div className="text-center space-y-8">
             <Badge variant="outline" className="text-sm py-2">
@@ -114,20 +185,12 @@ export const HeroSection = () => {
                   
                   if (isAuth) {
                     console.log('User is authenticated, showing pricing dialog');
-                    // Directly show the pricing dialog from the parent page
-                    window.dispatchEvent(new CustomEvent('showPricingDialog'));
-                    // Stay on the same page
+                    // Directly show the pricing dialog
+                    setShowPricingDialog(true);
                   } else {
-                    console.log('User is not authenticated, redirecting to login');
-                    // Store intended destination in localStorage to resume flow after login
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('redirectAfterLogin', 'pricing');
-                      // Use direct navigation to ensure the page fully reloads
-                      window.location.href = '/login';
-                    } else {
-                      // Fallback to router if window is not available
-                      router.push('/login');
-                    }
+                    console.log('User is not authenticated, showing auth dialog');
+                    // Show the auth dialog first
+                    setShowAuthDialog(true);
                   }
                 }}
               >
@@ -136,16 +199,36 @@ export const HeroSection = () => {
               </Button>
 
               <Button
-                  asChild
                   variant="secondary"
                   className="w-5/6 md:w-1/4 font-bold"
+                  onClick={() => {
+                    // Check auth status at the moment of click
+                    const isAuth = checkAuth();
+                    console.log('Voter Portal clicked, current auth status:', isAuth);
+                    
+                    if (isAuth) {
+                      // Set loading state
+                      setVoterButtonLoading(true);
+                      console.log('User is authenticated, redirecting to voter page');
+                      // Redirect to voter page
+                      router.push('/voter');
+                    } else {
+                      console.log('User is not authenticated, showing auth dialog');
+                      // Show the auth dialog with redirection to voter page after login
+                      setRedirectAfterAuth('/voter');
+                      setShowAuthDialog(true);
+                    }
+                  }}
+                  disabled={voterButtonLoading}
               >
-                <Link
-                    href="/voter"
-                    target="_blank"
-                >
-                  Go to Voter Portal
-                </Link>
+                {voterButtonLoading ? (
+                  <>
+                    <span className="mr-2 animate-spin">⏳</span>
+                    Redirecting...
+                  </>
+                ) : (
+                  "Go to Voter Portal"
+                )}
               </Button>
             </div>
 
@@ -165,6 +248,52 @@ export const HeroSection = () => {
             <div className="absolute bottom-0 left-0 w-full h-20 md:h-28 bg-gradient-to-b from-background/0 via-background/50 to-background rounded-lg"></div>
           </div>
         </div>
+
+        {/* Pricing Dialog */}
+        <PricingDialog
+          open={showPricingDialog}
+          onOpenChange={setShowPricingDialog}
+        />
+
+        {/* Auth Dialog */}
+        <AuthDialog
+          open={showAuthDialog}
+          onOpenChange={(open) => {
+            setShowAuthDialog(open);
+            // If auth dialog is closed and user is now authenticated
+            if (!open && authService.isAuthenticated()) {
+              // Refresh user data after authentication
+              const fetchUserData = async () => {
+                try {
+                  const userProfile = await authService.fetchUserProfile();
+                  setUserData({
+                    name: userProfile.fullName || userProfile.username || "User",
+                    email: userProfile.email || "",
+                    avatar: userProfile.profilePic || undefined
+                  });
+                } catch (error) {
+                  console.error("Failed to fetch user profile:", error);
+                }
+              };
+              fetchUserData();
+              
+              if (redirectAfterAuth) {
+                // Set loading state for voter button if redirecting there
+                if (redirectAfterAuth === '/voter') {
+                  setVoterButtonLoading(true);
+                }
+                // Redirect to the specified path after authentication
+                router.push(redirectAfterAuth);
+                // Reset the redirect path
+                setRedirectAfterAuth(null);
+              } else {
+                // If no specific redirect, show pricing dialog (original behavior)
+                setShowPricingDialog(true);
+              }
+            }
+          }}
+          defaultTab="login"
+        />
       </section>
   );
 };

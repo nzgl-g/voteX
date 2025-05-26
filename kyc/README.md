@@ -9,7 +9,6 @@ The KYC system is a Python-based application, likely using Flask or a similar mi
 ## Project Structure
 
 *   **`app.py`**: The main Flask (or similar) application file. It defines routes, handles requests, and orchestrates the KYC verification process.
-*   **`run.py`**: A simple script to run the development server for the KYC application.
 *   **`setup.py`**: Standard Python package setup file, indicating this can be packaged as a library (`kyc.egg-info`).
 *   **`requirements.txt`**: Lists the Python dependencies required for the KYC system.
 *   **`__init__.py`**: Makes the `kyc` directory a Python package.
@@ -122,9 +121,9 @@ Checks if the KYC system is operational.
 2.  **Create and activate a Python virtual environment.**
 3.  **Install dependencies**: `pip install -r requirements.txt`
 4.  **Set up environment variables**: Create a `.env` file based on `.env_sample` and provide necessary configurations (e.g., `FLASK_APP=app.py`, `FLASK_ENV=development`, any API keys for external services if used).
-5.  **Run the application**: `python run.py` or `flask run` (if `FLASK_APP` is set).
+5.  **Run the application**: `python app.py` or `flask run` (if `FLASK_APP=app.py` and the current directory is `kyc`).
 
-    The server will typically start on `http://localhost:5000` (or as configured).
+    The server will typically start on `http://localhost:80` (or as configured in `app.py`).
 
 ## Integration with Main Server
 

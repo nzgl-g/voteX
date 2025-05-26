@@ -35,7 +35,7 @@ const MenuItem = ({
     onClick: () => void;
     destructive?: boolean;
 }) => (
-    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+    <div>
         <DropdownMenuItem
             onClick={onClick}
             className={cn(
@@ -46,10 +46,10 @@ const MenuItem = ({
                     : "hover:bg-accent/80 hover:text-accent-foreground"
             )}
         >
-            <Icon className="mr-3 h-4 w-4 text-current group-hover:scale-110 transition-transform" />
+            <Icon className="mr-3 h-4 w-4 text-current" />
             <span className="text-sm">{label}</span>
         </DropdownMenuItem>
-    </motion.div>
+    </div>
 );
 
 export function UserProfile({
@@ -107,10 +107,10 @@ export function UserProfile({
     const isTeamLeaderPage = pathname?.startsWith("/team-leader");
 
     const UserAvatar = (
-        <Avatar className="h-8 w-8 transition-all duration-300 hover:scale-110 active:scale-95">
+        <Avatar className="h-8 w-8">
             <AvatarImage src={userAvatar} alt={userName} />
-            <AvatarFallback className="relative flex size-full items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary to-secondary">
-        <span className="relative font-semibold text-white drop-shadow-sm">
+            <AvatarFallback className="relative flex size-full items-center justify-center overflow-hidden rounded-full bg-primary">
+        <span className="relative font-semibold text-white">
           {initials}
         </span>
             </AvatarFallback>
@@ -131,29 +131,26 @@ export function UserProfile({
             <>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
+                        <button
                             className={cn(
                                 "flex items-center p-1 rounded-full bg-background",
                                 "hover:bg-accent hover:text-accent-foreground",
                                 "outline-none focus:ring-2 focus:ring-primary",
-                                "transition-all duration-200 ease-out",
                                 className
                             )}
                         >
                             {UserAvatar}
-                        </motion.button>
+                        </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
                         align="end"
-                        className="w-64 p-2 rounded-xl shadow-xl border border-border/50 bg-popover/95 backdrop-blur-sm"
+                        className="w-64 p-2 rounded-xl border border-border/50 bg-popover"
                         sideOffset={8}
                     >
                         <div className="flex items-center gap-3 p-2">
                             <Avatar className="h-10 w-10">
                                 <AvatarImage src={userAvatar} alt={userName} />
-                                <AvatarFallback className="bg-gradient-to-br from-primary to-secondary">
+                                <AvatarFallback className="bg-primary">
                                     {initials}
                                 </AvatarFallback>
                             </Avatar>
@@ -207,31 +204,29 @@ export function UserProfile({
         <>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        <button
                         className={cn(
                             "flex w-full items-center gap-3 rounded-lg p-2 text-left",
                             "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                            "transition-all duration-200 group",
+                            "group",
                             className
                         )}
                     >
                         {UserAvatar}
                         <div className="grid flex-1 text-left text-sm leading-tight overflow-hidden">
-              <span className="truncate font-medium transition-all duration-200 group-hover:translate-x-0.5">
+              <span className="truncate font-medium">
                 {userName}
               </span>
                             {userEmail && (
-                                <span className="truncate text-xs text-muted-foreground transition-all duration-200 group-hover:translate-x-0.5">
+                                <span className="truncate text-xs text-muted-foreground">
                   {userEmail}
                 </span>
                             )}
                         </div>
-                    </motion.button>
+                    </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                    className="w-64 rounded-xl shadow-xl border border-border/50 bg-popover/95 backdrop-blur-sm"
+                    className="w-64 rounded-xl border border-border/50 bg-popover"
                     align="start"
                     side="right"
                     sideOffset={8}
@@ -239,7 +234,7 @@ export function UserProfile({
                     <div className="flex items-center gap-3 p-2">
                         <Avatar className="h-10 w-10 rounded-lg">
                             <AvatarImage src={userAvatar} alt={userName} />
-                            <AvatarFallback className="bg-gradient-to-br from-primary to-secondary">
+                            <AvatarFallback className="bg-primary">
                                 {initials}
                             </AvatarFallback>
                         </Avatar>

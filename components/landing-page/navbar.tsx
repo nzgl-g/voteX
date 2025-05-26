@@ -24,7 +24,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { AuthButton } from "@/components/auth";
-import { motion } from "framer-motion";
+
 
 interface RouteProps {
   href: string;
@@ -88,112 +88,131 @@ export const Navbar = React.forwardRef<HTMLDivElement>((props, ref) => {
     }
   }, [resolvedTheme, mounted]);
   
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const isScrolled = window.scrollY > 10;
+      if (isScrolled !== scrolled) {
+        setScrolled(isScrolled);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [scrolled]);
+
   return (
-    <motion.header
+    <header
       ref={ref}
-      initial={{ y: -32, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ type: "spring", stiffness: 120, damping: 16 }}
-      className="sticky top-0 z-50 mx-auto w-full max-w-3xl sm:max-w-4xl lg:max-w-5xl rounded-full bg-background/80 shadow-lg backdrop-blur-md flex items-center justify-between px-4 py-2 border border-border transition-all"
-      style={{ boxShadow: '0 4px 24px 0 rgba(0,0,0,0.04)' }}
+      className={`fixed top-0 z-50 w-full bg-background/90 backdrop-blur-md transition-all duration-300 ease-in-out ${scrolled ? 'shadow-md py-1' : 'py-2'}`}
     >
-      <Link href="/public" className="font-bold text-lg flex items-center">
-        <Image src={logoSrc} alt="Vote System Logo" width={128} height={32} className="object-contain select-none" priority />
-      </Link>
-      {/* <!-- Mobile --> */}
-      <div className="flex items-center lg:hidden">
-        <Sheet open={isOpen} onOpenChange={setIsOpen}>
-          <SheetTrigger asChild>
-            <Menu
-              onClick={() => setIsOpen(!isOpen)}
-              className="cursor-pointer lg:hidden"
-            />
-          </SheetTrigger>
+      <div className="mx-auto max-w-4xl sm:max-w-5xl lg:max-w-6xl px-4 flex items-center justify-between">
+        {/* Logo - Left Side */}
+        <div className="flex-shrink-0">
+          <Link href="/public" className="font-bold text-lg flex items-center">
+            <Image src={logoSrc} alt="Vote System Logo" width={128} height={32} className="object-contain select-none" priority />
+          </Link>
+        </div>
 
-          <SheetContent
-            side="left"
-            className="flex flex-col justify-between rounded-tr-2xl rounded-br-2xl bg-card border-secondary"
-          >
-            <div>
-              <SheetHeader className="mb-4 ml-4">
-                <SheetTitle className="flex items-center">
-                  <Link href="/public" className="flex items-center">
-                    <Image src={logoSrc} alt="Vote System Logo" width={120} height={40} className="mr-2" />
-                  </Link>
-                </SheetTitle>
-              </SheetHeader>
+        {/* Mobile Menu Button */}
+        <div className="flex items-center lg:hidden">
+          <Sheet open={isOpen} onOpenChange={setIsOpen}>
+            <SheetTrigger asChild>
+              <Menu
+                onClick={() => setIsOpen(!isOpen)}
+                className="cursor-pointer lg:hidden"
+              />
+            </SheetTrigger>
 
-              <div className="flex flex-col gap-2">
-                {routeList.map(({ href, label }) => (
-                  <Button
-                    key={href}
-                    onClick={() => setIsOpen(false)}
-                    asChild
-                    variant="ghost"
-                    className="justify-start text-base"
-                  >
-                    <Link href={href}>{label}</Link>
-                  </Button>
-                ))}
-              </div>
-            </div>
+            <SheetContent
+              side="left"
+              className="flex flex-col justify-between bg-card"
+            >
+              <div>
+                <SheetHeader className="mb-4 ml-4">
+                  <SheetTitle className="flex items-center">
+                    <Link href="/public" className="flex items-center">
+                      <Image src={logoSrc} alt="Vote System Logo" width={120} height={40} className="mr-2" />
+                    </Link>
+                  </SheetTitle>
+                </SheetHeader>
 
-            <SheetFooter className="flex-col sm:flex-col justify-start items-start">
-              <Separator className="mb-2" />
-
-              <div className="flex items-center gap-2 w-full">
-                <ThemeToggle className="rounded-full bg-background hover:bg-accent hover:text-accent-foreground transition-colors !shadow-none !border-0" />
-                <AuthButton className="rounded-full bg-background hover:bg-accent hover:text-accent-foreground transition-colors !shadow-none !border-0 w-full" />
-              </div>
-            </SheetFooter>
-          </SheetContent>
-        </Sheet>
-      </div>
-
-      {/* <!-- Desktop --> */}
-      <NavigationMenu className="hidden lg:flex mx-auto">
-        <NavigationMenuList className="flex items-center">
-          <NavigationMenuItem>
-            <NavigationMenuTrigger className="bg-card text-base">
-              Features
-            </NavigationMenuTrigger>
-            <NavigationMenuContent>
-              <div className="grid w-[600px] grid-cols-1 gap-5 p-4">
-                <ul className="flex flex-col gap-2">
-                  {featureList.map(({ title, description }) => (
-                    <li
-                      key={title}
-                      className="rounded-md p-3 text-sm hover:bg-muted"
+                <div className="flex flex-col gap-2">
+                  {routeList.map(({ href, label }) => (
+                    <Button
+                      key={href}
+                      onClick={() => setIsOpen(false)}
+                      asChild
+                      variant="ghost"
+                      className="justify-start text-base"
                     >
-                      <p className="mb-1 font-semibold leading-none text-foreground">
-                        {title}
-                      </p>
-                      <p className="line-clamp-2 text-muted-foreground">
-                        {description}
-                      </p>
-                    </li>
+                      <Link href={href}>{label}</Link>
+                    </Button>
                   ))}
-                </ul>
+                </div>
               </div>
-            </NavigationMenuContent>
-          </NavigationMenuItem>
 
-          <NavigationMenuItem className="flex items-center">
-            {routeList.map(({ href, label }) => (
-              <NavigationMenuLink key={href} asChild>
-                <Link href={href} className="text-base px-4">
-                  {label}
-                </Link>
-              </NavigationMenuLink>
-            ))}
-          </NavigationMenuItem>
-        </NavigationMenuList>
-      </NavigationMenu>
+              <SheetFooter className="flex-col sm:flex-col justify-start items-start">
+                <Separator className="mb-2" />
 
-      <div className="hidden lg:flex items-center gap-2 bg-muted/40 rounded-full px-2 py-1 transition-all">
-        <ThemeToggle className="!rounded-full !bg-transparent !shadow-none !border-0" />
-        <AuthButton className="!rounded-full !bg-transparent !shadow-none !border-0" />
+                <div className="flex items-center gap-2 w-full">
+                  <ThemeToggle className="rounded-full bg-background hover:bg-accent hover:text-accent-foreground transition-colors !shadow-none !border-0" />
+                  <AuthButton className="rounded-full bg-background hover:bg-accent hover:text-accent-foreground transition-colors !shadow-none !border-0 w-full" />
+                </div>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+        </div>
+
+        {/* Desktop Navigation - Center */}
+        <div className="hidden lg:flex items-center justify-center flex-1">
+          <NavigationMenu>
+            <NavigationMenuList className="flex items-center">
+              <NavigationMenuItem>
+                <NavigationMenuTrigger className="text-base">
+                  Features
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <div className="grid w-[600px] grid-cols-1 gap-5 p-4">
+                    <ul className="flex flex-col gap-2">
+                      {featureList.map(({ title, description }) => (
+                        <li
+                          key={title}
+                          className="rounded-md p-3 text-sm hover:bg-muted"
+                        >
+                          <p className="mb-1 font-semibold leading-none text-foreground">
+                            {title}
+                          </p>
+                          <p className="line-clamp-2 text-muted-foreground">
+                            {description}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+
+              <NavigationMenuItem className="flex items-center">
+                {routeList.map(({ href, label }) => (
+                  <NavigationMenuLink key={href} asChild>
+                    <Link href={href} className="text-base px-4">
+                      {label}
+                    </Link>
+                  </NavigationMenuLink>
+                ))}
+              </NavigationMenuItem>
+            </NavigationMenuList>
+          </NavigationMenu>
+        </div>
+
+        {/* Theme Toggle and Auth - Right Side */}
+        <div className="hidden lg:flex items-center gap-2 px-2 flex-shrink-0">
+          <ThemeToggle className="!rounded-full !bg-transparent !shadow-none !border-0" />
+          <AuthButton className="!rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm" />
+        </div>
       </div>
-    </motion.header>
+    </header>
   );
 });

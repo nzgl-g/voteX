@@ -22,11 +22,11 @@ interface Step3Props {
 export default function Step3Lifecycle({ formData, updateFormData }: Step3Props) {
   // Use local state only for UI purposes, not for data management
   const [startDate, setStartDate] = useState<Date | undefined>(
-    formData.startDate ? new Date(formData.startDate) : undefined,
+    formData.startDate ? new Date(formData.startDate) : new Date(),
   )
-  const [endDate, setEndDate] = useState<Date | undefined>(formData.endDate ? new Date(formData.endDate) : undefined)
+  const [endDate, setEndDate] = useState<Date | undefined>(formData.endDate ? new Date(formData.endDate) : new Date())
   const [nominationStartDate, setNominationStartDate] = useState<Date | undefined>(
-    formData.nominationStartDate ? new Date(formData.nominationStartDate) : undefined,
+    formData.nominationStartDate ? new Date(formData.nominationStartDate) : new Date(),
   )
   const [nominationEndDate, setNominationEndDate] = useState<Date | undefined>(
     formData.nominationEndDate ? new Date(formData.nominationEndDate) : undefined,
@@ -51,6 +51,21 @@ export default function Step3Lifecycle({ formData, updateFormData }: Step3Props)
       (!nominationEndDate || formData.nominationEndDate.getTime() !== nominationEndDate.getTime())
     ) {
       setNominationEndDate(new Date(formData.nominationEndDate))
+    }
+    
+    // Initialize with current time if not already set
+    if (!formData.startDate) {
+      const now = new Date()
+      updateFormData({ startDate: now })
+    }
+    if (!formData.endDate) {
+      const now = new Date()
+      now.setDate(now.getDate() + 7) // Default to a week later
+      updateFormData({ endDate: now })
+    }
+    if (formData.voteType === "election" && formData.hasNomination && !formData.nominationStartDate) {
+      const now = new Date()
+      updateFormData({ nominationStartDate: now })
     }
   }, [formData])
 
@@ -88,8 +103,14 @@ export default function Step3Lifecycle({ formData, updateFormData }: Step3Props)
     const date = new Date()
 
     switch (type) {
-      case "1day":
+      case "now":
+        date.setTime(now.getTime())
+        break
+      case "tomorrow":
         date.setDate(now.getDate() + 1)
+        break
+      case "nextweek":
+        date.setDate(now.getDate() + 7)
         break
       case "1week":
         date.setDate(now.getDate() + 7)
@@ -386,7 +407,7 @@ export default function Step3Lifecycle({ formData, updateFormData }: Step3Props)
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      onClick={() => handleQuickSelect("1day", "start")}
+                      onClick={() => handleQuickSelect("tomorrow", "start")}
                       className="text-xs h-7 bg-muted/50 hover:bg-muted"
                     >
                       Tomorrow
@@ -394,7 +415,7 @@ export default function Step3Lifecycle({ formData, updateFormData }: Step3Props)
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      onClick={() => handleQuickSelect("1week", "start")}
+                      onClick={() => handleQuickSelect("nextweek", "start")}
                       className="text-xs h-7 bg-muted/50 hover:bg-muted"
                     >
                       Next week
@@ -454,7 +475,7 @@ export default function Step3Lifecycle({ formData, updateFormData }: Step3Props)
                       variant="ghost" 
                       size="sm" 
                       onClick={() => handleQuickSelect("1week", "end")}
-                      className="text-xs h-7 bg-muted/50 hover:bg-muted"
+                      className="text-xs h-7 bg-muted/50 hover:bg-muted font-medium"
                     >
                       1 week
                     </Button>
@@ -462,7 +483,7 @@ export default function Step3Lifecycle({ formData, updateFormData }: Step3Props)
                       variant="ghost" 
                       size="sm" 
                       onClick={() => handleQuickSelect("2weeks", "end")}
-                      className="text-xs h-7 bg-muted/50 hover:bg-muted"
+                      className="text-xs h-7 bg-muted/50 hover:bg-muted font-medium"
                     >
                       2 weeks
                     </Button>

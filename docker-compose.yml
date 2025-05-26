@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # Frontend NextJS Application
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+      - NEXT_PUBLIC_WS_URL=ws://backend:8000
+    volumes:
+      - ./app:/app/app
+      - ./components:/app/components
+      - ./public:/app/public
+      - ./styles:/app/styles
+    networks:
+      - vote-network
+
+  # Backend Express Service
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongo
+      - blockchain
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/vote-system
+      - KYC_SERVICE_URL=http://kyc:5000
+      - BLOCKCHAIN_SERVICE_URL=http://blockchain:8545
+      - JWT_SECRET=changeme_in_production
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    networks:
+      - vote-network
+
+  # KYC Python Service
+  kyc:
+    build:
+      context: ./kyc
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./kyc:/app
+      - kyc_data:/app/uploads
+    networks:
+      - vote-network
+
+  # Blockchain Service (Local Hardhat Node)
+  blockchain:
+    build:
+      context: ./blockchain
+      dockerfile: Dockerfile
+    ports:
+      - "8545:8545"
+    volumes:
+      - ./blockchain:/app
+      - /app/node_modules
+    networks:
+      - vote-network
+
+  # MongoDB
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - vote-network
+
+networks:
+  vote-network:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  kyc_data: 

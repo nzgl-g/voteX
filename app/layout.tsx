@@ -44,12 +44,12 @@ export default function RootLayout({
                 className: 'shadow-md',
               }}
             />
-                {/*<StagewiseToolbar
+                <StagewiseToolbar
                     config={{
                         plugins: [
                         ],
                     }}
-                />*/}
+                />
             {children}
         </ThemeProvider>
         </NotificationProvider>

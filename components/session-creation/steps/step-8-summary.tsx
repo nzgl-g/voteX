@@ -23,8 +23,7 @@ export default function Step8Summary({ formData, goToStep }: Step7Props) {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Summary</h2>
+      <div className="flex items-center justify-end">
         <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
           Almost Done!
         </Badge>

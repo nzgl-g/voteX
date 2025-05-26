@@ -74,6 +74,16 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<Task | undefined>(undefined)
 
+  // Helper function to check if current user is a team leader
+  const isCurrentUserTeamLeader = useCallback(() => {
+    const currentUser = localStorage.getItem('user') ? 
+      JSON.parse(localStorage.getItem('user') || '{}') : {};
+    
+    return teamMembers.some(member => 
+      member._id === currentUser._id && member.role === 'Leader'
+    );
+  }, [teamMembers]);
+
   // Apply filters and sorting to tasks
   useEffect(() => {
     setIsLoading(true)
@@ -182,28 +192,73 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
     
     const loadingToast = toast.loading("Deleting task...");
     
-    try {
-      await taskService.deleteTask(taskId);
-      
-      toast.success("Task deleted", {
-        description: "The task has been successfully removed.",
-      });
-      
-      // Refresh tasks after deletion
-      await fetchTasks();
+    // Set a timeout to provide feedback if the operation takes too long
+    const timeoutId = setTimeout(() => {
       toast.dismiss(loadingToast);
+      toast.warning("The operation is taking longer than expected", {
+        description: "Still trying to delete the task. Please wait..."
+      });
+    }, 5000);
+    
+    try {
+      // Check if current user is a team leader
+      if (!isCurrentUserTeamLeader()) {
+        clearTimeout(timeoutId);
+        toast.dismiss(loadingToast);
+        toast.error("Permission Denied", {
+          description: "Only team leaders can delete tasks. Please contact your team leader.",
+        });
+        return;
+      }
+      
+      try {
+        await taskService.deleteTask(taskId);
+        
+        clearTimeout(timeoutId);
+        toast.dismiss(loadingToast);
+        toast.success("Task deleted", {
+          description: "The task has been successfully removed.",
+        });
+        
+        // Refresh tasks after deletion
+        await fetchTasks();
+      } catch (deleteError: any) {
+        clearTimeout(timeoutId);
+        console.error("API error when deleting task:", deleteError);
+        
+        // Handle specific error cases
+        let errorMessage = deleteError.message || "Failed to delete task. Please try again.";
+        
+        if (errorMessage.includes("Access denied") || errorMessage.includes("Not authorized")) {
+          errorMessage = "Only team leaders can delete tasks.";
+        } else if (errorMessage.includes("Task not found")) {
+          errorMessage = "The task may have been already deleted.";
+        } else if (errorMessage === "API Error: {}") {
+          errorMessage = "Server permission error. Only team leaders can delete tasks.";
+        } else if (errorMessage.includes("timed out")) {
+          errorMessage = "The request timed out. The server might be busy. Please try again.";
+        }
+        
+        toast.dismiss(loadingToast);
+        toast.error("Error deleting task", {
+          description: errorMessage,
+        });
+        
+        // Still refresh tasks to be safe
+        fetchTasks();
+      }
     } catch (error: any) {
-      console.error("Failed to delete task:", error);
-      toast.error("Error deleting task", {
-        description: error.message || "Failed to delete task. Please try again.",
+      clearTimeout(timeoutId);
+      console.error("Failed to process task deletion:", error);
+      
+      toast.dismiss(loadingToast);
+      toast.error("Error processing request", {
+        description: "An unexpected error occurred. Please try again.",
       });
       
       // Refresh tasks after a short delay
       setTimeout(() => {
-        fetchTasks().then(() => {
-          // Dismiss loading toast when done
-          toast.dismiss(loadingToast);
-        });
+        fetchTasks();
       }, 500);
     }
   };
@@ -296,10 +351,17 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
         </div>
         
         <div className="flex items-center gap-2">
-          <Button onClick={onAddTask} className="flex items-center gap-2">
-            <PlusCircle className="h-4 w-4" />
-            Add Task
-          </Button>
+          {/* Show Add Task button only for team leaders */}
+          {isCurrentUserTeamLeader() ? (
+            <Button onClick={onAddTask} className="flex items-center gap-2">
+              <PlusCircle className="h-4 w-4" />
+              Add Task
+            </Button>
+          ) : (
+            <Badge variant="outline" className="bg-muted">
+              Only team leaders can add tasks
+            </Badge>
+          )}
         </div>
       </div>
       
@@ -497,18 +559,24 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
                             <>Mark as complete</>
                           )}
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleEditTask(task)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit task
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleDeleteTask(task)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete task
-                        </DropdownMenuItem>
+                        
+                        {/* Only show edit and delete options for team leaders */}
+                        {isCurrentUserTeamLeader() && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleEditTask(task)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit task
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteTask(task)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete task
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

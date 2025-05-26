@@ -139,22 +139,11 @@ class TaskService {
   }
 
   /**
-   * Delete a task with timeout handling
+   * Delete a task
    */
   async deleteTask(taskId: string): Promise<{ message: string }> {
-    // Create a timeout promise that rejects after 10 seconds
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
-        reject(new Error('Request timed out after 10 seconds'));
-      }, 10000);
-    });
-
     try {
-      // Race the actual request against the timeout
-      const response = await Promise.race([
-        baseApi.delete<{ message: string }>(`/tasks/${taskId}`),
-        timeoutPromise
-      ]) as any;
+      const response = await baseApi.delete<{ message: string }>(`/tasks/${taskId}`);
       
       // Handle empty successful response
       if (!response.data || Object.keys(response.data).length === 0) {
@@ -163,24 +152,6 @@ class TaskService {
       
       return response.data;
     } catch (error: any) {
-      console.error("Task deletion error:", error);
-      
-      // Handle timeout specifically
-      if (error.message && error.message.includes('timed out')) {
-        throw new Error('The request took too long to complete. Please try again.');
-      }
-      
-      // If the error has structured data from our improved server responses
-      if (error.data && typeof error.data === 'object') {
-        if (error.status === 403) {
-          // Handle permission errors
-          throw new Error(error.data.message || "Access denied. Not authorized as team leader");
-        } else if (error.status === 404) {
-          // Handle not found errors
-          throw new Error(error.data.message || "Task not found");
-        }
-      }
-      
       // If we got an empty error object from the API
       if (error.message === "API Error: {}") {
         throw new Error("Server permission error. Only team leaders can delete tasks.");
@@ -197,7 +168,7 @@ class TaskService {
       }
       
       // For other errors
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to delete task';
+      const errorMessage = error.response?.data?.message || 'Failed to delete task';
       throw new Error(errorMessage);
     }
   }

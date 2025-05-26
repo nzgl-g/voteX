@@ -5,7 +5,6 @@ const Task = require("../models/Task");
 const logActivity = require("../helpers/logActivity");
 const sendNotification = require("../helpers/sendNotification");
 const Team = require("../models/Team");
-const SessionParticipant = require("../models/SessionParticipants");
 
 const router = express.Router();
 
@@ -93,34 +92,13 @@ router.put("/:taskId", auth, isTeamLeader, async (req, res) => {
 });
 
 // Delete a task (team leader only)
-router.delete("/:taskId", auth, async (req, res) => {
+router.delete("/:taskId", auth, isTeamLeader, async (req, res) => {
   try {
-    // First, find the task to check if it exists
-    const task = await Task.findById(req.params.taskId);
-    if (!task) {
-      return res.status(404).json({ message: "Task not found" });
-    }
-    
-    // Check if user is a team leader for this session
-    const sessionId = task.session;
-    const participant = await SessionParticipant.findOne({
-      sessionId: sessionId,
-      userId: req.user._id,
-      role: "team_leader"
-    });
-    
-    if (!participant) {
-      return res.status(403).json({ message: "Access denied. Not authorized as team leader" });
-    }
-    
-    // Delete the task directly
-    await Task.deleteOne({ _id: req.params.taskId });
-    
-    // Simple response
-    return res.status(200).json({ message: "Task deleted successfully" });
+    const deleted = await Task.findByIdAndDelete(req.params.taskId);
+    if (!deleted) return res.status(404).json({ message: "Task not found" });
+    res.json({ message: "Task deleted" });
   } catch (err) {
-    console.error("Error deleting task:", err);
-    return res.status(500).json({ message: "Server error: " + err.message });
+    res.status(500).json({ message: err.message });
   }
 });
 

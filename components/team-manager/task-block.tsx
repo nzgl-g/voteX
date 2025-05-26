@@ -192,18 +192,9 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
     
     const loadingToast = toast.loading("Deleting task...");
     
-    // Set a timeout to provide feedback if the operation takes too long
-    const timeoutId = setTimeout(() => {
-      toast.dismiss(loadingToast);
-      toast.warning("The operation is taking longer than expected", {
-        description: "Still trying to delete the task. Please wait..."
-      });
-    }, 5000);
-    
     try {
       // Check if current user is a team leader
       if (!isCurrentUserTeamLeader()) {
-        clearTimeout(timeoutId);
         toast.dismiss(loadingToast);
         toast.error("Permission Denied", {
           description: "Only team leaders can delete tasks. Please contact your team leader.",
@@ -214,8 +205,6 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
       try {
         await taskService.deleteTask(taskId);
         
-        clearTimeout(timeoutId);
-        toast.dismiss(loadingToast);
         toast.success("Task deleted", {
           description: "The task has been successfully removed.",
         });
@@ -223,7 +212,6 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
         // Refresh tasks after deletion
         await fetchTasks();
       } catch (deleteError: any) {
-        clearTimeout(timeoutId);
         console.error("API error when deleting task:", deleteError);
         
         // Handle specific error cases
@@ -235,30 +223,26 @@ export default function TaskBlock({ onAddTask }: TaskBlockProps) {
           errorMessage = "The task may have been already deleted.";
         } else if (errorMessage === "API Error: {}") {
           errorMessage = "Server permission error. Only team leaders can delete tasks.";
-        } else if (errorMessage.includes("timed out")) {
-          errorMessage = "The request timed out. The server might be busy. Please try again.";
         }
         
-        toast.dismiss(loadingToast);
         toast.error("Error deleting task", {
           description: errorMessage,
         });
-        
-        // Still refresh tasks to be safe
-        fetchTasks();
       }
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-      console.error("Failed to process task deletion:", error);
       
       toast.dismiss(loadingToast);
+    } catch (error: any) {
+      console.error("Failed to process task deletion:", error);
+      
       toast.error("Error processing request", {
         description: "An unexpected error occurred. Please try again.",
       });
       
       // Refresh tasks after a short delay
       setTimeout(() => {
-        fetchTasks();
+        fetchTasks().then(() => {
+          toast.dismiss(loadingToast);
+        });
       }, 500);
     }
   };

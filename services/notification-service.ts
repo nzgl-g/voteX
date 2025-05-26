@@ -48,6 +48,19 @@ class NotificationService {
   }
 
   /**
+   * Mark all notifications as read for the current user
+   */
+  async markAllAsRead(): Promise<{ message: string }> {
+    try {
+      const response = await baseApi.patch<{ message: string }>('/notifications/read-all');
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Failed to mark all notifications as read';
+      throw new Error(errorMessage);
+    }
+  }
+
+  /**
    * Get unread notifications count
    */
   async getUnreadCount(): Promise<number> {

@@ -8,7 +8,7 @@ import { AppearanceSettings } from "@/components/user-settings/appearance-settin
 import { SupportSettings } from "@/components/user-settings/support-settings";
 import { LogoutSection } from "@/components/user-settings/logout";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Settings as SettingsIcon, Save, HelpCircle } from "lucide-react";
+import { Loader2, Settings as SettingsIcon, Save, User, Shield, Paintbrush, LifeBuoy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authService } from "@/services";
 
@@ -71,6 +71,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         setHasUnsavedChanges(true);
     };
 
+    const tabItems = [
+        { id: 'profile', label: 'Profile', icon: <User className="h-4 w-4 mr-2" /> },
+        { id: 'security', label: 'Security', icon: <Shield className="h-4 w-4 mr-2" /> },
+        { id: 'appearance', label: 'Appearance', icon: <Paintbrush className="h-4 w-4 mr-2" /> },
+        { id: 'support', label: 'Support', icon: <LifeBuoy className="h-4 w-4 mr-2" /> },
+    ];
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-[95vw] md:max-w-[90vw] lg:max-w-[900px] p-0 h-[90vh] max-h-[90vh] overflow-hidden border border-border bg-background">
@@ -103,21 +110,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                     <span>Save Changes</span>
                                 </Button>
                             )}
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1.5"
-                                onClick={() => {
-                                    onOpenChange(false);
-                                    toast({
-                                        title: "Need help?",
-                                        description: "Our support team is always ready to assist you.",
-                                    });
-                                }}
-                            >
-                                <HelpCircle className="h-3.5 w-3.5" />
-                                <span>Help</span>
-                            </Button>
                         </div>
                     </div>
 
@@ -131,13 +123,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                             {/* Sidebar */}
                             <div className="bg-muted/50 md:w-[240px] border-r md:h-full">
                                 <TabsList className="flex md:flex-col h-auto bg-transparent p-0 w-full">
-                                    {['profile', 'security', 'appearance', 'support'].map((tab) => (
+                                    {tabItems.map((tab) => (
                                         <TabsTrigger
-                                            key={tab}
-                                            value={tab}
-                                            className="w-full justify-start px-6 py-4 data-[state=active]:bg-background rounded-none border-b md:border-b-0 md:border-r-2 data-[state=active]:border-primary capitalize"
+                                            key={tab.id}
+                                            value={tab.id}
+                                            className="w-full justify-start px-6 py-4 data-[state=active]:bg-background rounded-none border-b md:border-b-0 md:border-r-2 data-[state=active]:border-primary flex items-center gap-2"
                                         >
-                                            {tab}
+                                            {tab.icon}
+                                            {tab.label}
                                         </TabsTrigger>
                                     ))}
                                 </TabsList>

@@ -269,6 +269,14 @@ class SessionService {
         }
       }
       
+      // If banner is a File object, it should have been uploaded to Cloudinary already
+      // and the URL stored in the banner field
+      if (sessionData.banner && typeof sessionData.banner !== 'string') {
+        console.warn('Warning: Banner is not a string URL. It should be uploaded to Cloudinary first.');
+        // We'll set it to null to avoid sending a File object to the API
+        sessionData.banner = null;
+      }
+      
       const response = await baseApi.post<Session>('/sessions', sessionData);
       console.log('Session created successfully with ID:', response.data._id);
       return response.data;

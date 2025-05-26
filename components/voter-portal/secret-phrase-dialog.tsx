@@ -23,6 +23,7 @@ export function SecretPhraseDialog({
   const [secretPhrase, setSecretPhrase] = useState("");
 
   const handleSubmit = async () => {
+    console.log("Submitting secret phrase:", secretPhrase ? '[REDACTED]' : 'empty');
     await onSubmit(secretPhrase);
   };
 

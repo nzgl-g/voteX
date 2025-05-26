@@ -203,50 +203,30 @@ export default function AddMemberModal({ isOpen, onClose }: AddMemberModalProps)
           </DialogDescription>
         </DialogHeader>
         
-        <Tabs defaultValue="email">
+        <Tabs defaultValue="search">
           <TabsList className="grid grid-cols-2 mb-4">
-            <TabsTrigger value="email">Invite by Email</TabsTrigger>
             <TabsTrigger value="search">Search Users</TabsTrigger>
+            <TabsTrigger value="email" className="relative">
+              Invite by Email
+              <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] px-1 rounded-sm">
+                Coming Soon
+              </span>
+            </TabsTrigger>
           </TabsList>
           
           <TabsContent value="email">
-            <form className="space-y-4" onSubmit={handleInviteSubmit}>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter email address"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  required
-                />
+            <div className="flex flex-col items-center justify-center py-12 space-y-4 text-center">
+              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <Mail className="h-8 w-8 text-primary" />
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="message">Invitation Message (Optional)</Label>
-                <Textarea
-                  id="message"
-                  placeholder="Enter a message to include with the invitation"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  rows={3}
-                  className="resize-none"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Note: Message will be sent as a notification to the user.
-                </p>
-              </div>
-              
-              <DialogFooter>
-                <Button variant="outline" type="button" onClick={onClose} disabled={isLoading}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isLoading || !inviteEmail}>
-                  {isLoading ? "Sending..." : "Send Invitation"}
-                </Button>
-              </DialogFooter>
-            </form>
+              <h3 className="text-xl font-medium">Email Invitations Coming Soon</h3>
+              <p className="text-muted-foreground max-w-sm">
+                This feature is currently in development. You'll soon be able to invite team members directly via email.
+              </p>
+              <Button variant="outline" type="button" onClick={onClose} className="mt-4">
+                Close
+              </Button>
+            </div>
           </TabsContent>
           
           <TabsContent value="search">

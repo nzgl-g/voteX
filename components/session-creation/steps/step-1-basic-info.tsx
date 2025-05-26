@@ -2,90 +2,50 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import type { FormData } from "../voting-session-form"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Info, Upload, X } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Info } from "lucide-react"
+import CloudinaryUploader from "@/components/cloudinary-uploader"
+import BannerGallery from "../banner-gallery"
 
 interface Step1Props {
   formData: FormData
   updateFormData: (data: Partial<FormData>) => void
 }
 
+// Updated predefined banners with voting-themed Cloudinary URLs
 const predefinedBanners = [
-  "/placeholder.svg?height=200&width=400",
-  "/placeholder.svg?height=200&width=400",
-  "/placeholder.svg?height=200&width=400",
-  "/placeholder.svg?height=200&width=400",
+  "https://res.cloudinary.com/dxh0qathv/image/upload/v1748278383/Capture_d_%C3%A9cran_2025-05-26_174913_bprgte.png",
+  "https://res.cloudinary.com/dxh0qathv/image/upload/v1748278381/Capture_d_%C3%A9cran_2025-05-26_175107_x4j5tq.png",
+  "https://res.cloudinary.com/dxh0qathv/image/upload/v1748278382/Capture_d_%C3%A9cran_2025-05-26_175157_snturd.png",
+  "https://res.cloudinary.com/dxh0qathv/image/upload/v1748278382/Capture_d_%C3%A9cran_2025-05-26_174836_epakfk.png",
 ]
 
 export default function Step1BasicInfo({ formData, updateFormData }: Step1Props) {
-  const [dragActive, setDragActive] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(
     typeof formData.banner === "string" ? formData.banner : null,
   )
 
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true)
-    } else if (e.type === "dragleave") {
-      setDragActive(false)
-    }
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0]
-      handleFile(file)
-    }
-  }
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      handleFile(file)
-    }
-  }
-
-  const handleFile = (file: File) => {
-    // Check if file is an image
-    if (!file.type.match("image.*")) {
-      alert("Please select an image file (.jpg or .png)")
-      return
-    }
-
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert("File size should be less than 5MB")
-      return
-    }
-
-    updateFormData({ banner: file })
-    const url = URL.createObjectURL(file)
-    setPreviewUrl(url)
-  }
-
-  const selectPredefinedBanner = (url: string) => {
+  // Handle image uploaded from Cloudinary
+  const handleImageUploaded = (url: string) => {
     updateFormData({ banner: url })
     setPreviewUrl(url)
   }
 
+  // Clear banner image
   const clearBanner = () => {
     updateFormData({ banner: null })
     setPreviewUrl(null)
-    if (typeof formData.banner === "object" && formData.banner !== null) {
-      URL.revokeObjectURL(previewUrl!)
-    }
+  }
+
+  // Select predefined banner
+  const selectPredefinedBanner = (url: string) => {
+    updateFormData({ banner: url })
+    setPreviewUrl(url)
   }
 
   return (
@@ -158,71 +118,24 @@ export default function Step1BasicInfo({ formData, updateFormData }: Step1Props)
               </Tooltip>
             </TooltipProvider>
           </div>
+          
+          <div className="space-y-2">
+            <p className="text-sm text-gray-500">
+              Choose a banner image to make your voting session stand out. You can upload your own image or select from our gallery.
+            </p>
+            
+            <CloudinaryUploader 
+              previewUrl={previewUrl}
+              onImageUploaded={handleImageUploaded}
+              onClear={clearBanner}
+            />
 
-          {previewUrl ? (
-            <div className="relative mt-2 rounded-lg overflow-hidden">
-              <img src={previewUrl || "/placeholder.svg"} alt="Banner preview" className="w-full h-48 object-cover" />
-              <button
-                onClick={clearBanner}
-                className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full p-1"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          ) : (
-            <>
-              <div
-                className={cn(
-                  "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors",
-                  dragActive
-                    ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
-                    : "border-gray-300 hover:border-purple-400 dark:border-gray-600",
-                )}
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-                onClick={() => document.getElementById("file-upload")?.click()}
-              >
-                <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                  Drag and drop an image, or click to select
-                </p>
-                <p className="text-xs text-gray-500 mt-1">JPG or PNG, max 5MB</p>
-                <input
-                  id="file-upload"
-                  type="file"
-                  className="hidden"
-                  accept="image/jpeg, image/png"
-                  onChange={handleFileChange}
-                />
-              </div>
-
-              <div className="mt-4">
-                <p className="text-sm font-medium mb-2">Or choose from our gallery:</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {predefinedBanners.map((banner, index) => (
-                    <div
-                      key={index}
-                      className={cn(
-                        "cursor-pointer rounded-lg overflow-hidden border-2 transition-all",
-                        formData.banner === banner
-                          ? "border-purple-500 ring-2 ring-purple-300"
-                          : "border-transparent hover:border-purple-300",
-                      )}
-                      onClick={() => selectPredefinedBanner(banner)}
-                    >
-                      <img
-                        src={banner || "/placeholder.svg"}
-                        alt={`Predefined banner ${index + 1}`}
-                        className="w-full h-20 object-cover"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
+            <BannerGallery 
+              banners={predefinedBanners}
+              selectedBanner={previewUrl}
+              onSelect={selectPredefinedBanner}
+            />
+          </div>
         </div>
       </div>
     </div>

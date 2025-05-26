@@ -1,20 +1,25 @@
-
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { authService } from "@/services";
+import { useRouter } from "next/navigation";
 
 export function LogoutSection() {
     const { toast } = useToast();
+    const router = useRouter();
 
     const handleLogout = () => {
+        // Call the auth service logout method to properly clear tokens
+        authService.logout();
+        
         toast({
             title: "Successfully logged out",
             description: "See you soon! 👋",
         });
 
-        // In a real application, this would clear auth tokens and redirect
+        // Redirect to login page after showing toast
         setTimeout(() => {
-            window.location.reload();
+            router.push("/");
         }, 1500);
     };
 

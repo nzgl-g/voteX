@@ -59,7 +59,7 @@ const LandingPageContent = () => {
       <header className="mt-2">
         <Navbar/>
       </header>
-      <main className="flex-1 flex flex-col items-center w-full landing-page">
+      <main className="flex-1 flex flex-col items-center w-full landing-page pt-20">
         <div className="w-full max-w-screen-xl mx-auto">
           <HeroSection/>
           <FeaturesSection/>

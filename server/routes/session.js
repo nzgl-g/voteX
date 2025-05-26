@@ -85,7 +85,7 @@ router.get("/by-phrase/:phrase", auth, async (req, res) => {
     }
     const session = await Session.findOne({
       secretPhrase: phrase,
-      visibility: "Private",
+      visibility: "private",
       securityMethod: "Secret Phrase",
     });
 

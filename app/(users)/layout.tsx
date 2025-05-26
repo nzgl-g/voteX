@@ -26,11 +26,11 @@ export default function UsersLayout({
     }
   }, [router]);
 
-  // We could add a loading state here, but for simplicity, we'll just render the children
+  // Wrap children with NotificationProvider but don't add any additional UI elements
   return (
     <NotificationProvider>
-        <ClientLoadingBar />
-        {children}
+      <ClientLoadingBar />
+      {children}
     </NotificationProvider>
   );
 } 

@@ -110,7 +110,7 @@ export const Navbar = React.forwardRef<HTMLDivElement>((props, ref) => {
       <div className="mx-auto max-w-4xl sm:max-w-5xl lg:max-w-6xl px-4 flex items-center justify-between">
         {/* Logo - Left Side */}
         <div className="flex-shrink-0">
-          <Link href="/public" className="font-bold text-lg flex items-center">
+          <Link href="/" className="font-bold text-lg flex items-center">
             <Image src={logoSrc} alt="Vote System Logo" width={128} height={32} className="object-contain select-none" priority />
           </Link>
         </div>
@@ -132,7 +132,7 @@ export const Navbar = React.forwardRef<HTMLDivElement>((props, ref) => {
               <div>
                 <SheetHeader className="mb-4 ml-4">
                   <SheetTitle className="flex items-center">
-                    <Link href="/public" className="flex items-center">
+                    <Link href="/" className="flex items-center">
                       <Image src={logoSrc} alt="Vote System Logo" width={120} height={40} className="mr-2" />
                     </Link>
                   </SheetTitle>
@@ -216,3 +216,5 @@ export const Navbar = React.forwardRef<HTMLDivElement>((props, ref) => {
     </header>
   );
 });
+
+Navbar.displayName = "Navbar";

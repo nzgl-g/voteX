@@ -125,16 +125,28 @@ class AuthService {
    * Log out the current user
    */
   logout(): void {
-    // Call the logout endpoint (optional, depends on if server does anything)
-    baseApi.post('/users/logout').catch(err => console.error('Logout error:', err));
-    
-    // Remove auth data
+    // First remove auth data to prevent further authenticated requests
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    
+    // Remove private session data
+    localStorage.removeItem('accessedSecretSessions');
+    localStorage.removeItem('redirectAfterLogin');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userId');
     
     // Remove cookies
     this.deleteCookie('token');
     this.deleteCookie('user');
+    
+    // Call the logout endpoint without requiring authentication
+    // We don't need to wait for the response or handle errors 
+    // since we're already logged out on the client side
+    fetch(`${baseApi.defaults.baseURL}/users/logout`, {
+      method: 'POST',
+    }).catch(() => {
+      // Silently fail - we're already logged out on the client
+    });
   }
 
   /**

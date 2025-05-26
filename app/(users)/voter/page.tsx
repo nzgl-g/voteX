@@ -5,7 +5,8 @@
 //-----------------------------------------------------
 
 // React and hooks
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 
 // Icons
 import { Plus, Key, RefreshCcw, Filter, AlertTriangle } from "lucide-react";
@@ -53,6 +54,7 @@ export default function VoterPage() {
   const [hiddenSessions, setHiddenSessions] = useState<Session[]>([]); // Sessions requiring secret phrase
   const [publicSessions, setPublicSessions] = useState<Session[]>([]); // Publicly accessible sessions
   const [filteredSessions, setFilteredSessions] = useState<Session[]>([]); // Sessions after applying filters
+  const [accessedSecretSessions, setAccessedSecretSessions] = useState<Session[]>([]); // Secret sessions user has accessed
   
   // UI state management
   const [loading, setLoading] = useState(true);                     // Loading indicator
@@ -72,6 +74,8 @@ export default function VoterPage() {
   
   // User information
   const [userId, setUserId] = useState<string>("anonymous");                   // Current user ID
+
+  const router = useRouter();
 
   //-----------------------------------------------------
   // UTILITY FUNCTIONS
@@ -118,6 +122,7 @@ export default function VoterPage() {
       console.warn(`Filtered out ${allSessions.length - validSessions.length} invalid sessions`);
     }
     
+    // No need to combine with accessedSecretSessions as they're already included in the passed allSessions
     setSessions(validSessions);
     
     try {
@@ -146,8 +151,19 @@ export default function VoterPage() {
       setPublicSessions(public_sessions);
       setHiddenSessions(secret_sessions);
       
-      // Apply filters to the public sessions
-      applyFilters(public_sessions);
+      // For filteredSessions, include both public sessions and accessed secret sessions
+      // Since we already combined regular sessions with secret sessions, all should be in validSessions
+      let sessionsToFilter = [...public_sessions];
+      
+      // Include ALL secret sessions since they would only be included if they were accessed
+      // (They were added in the fetch/refresh functions)
+      if (secret_sessions.length > 0) {
+        console.log(`Adding ${secret_sessions.length} secret sessions to filtered list`);
+        sessionsToFilter = [...sessionsToFilter, ...secret_sessions];
+      }
+      
+      // Apply filters to the combined list
+      applyFilters(sessionsToFilter);
     } catch (err) {
       console.error("Error processing sessions:", err);
       setError("Error processing sessions. Please try again.");
@@ -202,19 +218,57 @@ export default function VoterPage() {
    * @param sessions - Array of sessions to filter
    */
   const applyFilters = (sessions: Session[]) => {
+    console.log(`Applying filters to ${sessions.length} sessions. Type filter: ${typeFilter}, Status filter: ${statusFilter}`);
+    
     let filtered = [...sessions];
     
     // Apply type filter
     if (typeFilter !== 'all') {
       filtered = filtered.filter(session => session.type === typeFilter);
+      console.log(`After type filter: ${filtered.length} sessions remain`);
     }
     
     // Apply status filter
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(session => getSessionStatus(session) === statusFilter);
+      filtered = filtered.filter(session => {
+        const status = getSessionStatus(session);
+        return status === statusFilter;
+      });
+      console.log(`After status filter: ${filtered.length} sessions remain`);
+    }
+    
+    // Log some details about filtered sessions
+    if (filtered.length > 0) {
+      console.log("Filtered sessions:", filtered.map(s => ({
+        id: s._id,
+        name: s.name,
+        type: s.type,
+        securityMethod: s.securityMethod || 'none'
+      })));
     }
     
     setFilteredSessions(filtered);
+  };
+
+  /**
+   * Loads secret sessions from localStorage and applies them to state
+   * Returns the loaded sessions for immediate use
+   */
+  const loadSecretSessionsFromStorage = (): Session[] => {
+    try {
+      const savedSessions = localStorage.getItem('accessedSecretSessions');
+      if (savedSessions) {
+        const parsedSessions = JSON.parse(savedSessions);
+        if (Array.isArray(parsedSessions) && parsedSessions.length > 0) {
+          console.log(`Loading ${parsedSessions.length} secret sessions from localStorage`);
+          // Don't set state here, just return the sessions to be used
+          return parsedSessions;
+        }
+      }
+    } catch (err) {
+      console.error("Error loading from localStorage:", err);
+    }
+    return [];
   };
 
   //-----------------------------------------------------
@@ -236,10 +290,24 @@ export default function VoterPage() {
         setUserId(userData._id || "anonymous");
       }
       
+      // Load secret sessions first
+      const secretSessions = loadSecretSessionsFromStorage();
+      setAccessedSecretSessions(secretSessions);
+      
       console.log("Fetching sessions...");
       const allSessions = await sessionService.getAllSessions();
       console.log(`Fetched ${allSessions.length} sessions`);
-      processSessions(allSessions);
+      
+      // Combine fetched sessions with secret sessions
+      const combinedSessions = [...allSessions];
+      secretSessions.forEach(secretSession => {
+        if (!combinedSessions.some(s => s._id === secretSession._id)) {
+          combinedSessions.push(secretSession);
+        }
+      });
+      
+      // processSessions will handle the combined list
+      processSessions(combinedSessions);
     } catch (error) {
       console.error("Error fetching sessions:", error);
       setError("Failed to load sessions. Please try again later.");
@@ -263,6 +331,10 @@ export default function VoterPage() {
     setError(null);
     
     try {
+      // Load secret sessions first
+      const secretSessions = loadSecretSessionsFromStorage();
+      setAccessedSecretSessions(secretSessions);
+      
       console.log("Refreshing all sessions for voter portal...");
       const allSessions = await sessionService.getAllSessions();
       
@@ -270,7 +342,16 @@ export default function VoterPage() {
         throw new Error("Invalid response format from server");
       }
       
-      processSessions(allSessions);
+      // Combine fetched sessions with secret sessions
+      const combinedSessions = [...allSessions];
+      secretSessions.forEach(secretSession => {
+        if (!combinedSessions.some(s => s._id === secretSession._id)) {
+          combinedSessions.push(secretSession);
+        }
+      });
+      
+      // Process the combined sessions
+      processSessions(combinedSessions);
       toast.success("Sessions refreshed successfully");
     } catch (err: any) {
       console.error("Failed to refresh sessions:", err);
@@ -289,11 +370,24 @@ export default function VoterPage() {
     try {
       if (refreshing) return;
       
+      // Load secret sessions first
+      const secretSessions = loadSecretSessionsFromStorage();
+      setAccessedSecretSessions(secretSessions);
+      
       // Don't set the refreshing state to avoid UI changes
       const allSessions = await sessionService.getAllSessions();
       
       if (allSessions && Array.isArray(allSessions)) {
-        processSessions(allSessions);
+        // Combine fetched sessions with secret sessions
+        const combinedSessions = [...allSessions];
+        secretSessions.forEach(secretSession => {
+          if (!combinedSessions.some(s => s._id === secretSession._id)) {
+            combinedSessions.push(secretSession);
+          }
+        });
+        
+        // Process the combined sessions
+        processSessions(combinedSessions);
         console.log(`Silently refreshed ${allSessions.length} sessions`);
       }
     } catch (err) {
@@ -326,6 +420,33 @@ export default function VoterPage() {
     // Clean up interval on component unmount
     return () => clearInterval(autoRefreshInterval);
   }, []);
+
+  // Load accessed secret sessions from localStorage on initial mount
+  useEffect(() => {
+    try {
+      const savedSessions = localStorage.getItem('accessedSecretSessions');
+      if (savedSessions) {
+        const parsedSessions = JSON.parse(savedSessions);
+        if (Array.isArray(parsedSessions) && parsedSessions.length > 0) {
+          console.log(`Loaded ${parsedSessions.length} secret sessions from localStorage`);
+          setAccessedSecretSessions(parsedSessions);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading from localStorage:", err);
+    }
+  }, []);
+
+  // When accessedSecretSessions changes, update the processed sessions
+  useEffect(() => {
+    if (accessedSecretSessions.length > 0) {
+      console.log("Secret sessions updated, reprocessing all sessions");
+      // If we have regular sessions, combine them with secret sessions
+      if (sessions.length > 0) {
+        processSessions([...sessions]);
+      }
+    }
+  }, [accessedSecretSessions]);
 
   //-----------------------------------------------------
   // EVENT HANDLERS
@@ -398,8 +519,7 @@ export default function VoterPage() {
       return;
     }
     
-    toast.info(`Viewing profile for ${session.name}`);
-    // Implementation would depend on your app's navigation/routing
+    router.push(`/voter/session/${session._id}`);
   };
 
   /**
@@ -422,21 +542,51 @@ export default function VoterPage() {
         return;
       }
       
-      // Add the session to our list if it's not already there
-      setSessions(prevSessions => {
-        // Check if we already have this session
-        const exists = prevSessions.some(s => s._id === session._id);
-        if (exists) {
-          toast.info("You already have access to this session.");
-          return prevSessions;
-        }
-        
-        // Add the new session and process
-        const updatedSessions = [...prevSessions, session];
-        processSessions(updatedSessions);
-        toast.success(`Joined session: ${session.name}`);
-        return updatedSessions;
+      console.log("Retrieved secret session:", {
+        id: session._id,
+        name: session.name,
+        type: session.type,
+        securityMethod: session.securityMethod,
+        secretPhrase: session.secretPhrase ? '[REDACTED]' : 'none',
+        visibility: session.visibility
       });
+      // Check if we already have this session
+      const exists = sessions.some(s => s._id === session._id);
+      if (exists) {
+        toast.info("You already have access to this session.");
+        setShowSecretPhraseDialog(false);
+        return;
+      }
+      
+      // Get existing secret sessions from localStorage
+      const existingSecretSessions = loadSecretSessionsFromStorage();
+      
+      // Check if this session is already in localStorage
+      if (existingSecretSessions.some(s => s._id === session._id)) {
+        console.log("Session already exists in localStorage, but not in state. Adding to state.");
+      }
+      
+      // Add the new session to the list
+      const updatedSecretSessions = [...existingSecretSessions];
+      if (!updatedSecretSessions.some(s => s._id === session._id)) {
+        updatedSecretSessions.push(session);
+      }
+      
+      // Update state and localStorage
+      setAccessedSecretSessions(updatedSecretSessions);
+      localStorage.setItem('accessedSecretSessions', JSON.stringify(updatedSecretSessions));
+      
+      // Combine with current sessions and process
+      const allSessions = [...sessions];
+      if (!allSessions.some(s => s._id === session._id)) {
+        allSessions.push(session);
+      }
+      
+      processSessions(allSessions);
+      
+      console.log("After processing, filtered sessions count:", filteredSessions.length);
+      
+      toast.success(`Joined session: ${session.name}`);
       
       // Close the dialog
       setShowSecretPhraseDialog(false);
@@ -464,9 +614,9 @@ export default function VoterPage() {
   //-----------------------------------------------------
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Page Header */}
+      {/* Voter Header */}
       <VoterHeader />
-
+      
       {/* Main Content Area */}
       <main className="flex-1 container mx-auto py-8 px-4">
         {/* Page Title and Action Buttons */}

@@ -179,6 +179,13 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
       if (!formData.nominationStartDate || !formData.nominationEndDate) {
         errors.push("Election requires nomination start and end dates");
       }
+      
+      // Ensure nomination dates are before voting dates
+      if (formData.nominationStartDate && formData.nominationEndDate && formData.startDate) {
+        if (formData.nominationEndDate >= formData.startDate) {
+          errors.push("Nomination end date must be before voting start date");
+        }
+      }
     }
     
     // If we have no verification method selected
@@ -214,7 +221,7 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
         name: formData.title,
         description: formData.description || "", 
         organizationName: formData.organization || "",
-        banner: null, // File uploads handled separately
+        banner: typeof formData.banner === 'string' ? formData.banner : null, // Use the Cloudinary URL
         
         type: formData.voteType,
         subtype: formData.votingMode,
@@ -237,9 +244,9 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
             start: formData.startDate.toISOString(),
             end: formData.endDate.toISOString()
           },
-          // These should be null initially
-          startedAt: null,
-          endedAt: null
+          // Set startedAt and endedAt properly
+          startedAt: formData.startDate.toISOString(),
+          endedAt: formData.endDate.toISOString()
         },
         
         contractAddress: null,
@@ -329,12 +336,19 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
           return !!formData.startDate && !!formData.endDate
         } else if (formData.voteType === "election") {
           // For elections, always require nomination dates and voting dates
-          return (
-            !!formData.startDate &&
-            !!formData.endDate &&
-            !!formData.nominationStartDate &&
-            !!formData.nominationEndDate
-          )
+          const hasValidNominationDates = !!formData.nominationStartDate && 
+                                          !!formData.nominationEndDate && 
+                                          formData.nominationStartDate < formData.nominationEndDate;
+                                          
+          const hasValidVotingDates = !!formData.startDate && 
+                                      !!formData.endDate && 
+                                      formData.startDate < formData.endDate;
+                                      
+          const isNominationBeforeVoting = !!formData.nominationEndDate && 
+                                           !!formData.startDate && 
+                                           formData.nominationEndDate < formData.startDate;
+                                           
+          return hasValidNominationDates && hasValidVotingDates && isNominationBeforeVoting;
         }
         return false
       case 3: // Verification

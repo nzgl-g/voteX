@@ -5,7 +5,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { HelpCircle, MessageCircle, AlertTriangle, Mail } from "lucide-react";
+import { HelpCircle, MessageCircle, Mail } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const faqs = [
     {
@@ -21,14 +22,12 @@ const faqs = [
         answer: "Yes, all your data is automatically backed up to our secure cloud servers in real-time. You don't need to do anything to ensure your data is safe."
     },
     {
-        question: "How do I delete my account?",
-        answer: "You can delete your account from the Support & More tab in Settings. Scroll down to the 'Danger Zone' section and click on 'Delete Account'. Please note that this action is irreversible."
+        question: "How do I update my personal information?",
+        answer: "You can update your personal information from the Profile tab in Settings. Click the edit button next to any field you wish to change."
     }
 ];
 
 export function SupportSettings() {
-    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const [confirmText, setConfirmText] = useState("");
     const [chatOpen, setChatOpen] = useState(false);
     const { toast } = useToast();
 
@@ -41,150 +40,77 @@ export function SupportSettings() {
         setChatOpen(false);
     };
 
-    const handleDeleteAccount = () => {
-        if (confirmText === "DELETE") {
-            toast({
-                title: "Account scheduled for deletion",
-                description: "Your account will be permanently deleted within 30 days.",
-                duration: 5000,
-            });
-            setDeleteDialogOpen(false);
-            setConfirmText("");
-        } else {
-            toast({
-                title: "Confirmation failed",
-                description: "Please type DELETE in all capitals to confirm.",
-                variant: "destructive",
-            });
-        }
-    };
-
     return (
         <div className="space-y-8">
             <div>
                 <h3 className="text-lg font-medium">Help & Support</h3>
-                <p className="text-sm text-gray-500">
-                    Get help with your account and manage account-related settings.
+                <p className="text-sm text-muted-foreground">
+                    Get help with your account and find answers to common questions.
                 </p>
             </div>
 
             <div className="space-y-6">
-                <div className="space-y-3">
-                    <h4 className="font-medium flex items-center gap-2">
-                        <HelpCircle className="h-4 w-4 text-gray-500" />
-                        Frequently Asked Questions
-                    </h4>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                            <HelpCircle className="h-4 w-4 text-primary" />
+                            Frequently Asked Questions
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Accordion type="single" collapsible className="w-full">
+                            {faqs.map((faq, index) => (
+                                <AccordionItem key={index} value={`faq-${index}`}>
+                                    <AccordionTrigger className="text-left">
+                                        {faq.question}
+                                    </AccordionTrigger>
+                                    <AccordionContent>
+                                        <p className="text-muted-foreground">{faq.answer}</p>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    </CardContent>
+                </Card>
 
-                    <Accordion type="single" collapsible className="w-full">
-                        {faqs.map((faq, index) => (
-                            <AccordionItem key={index} value={`faq-${index}`}>
-                                <AccordionTrigger className="text-left">
-                                    {faq.question}
-                                </AccordionTrigger>
-                                <AccordionContent>
-                                    <p className="text-gray-600">{faq.answer}</p>
-                                </AccordionContent>
-                            </AccordionItem>
-                        ))}
-                    </Accordion>
-                </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Get Support</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Button
+                                variant="outline"
+                                className="flex items-center justify-start gap-3 p-6 h-auto"
+                                onClick={() => setChatOpen(true)}
+                            >
+                                <MessageCircle className="h-5 w-5 text-blue-500" />
+                                <div className="text-left">
+                                    <div className="font-medium">Live Chat</div>
+                                    <div className="text-sm text-muted-foreground">Chat with our support team</div>
+                                </div>
+                            </Button>
 
-                <div className="space-y-4 border-t pt-6">
-                    <h4 className="font-medium">Get Support</h4>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Button
-                            variant="outline"
-                            className="flex items-center justify-start gap-3 p-6 h-auto"
-                            onClick={() => setChatOpen(true)}
-                        >
-                            <MessageCircle className="h-5 w-5 text-blue-500" />
-                            <div className="text-left">
-                                <div className="font-medium">Live Chat</div>
-                                <div className="text-sm text-gray-500">Chat with our support team</div>
-                            </div>
-                        </Button>
-
-                        <Button
-                            variant="outline"
-                            className="flex items-center justify-start gap-3 p-6 h-auto"
-                            onClick={() => {
-                                toast({
-                                    title: "Email support",
-                                    description: "You can reach us at support@example.com",
-                                });
-                            }}
-                        >
-                            <Mail className="h-5 w-5 text-green-500" />
-                            <div className="text-left">
-                                <div className="font-medium">Email Support</div>
-                                <div className="text-sm text-gray-500">Get help via email</div>
-                            </div>
-                        </Button>
-                    </div>
-                </div>
-
-                <div className="border-t pt-6 mt-8">
-                    <div className="space-y-4">
-                        <h4 className="font-medium flex items-center gap-2 text-red-600">
-                            <AlertTriangle className="h-4 w-4" />
-                            Danger Zone
-                        </h4>
-                        <p className="text-sm text-gray-600">
-                            Permanent actions that can't be undone. Please proceed with caution.
-                        </p>
-
-                        <Button
-                            variant="destructive"
-                            onClick={() => setDeleteDialogOpen(true)}
-                            className="mt-2"
-                        >
-                            Delete Account
-                        </Button>
-                    </div>
-                </div>
+                            <Button
+                                variant="outline"
+                                className="flex items-center justify-start gap-3 p-6 h-auto"
+                                onClick={() => {
+                                    toast({
+                                        title: "Email support",
+                                        description: "You can reach us at support@example.com",
+                                    });
+                                }}
+                            >
+                                <Mail className="h-5 w-5 text-green-500" />
+                                <div className="text-left">
+                                    <div className="font-medium">Email Support</div>
+                                    <div className="text-sm text-muted-foreground">Get help via email</div>
+                                </div>
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
-
-            {/* Delete Account Dialog */}
-            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you really sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This action is irreversible. Your account, data, and all associated information will be permanently deleted.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-
-                    <div className="py-3">
-                        <Label htmlFor="confirm-delete" className="text-sm font-medium">
-                            Please type <span className="font-bold">DELETE</span> to confirm
-                        </Label>
-                        <Input
-                            id="confirm-delete"
-                            value={confirmText}
-                            onChange={(e) => setConfirmText(e.target.value)}
-                            className="mt-2"
-                        />
-                    </div>
-
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            className="bg-red-600 hover:bg-red-700"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                handleDeleteAccount();
-                            }}
-                        >
-                            Delete Forever
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-
-                    <div className="text-center text-sm text-gray-500 mt-2">
-                        We'll miss you 😢... but we understand.
-                    </div>
-                </AlertDialogContent>
-            </AlertDialog>
 
             {/* Live Chat Dialog */}
             <AlertDialog open={chatOpen} onOpenChange={setChatOpen}>

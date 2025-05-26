@@ -580,7 +580,7 @@ export function SessionCard({
     return (
       <button
         onClick={() => onViewProfile(session)}
-        className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 w-full ${getVariantClasses('outline')}`}
+        className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 w-full ${getVariantClasses('blue')}`}
       >
         <Eye className="h-4 w-4 mr-2" />
         View Details
@@ -591,16 +591,26 @@ export function SessionCard({
   const getAdditionalBadges = () => {
     const badges = [];
     
-    // Security method badge
-    if (session.securityMethod) {
-      if (session.securityMethod === "public") {
+    // Visibility badge (public/private)
+    if (session.visibility) {
+      if (session.visibility === "public") {
         badges.push(
-          <Badge key="security" variant="outline" className="px-2 py-0.5 text-xs font-normal flex items-center gap-1 border-green-200 text-green-700 dark:border-green-800 dark:text-green-400 bg-green-50 dark:bg-green-950/30 shadow-sm">
+          <Badge key="visibility" variant="outline" className="px-2 py-0.5 text-xs font-normal flex items-center gap-1 border-green-200 text-green-700 dark:border-green-800 dark:text-green-400 bg-green-50 dark:bg-green-950/30 shadow-sm">
             <UnlockIcon className="h-3 w-3" />
             Public
           </Badge>
         );
-      } else if (session.securityMethod === "private") {
+      } else if (session.visibility === "private") {
+        badges.push(
+          <Badge key="visibility" variant="outline" className="px-2 py-0.5 text-xs font-normal flex items-center gap-1 border-amber-200 text-amber-700 dark:border-amber-800 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 shadow-sm">
+            <LockIcon className="h-3 w-3" />
+            Private
+          </Badge>
+        );
+      }
+    } else if (session.securityMethod) {
+      // Fallback to securityMethod if visibility is not available
+      if (session.securityMethod === "Secret Phrase") {
         badges.push(
           <Badge key="security" variant="outline" className="px-2 py-0.5 text-xs font-normal flex items-center gap-1 border-amber-200 text-amber-700 dark:border-amber-800 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 shadow-sm">
             <LockIcon className="h-3 w-3" />

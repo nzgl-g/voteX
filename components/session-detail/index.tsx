@@ -371,8 +371,9 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
 
   const handleEditSession = () => {
     const status = getSessionStatus();
+    // Remove the restriction for started/ended sessions - allow editing settings at all times
     if (status.status === "started" || status.status === "ended") {
-      // If session is active or ended, only allow editing settings
+      // For active/ended sessions, only allow editing settings, not basic details
       setEditSection('settings')
     } else {
       // Otherwise allow editing all details
@@ -389,6 +390,33 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
     }, 100)
   }
 
+  // New dedicated function to edit settings - works in all cases
+  const handleEditSettings = () => {
+    setEditSection('settings')
+    setIsEditing(true)
+    
+    // Make sure the settings tab is active and scrolled into view
+    const tabsList = document.querySelector('[role="tablist"]') as HTMLElement
+    if (tabsList) {
+      const settingsTab = Array.from(tabsList.children).find(
+        tab => tab.getAttribute('data-value') === 'settings' || 
+        tab.getAttribute('value') === 'settings'
+      ) as HTMLElement
+      
+      if (settingsTab) {
+        settingsTab.click()
+      }
+    }
+    
+    // Scroll to the settings section
+    setTimeout(() => {
+      const element = document.getElementById('settings-tab')
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' })
+      }
+    }, 100)
+  }
+
   const handleSaveEdit = async () => {
     try {
       if (!session || !session._id) return
@@ -398,14 +426,34 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
       const status = getSessionStatus();
       
       if (editSection === 'details') {
-        // Get values from detail form fields
+        // Check for banner edit fields first (they take precedence if present)
+        const bannerNameInput = document.getElementById('banner-session-name') as HTMLInputElement;
+        const bannerDescInput = document.getElementById('banner-session-description') as HTMLTextAreaElement;
+        const bannerOrgInput = document.getElementById('banner-organization-name') as HTMLInputElement;
+        
+        // Fall back to regular form fields if banner fields don't exist
         const nameInput = document.getElementById('session-name') as HTMLInputElement;
         const descriptionInput = document.getElementById('session-description') as HTMLTextAreaElement;
         const orgNameInput = document.getElementById('organization-name') as HTMLInputElement;
         
-        if (nameInput && nameInput.value) updateData.name = nameInput.value;
-        if (descriptionInput) updateData.description = descriptionInput.value;
-        if (orgNameInput) updateData.organizationName = orgNameInput.value;
+        // Use banner values if available, otherwise use form values
+        if (bannerNameInput && bannerNameInput.value) {
+          updateData.name = bannerNameInput.value;
+        } else if (nameInput && nameInput.value) {
+          updateData.name = nameInput.value;
+        }
+        
+        if (bannerDescInput) {
+          updateData.description = bannerDescInput.value;
+        } else if (descriptionInput) {
+          updateData.description = descriptionInput.value;
+        }
+        
+        if (bannerOrgInput) {
+          updateData.organizationName = bannerOrgInput.value;
+        } else if (orgNameInput) {
+          updateData.organizationName = orgNameInput.value;
+        }
         
         // Check for session lifecycle fields (only if session hasn't started)
         if (status.status === "upcoming" || status.status === "nomination") {
@@ -702,10 +750,10 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
           priority
         />
         {/* Stronger gradient overlay for better text visibility */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/30"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/40"></div>
         
         {/* Session Tags - Now at the top of the content area, above session name */}
-        <div className="absolute top-4 left-4 flex flex-wrap gap-2 mb-4">
+        <div className="absolute top-4 left-4 flex flex-wrap gap-2 mb-4 z-10">
           <Badge variant="outline" className="capitalize bg-indigo-500/80 dark:bg-indigo-600/80 backdrop-blur-md text-white border-transparent">
             {session.type}
           </Badge>
@@ -724,24 +772,22 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
           </Badge>
         </div>
         
-        {/* Session name and description - Below the badges */}
-        <div className="absolute top-16 left-4 flex flex-col items-start justify-start text-left px-4">
+        {/* Session name and description - No inline editing in banner */}
+        <div className="absolute top-16 left-4 flex flex-col items-start justify-start text-left px-4 w-3/4 z-10">
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">{session.name}</h1>
-          {session.description && (
-            <p className="text-white/80 max-w-2xl mb-4">{session.description}</p>
+          <p className="text-white/90 max-w-2xl mb-2">{session.description || "No description provided"}</p>
+          
+          {/* Organization name */}
+          {session.organizationName && (
+            <div className="flex items-center gap-2 text-white/90 mt-2">
+              <Users className="h-4 w-4" />
+              <span className="font-medium">{session.organizationName}</span>
+            </div>
           )}
         </div>
         
-        {/* Organization name - Top left, adjusted position to be below description */}
-        {session.organizationName && (
-          <div className="absolute top-36 left-4 flex items-center gap-2 text-white/90">
-            <Users className="h-4 w-4" />
-            <span className="font-medium">{session.organizationName}</span>
-          </div>
-        )}
-        
         {/* Action Buttons - Bottom right corner */}
-        <div className="absolute bottom-4 right-4 flex flex-wrap gap-3 justify-end">
+        <div className="absolute bottom-4 right-4 flex flex-wrap gap-3 justify-end z-10">
           {/* Start Session Button */}
           {(statusInfo.status === "upcoming" || statusInfo.status === "nomination" || statusInfo.status === "pending_deployment") && (
             <Button 
@@ -774,7 +820,6 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
             variant={isEditing ? "default" : "outline"}
             size="sm"
             className={`${isEditing ? "bg-gradient-to-r from-blue-500 to-cyan-600" : "bg-gradient-to-r from-sky-500 to-blue-600"} hover:from-sky-600 hover:to-blue-700 text-white font-medium shadow-md hover:shadow-lg rounded-lg transition-all duration-300 px-4 border border-blue-400/20 flex items-center gap-2`}
-            disabled={statusInfo.status === "ended"}
           >
             <UserPlus className="h-4 w-4" />
             {isEditing ? "Currently Editing" : "Edit Session"}
@@ -797,7 +842,7 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
       <div id="details-section" className="space-y-4">
 
         {isEditing && editSection === 'details' ? (
-          <div className="space-y-4 border p-4 rounded-md">
+          <div className="space-y-4 border p-4 rounded-md bg-background shadow-md mt-4">
             <h3 className="text-lg font-medium">Edit Session Details</h3>
             <div className="grid gap-4">
               <div className="grid gap-2">
@@ -915,90 +960,138 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2 mt-2">
           <div className="backdrop-blur-md bg-background/60 rounded-xl border border-border/50 shadow-lg overflow-hidden hover:shadow-muted/20 transition-all duration-300">
             <div className="p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-foreground">Session Timeline</h3>
-              </div>
+              <h3 className="text-lg font-medium text-foreground mb-4">Session Timeline</h3>
               
               <div className="relative">
-                <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gradient-to-b from-muted/30 to-muted-foreground/20 z-0"></div>
+                {/* Timeline line - vertical */}
+                <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gradient-to-b from-primary/30 via-primary/20 to-muted-foreground/20 z-0"></div>
                 
-                <div className="relative z-10 space-y-6 pl-8">
-                  <div className="relative">
-                    <div className="absolute -left-8 top-0 bg-muted/40 backdrop-blur-sm rounded-full p-1.5">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                <div className="relative z-10 flex flex-col space-y-6 pl-12 pr-4">
+                  {/* Created event - always shown */}
+                  <div className="relative flex items-start">
+                    {/* Dot on timeline */}
+                    <div className="absolute left-[-32px] top-1 h-4 w-4 rounded-full bg-primary/20 border border-primary flex items-center justify-center">
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>
                     </div>
+                    {/* Content */}
                     <div>
-                      <p className="text-muted-foreground text-xs uppercase tracking-wider">Created</p>
-                      <p className="text-foreground">{formatDate(session.sessionLifecycle?.createdAt)}</p>
+                      <span className="text-xs font-medium uppercase tracking-wider text-primary">CREATED</span>
+                      <p className="text-sm text-foreground">{formatDate(session.sessionLifecycle?.createdAt)}</p>
                     </div>
                   </div>
                   
-                  {session.sessionLifecycle?.startedAt && (
-                    <div className="relative">
-                      <div className="absolute -left-8 top-0 bg-muted/40 backdrop-blur-sm rounded-full p-1.5">
-                        <Vote className="h-4 w-4 text-muted-foreground" />
+                  {/* Nomination phase for elections only */}
+                  {session.type === "election" && session.sessionLifecycle?.scheduledAt?.start && (
+                    <div className="relative flex items-start">
+                      {/* Dot on timeline */}
+                      <div className="absolute left-[-32px] top-1 h-4 w-4 rounded-full bg-amber-500/20 border border-amber-500 flex items-center justify-center">
+                        <div className="h-1.5 w-1.5 rounded-full bg-amber-500"></div>
                       </div>
+                      {/* Content */}
                       <div>
-                        <p className="text-muted-foreground text-xs uppercase tracking-wider">Started</p>
-                        <p className="text-foreground">{formatDate(session.sessionLifecycle.startedAt)}</p>
+                        <span className="text-xs font-medium uppercase tracking-wider text-amber-500">NOMINATION START</span>
+                        <p className="text-sm text-foreground">{formatDate(session.sessionLifecycle.scheduledAt.start)}</p>
                       </div>
                     </div>
                   )}
                   
-                  {session.sessionLifecycle?.endedAt && (
-                    <div className="relative">
-                      <div className="absolute -left-8 top-0 bg-muted/40 backdrop-blur-sm rounded-full p-1.5">
-                        <BarChart className="h-4 w-4 text-muted-foreground" />
+                  {/* Nomination end for elections only */}
+                  {session.type === "election" && session.sessionLifecycle?.scheduledAt?.end && (
+                    <div className="relative flex items-start">
+                      {/* Dot on timeline */}
+                      <div className="absolute left-[-32px] top-1 h-4 w-4 rounded-full bg-amber-700/20 border border-amber-700 flex items-center justify-center">
+                        <div className="h-1.5 w-1.5 rounded-full bg-amber-700"></div>
                       </div>
+                      {/* Content */}
                       <div>
-                        <p className="text-muted-foreground text-xs uppercase tracking-wider">Ended</p>
-                        <p className="text-foreground">{formatDate(session.sessionLifecycle.endedAt)}</p>
+                        <span className="text-xs font-medium uppercase tracking-wider text-amber-700">NOMINATION END</span>
+                        <p className="text-sm text-foreground">{formatDate(session.sessionLifecycle.scheduledAt.end)}</p>
                       </div>
                     </div>
                   )}
+                  
+                  {/* Scheduled start for polls only */}
+                  {session.type === "poll" && !session.sessionLifecycle?.startedAt && session.sessionLifecycle?.scheduledAt?.start && (
+                    <div className="relative flex items-start">
+                      {/* Dot on timeline */}
+                      <div className="absolute left-[-32px] top-1 h-4 w-4 rounded-full bg-blue-500/20 border border-blue-500 flex items-center justify-center">
+                        <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
+                      </div>
+                      {/* Content */}
+                      <div>
+                        <span className="text-xs font-medium uppercase tracking-wider text-blue-500">SCHEDULED START</span>
+                        <p className="text-sm text-foreground">{formatDate(session.sessionLifecycle.scheduledAt.start)}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Scheduled end for polls only */}
+                  {session.type === "poll" && !session.sessionLifecycle?.endedAt && session.sessionLifecycle?.scheduledAt?.end && (
+                    <div className="relative flex items-start">
+                      {/* Dot on timeline */}
+                      <div className="absolute left-[-32px] top-1 h-4 w-4 rounded-full bg-blue-700/20 border border-blue-700 flex items-center justify-center">
+                        <div className="h-1.5 w-1.5 rounded-full bg-blue-700"></div>
+                      </div>
+                      {/* Content */}
+                      <div>
+                        <span className="text-xs font-medium uppercase tracking-wider text-blue-700">SCHEDULED END</span>
+                        <p className="text-sm text-foreground">{formatDate(session.sessionLifecycle.scheduledAt.end)}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Voting start */}
+                  {session.sessionLifecycle?.startedAt && (
+                    <div className="relative flex items-start">
+                      {/* Dot on timeline */}
+                      <div className="absolute left-[-32px] top-1 h-4 w-4 rounded-full bg-green-500/20 border border-green-500 flex items-center justify-center">
+                        <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
+                      </div>
+                      {/* Content */}
+                      <div>
+                        <span className="text-xs font-medium uppercase tracking-wider text-green-500">VOTING START</span>
+                        <p className="text-sm text-foreground">{formatDate(session.sessionLifecycle.startedAt)}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Voting end */}
+                  {session.sessionLifecycle?.endedAt && (
+                    <div className="relative flex items-start">
+                      {/* Dot on timeline */}
+                      <div className="absolute left-[-32px] top-1 h-4 w-4 rounded-full bg-blue-500/20 border border-blue-500 flex items-center justify-center">
+                        <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
+                      </div>
+                      {/* Content */}
+                      <div>
+                        <span className="text-xs font-medium uppercase tracking-wider text-blue-500">VOTING END</span>
+                        <p className="text-sm text-foreground">{formatDate(session.sessionLifecycle.endedAt)}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Current status indicator */}
+                  <div className="relative flex items-start">
+                    {/* Dot on timeline */}
+                    <div className="absolute left-[-32px] top-1 h-4 w-4 rounded-full bg-gray-500/20 border border-gray-500 flex items-center justify-center">
+                      <div className="h-1.5 w-1.5 rounded-full bg-gray-500"></div>
+                    </div>
+                    {/* Content */}
+                    <div>
+                      <span className="text-xs font-medium uppercase tracking-wider text-gray-500">CURRENT STATUS</span>
+                      <div className="mt-1">
+                        <Badge className={`${statusInfo.color} px-2 py-0.5 text-xs`}>
+                          {statusInfo.label}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
           
-          {session.type === "election" && session.sessionLifecycle?.scheduledAt?.start && (
-            <div className="backdrop-blur-md bg-background/60 rounded-xl border border-border/50 shadow-lg overflow-hidden hover:shadow-muted/20 transition-all duration-300">
-              <div className="p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium text-foreground">Nomination Phase</h3>
-                  <div className="bg-muted/50 p-2 rounded-full">
-                    <UserPlus className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </div>
-                
-                <div className="mt-4 space-y-5">
-                  <div className="bg-muted/30 backdrop-blur-sm rounded-lg p-4 border-l-2 border-border/50">
-                    <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Starts</p>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5 text-muted-foreground" />
-                      <p className="text-foreground">{formatDate(session.sessionLifecycle.scheduledAt.start)}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-muted/30 backdrop-blur-sm rounded-lg p-4 border-l-2 border-border/50">
-                    <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Ends</p>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5 text-muted-foreground" />
-                      <p className="text-foreground">{formatDate(session.sessionLifecycle.scheduledAt.end)}</p>
-                    </div>
-                  </div>
-                  
-                  {getSessionStatusFromData(session) === "nomination" && (
-                    <div className="mt-4 text-center">
-                      <Badge className="bg-muted/70 hover:bg-muted/90 text-foreground px-3 py-1 text-sm">
-                        Nominations Active
-                      </Badge>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Nomination phase information is now integrated into the main timeline */}
         </div>
 
         {/* Blockchain information - Redesigned into a single cohesive block */}
@@ -1076,7 +1169,7 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
         {/* Settings Tab */}
         <TabsContent value="settings" className="space-y-6">
           {isEditing && editSection === 'settings' ? (
-            <div className="space-y-4 border p-4 rounded-md">
+            <div className="space-y-4 border p-4 rounded-md bg-background shadow-md">
               <h3 className="text-lg font-medium">Edit Session Settings</h3>
               <div className="grid gap-4">
                 <div className="grid gap-2">
@@ -1127,12 +1220,23 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
             <div className="space-y-8">
               <div className="backdrop-blur-md bg-background/60 rounded-xl border border-border/50 shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300">
                 <div className="p-6">
-                  <h3 className="text-xl font-semibold mb-6 text-foreground flex items-center">
-                    <span className="bg-indigo-100 dark:bg-indigo-900/30 p-2 rounded-lg mr-3">
-                      <Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                    </span>
-                    Session Configuration
-                  </h3>
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-semibold text-foreground flex items-center">
+                      <span className="bg-indigo-100 dark:bg-indigo-900/30 p-2 rounded-lg mr-3">
+                        <Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                      </span>
+                      Session Configuration
+                    </h3>
+                    <Button 
+                      onClick={handleEditSettings}
+                      variant="outline" 
+                      size="sm" 
+                      className="bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white"
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Edit Settings
+                    </Button>
+                  </div>
                   
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Verification Method */}

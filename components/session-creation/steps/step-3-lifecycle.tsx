@@ -63,9 +63,34 @@ export default function Step3Lifecycle({ formData, updateFormData }: Step3Props)
       now.setDate(now.getDate() + 7) // Default to a week later
       updateFormData({ endDate: now })
     }
-    if (formData.voteType === "election" && formData.hasNomination && !formData.nominationStartDate) {
-      const now = new Date()
-      updateFormData({ nominationStartDate: now })
+    
+    // For election type, ensure nomination dates are set
+    if (formData.voteType === "election") {
+      // Set hasNomination to true for elections
+      if (!formData.hasNomination) {
+        updateFormData({ hasNomination: true })
+      }
+      
+      // Set nomination start date if not already set
+      if (!formData.nominationStartDate) {
+        const now = new Date()
+        updateFormData({ nominationStartDate: now })
+        setNominationStartDate(now)
+      }
+      
+      // Set nomination end date if not already set
+      if (!formData.nominationEndDate) {
+        const nominationEnd = new Date()
+        nominationEnd.setDate(nominationEnd.getDate() + 3) // Default to 3 days later
+        updateFormData({ nominationEndDate: nominationEnd })
+        setNominationEndDate(nominationEnd)
+        
+        // Also update voting start date to be after nomination end
+        const votingStart = new Date(nominationEnd)
+        votingStart.setDate(votingStart.getDate() + 1) // Start voting 1 day after nomination ends
+        updateFormData({ startDate: votingStart })
+        setStartDate(votingStart)
+      }
     }
   }, [formData])
 

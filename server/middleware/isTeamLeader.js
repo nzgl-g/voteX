@@ -24,7 +24,7 @@ module.exports = async function isTeamLeader(req, res, next) {
       if (!task) return res.status(404).send("Task not found");
 
       const participant = await SessionParticipant.findOne({
-        sessionId,
+        sessionId: task.session,
         userId: req.user._id,
         role: "team_leader",
       });

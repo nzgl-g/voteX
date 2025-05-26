@@ -5,6 +5,7 @@ const Task = require("../models/Task");
 const logActivity = require("../helpers/logActivity");
 const sendNotification = require("../helpers/sendNotification");
 const Team = require("../models/Team");
+const SessionParticipant = require("../models/SessionParticipants");
 
 const router = express.Router();
 
@@ -20,7 +21,22 @@ router.post("/", auth, isTeamLeader, async (req, res) => {
       session,
       color,
     } = req.body;
+    const validParticipants = await SessionParticipant.find({
+      sessionId: session,
+      role: { $in: ["team_leader", "team_member"] },
+    }).select("userId");
 
+    const validUserIds = validParticipants.map((p) => p.userId.toString());
+    const invalidMembers = assignedMembers.filter(
+      (userId) => !validUserIds.includes(userId.toString())
+    );
+
+    if (invalidMembers.length > 0) {
+      return res.status(400).json({
+        message: "Some assigned users are not members",
+        invalidMembers,
+      });
+    }
     const task = new Task({
       title,
       description,
@@ -52,7 +68,13 @@ router.post("/", auth, isTeamLeader, async (req, res) => {
 
 router.get("/session/:sessionId", auth, async (req, res) => {
   try {
-    const tasks = await Task.find({ session: req.params.sessionId });
+    const filter = { session: req.params.sessionId };
+
+    if (req.query.mine === "true") {
+      filter.assignedMembers = req.user._id;
+    }
+
+    const tasks = await Task.find(filter);
     res.json(tasks);
   } catch (err) {
     res.status(500).json({ message: err.message });

@@ -28,7 +28,6 @@ router.get("/", auth, async (req, res) => {
 router.get("/my-sessions", auth, async (req, res) => {
   try {
     const userId = req.user._id;
-    console.log(userId);
     const sessions = await Session.find({ createdBy: userId })
       .populate("team")
       .populate("createdBy", "username email")

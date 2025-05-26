@@ -84,7 +84,12 @@ export default function AddMemberModal({ isOpen, onClose }: AddMemberModalProps)
       // Direct API call to match server expectations
       // Server expects a POST to /teams/:teamId/invite with email in the body
       const response = await baseApi.post(`/teams/${targetTeamId}/invite`, {
-        email: inviteEmail
+        email: inviteEmail,
+        message: message, // Include the custom message
+        extraData: {
+          sessionId: sessionId,
+          teamId: targetTeamId
+        }
       });
       
       toast.success("Invitation Sent", {

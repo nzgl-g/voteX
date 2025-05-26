@@ -1,275 +1,158 @@
-# AI-Powered KYC (Know Your Customer) System
+# KYC (Know Your Customer) System Documentation
 
-This is an AI-powered KYC system designed to verify customer identities with multiple verification layers. It uses advanced image processing and AI techniques to detect fake or manipulated ID documents.
+This document provides an overview of the KYC system, its components, API, and how it operates.
 
-## Features
+## Overview
 
-The system consists of several verification layers:  
-- **OCR Verification** – Extracts and validates text from ID documents and compares with provided form data.
-- **Metadata Verification** – Checks image EXIF metadata for inconsistencies or signs of manipulation.
-- **ELA (Error Level Analysis) Check** – Detects possible image tampering using compression analysis.
-- **Photo Forensics** – Performs in-depth pixel and pattern analysis to detect manipulation.
-- **Decision-Making Engine** – Aggregates verification results and uses AI to make a final decision based on priority and confidence levels.
+The KYC system is a Python-based application, likely using Flask or a similar micro-framework, designed to verify user identities. It performs several checks on submitted ID documents and personal information to determine the authenticity and validity of the KYC request. The main server application (Node.js/Express) interacts with this KYC system via its API.
 
-## How It Works
+## Project Structure
 
-Each verification layer outputs its results individually. These results are then passed to an AI engine, which determines the final decision based on predefined rules and priority settings:
+*   **`app.py`**: The main Flask (or similar) application file. It defines routes, handles requests, and orchestrates the KYC verification process.
+*   **`run.py`**: A simple script to run the development server for the KYC application.
+*   **`setup.py`**: Standard Python package setup file, indicating this can be packaged as a library (`kyc.egg-info`).
+*   **`requirements.txt`**: Lists the Python dependencies required for the KYC system.
+*   **`__init__.py`**: Makes the `kyc` directory a Python package.
+*   **`.env_sample`**: A sample environment file, indicating that configuration (e.g., API keys, secret keys) is likely managed through environment variables. A `.env` file (gitignored) would typically be used in development/production.
+*   **`.gitignore`**: Specifies files and directories to be ignored by Git (e.g., `__pycache__`, `uploads`, `output`, `.env`).
+*   **`/api/`**: Contains the API specific logic and its documentation.
+    *   `kyc_service.py`: Implements the core logic for the `/api/v1/verify` endpoint, likely calling functions from the `kyc_engine`.
+    *   `test_api.py`: Contains tests for the API endpoints.
+    *   `node_client_example.js`: Provides an example of how a Node.js client can interact with the KYC API.
+    *   `README.md`: (Already read) API endpoint documentation.
+*   **`/kyc_engine/`**: The core processing unit of the KYC system. It contains modules for various verification checks:
+    *   `decision_making.py`: Aggregates results from various checks to make a final KYC decision (accept, deny, flag for review).
+    *   `ela_check.py`: Likely performs Error Level Analysis on images to detect manipulations.
+    *   `image_forensics.py`: A broader module for various image forensic techniques (e.g., detecting tampering, inconsistencies).
+    *   `metadata_check.py`: Extracts and analyzes metadata from the uploaded ID image (e.g., EXIF data) for suspicious patterns.
+    *   `ocr_check.py`: Performs Optical Character Recognition (OCR) on the ID image to extract text (name, DOB, ID number) and compares it with the user-submitted data.
+    *   `shared.py`: Likely contains utility functions, constants, or shared logic used by multiple modules within the `kyc_engine`.
+*   **`/templates/`**: Contains HTML templates, likely for a simple web interface (e.g., `index.html` could be a test/demo page for uploading documents directly to the KYC app).
+*   **`/uploads/`**: Directory where uploaded ID images are temporarily stored for processing. This should be secured and cleaned regularly.
+*   **`/output/`**: Directory where processing outputs or reports might be saved (e.g., images with forensic analysis overlays, OCR results). This also needs proper management.
+*   **`/assets/`**: Static assets (CSS, JS, images) for the HTML templates.
+*   **`/__pycache__/`**: Python bytecode cache files.
+*   **`/kyc.egg-info/`**: Contains metadata related to the packaging of the `kyc` project.
 
-1. User submits personal information and ID image
-2. System runs the verification pipeline:
-   - OCR extracts text and compares with form data
-   - Metadata verification checks for tampering signs
-   - ELA detects compression inconsistencies
-   - Forensic analysis checks pixel-level manipulation
-3. AI decision engine evaluates all results
-4. System returns verification decision (accept/deny/flag for review)
+## Core Functionality (`app.py` and `/kyc_engine/`)
 
-## Codebase Structure
+1.  **Request Handling (`app.py`)**: The Flask app receives KYC verification requests, typically via the `/api/v1/verify` endpoint.
+2.  **Data Reception**: It accepts `multipart/form-data` including user details (full name, DOB, nationality, ID number) and the ID image file.
+3.  **File Storage**: The uploaded ID image is saved temporarily in the `/uploads/` directory.
+4.  **KYC Processing Pipeline (`/kyc_engine/`)**: The `kyc_service.py` likely orchestrates a series of checks by calling functions from the `kyc_engine` modules:
+    *   **OCR Check (`ocr_check.py`)**: Extracts text from the ID image. The extracted text is compared against the user-provided `full_name`, `dob`, and `id_number`.
+    *   **Metadata Check (`metadata_check.py`)**: Analyzes the image's metadata for any red flags (e.g., signs of editing software, unusual timestamps).
+    *   **Image Forensics (`image_forensics.py`, `ela_check.py`)**: Applies various techniques to the image to detect signs of digital tampering, such as:
+        *   Error Level Analysis (ELA)
+        *   Luminance gradient analysis
+        *   Other pixel-based forgery detection methods.
+5.  **Decision Making (`decision_making.py`)**: Based on the results from all the above checks, this module makes a final decision:
+    *   **`accept`**: If all checks pass with high confidence.
+    *   **`deny`**: If critical checks fail or strong indicators of fraud are detected.
+    *   **`flag for review`**: If some checks are inconclusive or raise minor suspicions, requiring manual review.
+6.  **Response Generation**: The system then formats a JSON response including the overall decision, a reason, and the status of individual checks.
+7.  **Cleanup**: Temporary files in `/uploads/` and `/output/` should ideally be cleaned up after processing.
 
-```
-.
-├── api/                    # API-related files
-│   ├── kyc_service.py      # API blueprint for KYC verification
-│   ├── node_client_example.js # Example Node.js integration
-│   ├── README.md           # API documentation
-│   └── test_api.py         # API testing utilities
-├── kyc_engine/             # Core verification modules
-│   ├── decision_making.py  # Pipeline and decision-making logic
-│   ├── ela_check.py        # Error Level Analysis implementation
-│   ├── image_forensics.py  # Pixel-level forensic analysis
-│   ├── metadata_check.py   # EXIF metadata analysis
-│   ├── ocr_check.py        # OCR verification implementation
-│   └── shared.py           # Shared utilities and configurations
-├── templates/              # Web interface templates
-│   └── index.html          # Main UI template
-├── uploads/                # Temporary storage for uploaded images
-├── output/                 # Output directory for analysis results
-│   ├── temp/               # Temporary files
-│   └── analysis/           # Analysis visualizations
-├── app.py                  # Main Flask application
-├── requirements.txt        # Python dependencies
-└── .env_sample             # Sample environment variables
-```
+## API Endpoints
 
-## Module Descriptions
+(Adapted from `kyc/api/README.md`)
 
-### 1. KYC Engine Core Modules
+### Verify KYC
 
-#### decision_making.py
-Central orchestration module that runs the verification pipeline and makes final decisions.
-- `run_pipeline()`: Executes all verification steps and collects results
-- `kyc_decision()`: Processes verification results to make final accept/deny/flag decision
+Performs KYC verification checks on a submitted ID card and personal information.
 
-#### ocr_check.py
-Handles OCR extraction and verification of ID card text.
-- `gemini()`: Uses Google Gemini API to extract and verify ID text
-- `ollama()`: Alternative implementation using local Ollama model
+*   **URL**: `/api/v1/verify`
+*   **Method**: `POST`
+*   **Content-Type**: `multipart/form-data`
+*   **Form Parameters**:
 
-#### metadata_check.py
-Analyzes EXIF metadata for signs of tampering.
-- `extract_metadata()`: Extracts all EXIF metadata from image
-- `detect_tampering()`: Analyzes metadata for manipulation indicators
+    | Parameter     | Type   | Description                                  | Required |
+    |---------------|--------|----------------------------------------------|----------|
+    | `full_name`   | string | Full name of the person                      | Yes      |
+    | `dob`         | string | Date of birth (format: YYYY-MM-DD or DD-MM-YYYY) | Yes      |
+    | `nationality` | string | Nationality of the person                    | Yes      |
+    | `id_number`   | string | ID card number                               | Yes      |
+    | `id_image`    | file   | Image of the ID card (JPG, JPEG, PNG)        | Yes      |
 
-#### ela_check.py
-Implements Error Level Analysis to detect image manipulation.
-- `ela_analysis()`: Performs ELA algorithm on image
-- `generate_composite_ela_image()`: Creates visualization of ELA results
+*   **Success Response (200 OK)**:
 
-#### image_forensics.py
-Advanced pixel-level forensic analysis for manipulation detection.
-- `pixel_level_check()`: Main analysis function
-- `analyze_edges()`, `analyze_noise()`: Component analysis techniques
-- `detect_cloning()`: Detects copy-paste manipulation
-- `generate_composite_image()`: Creates visualization of forensic results
-
-#### shared.py
-Core utilities and shared functionality.
-- API endpoints and configurations
-- Output directory management
-- JSON parsing utilities
-- Prompt templates for AI models
-
-### 2. API Components
-
-#### kyc_service.py
-Blueprint for KYC API endpoints.
-- `/api/v1/verify`: Main verification endpoint
-- `/api/v1/health`: Health check endpoint
-
-#### node_client_example.js
-Example Node.js client showing API integration.
-- Form handling and file upload
-- Communication with KYC API
-- Result processing and display
-
-### 3. Web Interface
-
-#### app.py
-Main Flask application.
-- Web routes and form handling
-- API blueprint registration
-- Directory initialization
-
-#### templates/index.html
-Web interface template with form for submitting ID verification.
-
-## Environment Setup
-
-The system requires the following environment variables:
-- `GEMINI_API_KEY`: API key for Google Gemini API
-- `GEMINI_MODEL`: Model identifier for Gemini AI model
-
-## Installation
-
-Follow these steps to set up and run the project:
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd <project-folder>
-   ```
-
-2. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Set up environment variables**
-   - Create a `.env` file in the project root based on `.env_sample`
-   - Add your Gemini API key and model name
-
-4. **Run the application**
-   ```bash
-   python app.py
-   ```
-
-## API Integration
-
-The system provides a RESTful API for integration with other applications:
-
-### API Endpoints
-
-- **Verify KYC**: `POST /api/v1/verify`
-  - Processes an ID card image and personal information for KYC verification
-  - Returns a verification decision with detailed results
-
-- **Health Check**: `GET /api/v1/health`
-  - Checks if the KYC service is operational
-
-### Request Format (Verify KYC)
-
-```
-POST /api/v1/verify
-Content-Type: multipart/form-data
-
-Form Parameters:
-- full_name: User's full name
-- dob: Date of birth (DD-MM-YYYY)
-- nationality: User's nationality
-- id_number: ID card number
-- id_image: ID card image file (JPG/PNG)
-```
-
-### Response Format
-
-```json
-{
-  "status": "success",
-  "verification_result": {
-    "decision": "accept",
-    "reason": "All verification checks passed successfully",
-    "checks": {
-      "ocr": "success",
-      "metadata": "success",
-      "image_integrity": "success"
+    ```json
+    {
+      "status": "success",
+      "verification_result": {
+        "decision": "accept" | "deny" | "flag for review",
+        "reason": "Explanation of the decision",
+        "checks": {
+          "ocr": "success" | "fail" | "flag for review",
+          "metadata": "success" | "fail" | "flag for review",
+          "image_integrity": "success" | "fail" | "flag for review"
+        }
+      }
     }
-  }
-}
-```
+    ```
 
-### Integration with Node.js/Express
+*   **Error Response (e.g., 400 Bad Request, 500 Internal Server Error)**:
 
-Example integration code for Node.js applications:
+    ```json
+    {
+      "status": "error",
+      "message": "Description of the error"
+    }
+    ```
 
-```javascript
-const axios = require('axios');
-const FormData = require('form-data');
-const fs = require('fs');
+### Health Check
 
-async function verifyKYC(userData, idImagePath) {
-  const form = new FormData();
-  form.append('full_name', userData.fullName);
-  form.append('dob', userData.dateOfBirth);
-  form.append('nationality', userData.nationality);
-  form.append('id_number', userData.idNumber);
-  form.append('id_image', fs.createReadStream(idImagePath));
-  
-  const response = await axios.post('http://your-kyc-server:5000/api/v1/verify', form, {
-    headers: { ...form.getHeaders() }
-  });
-  
-  return response.data;
-}
-```
+Checks if the KYC system is operational.
 
-See the complete Node.js example in `api/node_client_example.js`
+*   **URL**: `/api/v1/health`
+*   **Method**: `GET`
+*   **Success Response (200 OK)**:
 
-## Verification Process Technical Details
+    ```json
+    {
+      "status": "operational",
+      "version": "1.0" 
+    }
+    ```
+    (Version might be dynamically fetched or hardcoded in `app.py`)
 
-### OCR Verification
-The OCR verification uses Google's Gemini AI to extract text from ID cards and compare it with submitted form data. The system uses fuzzy matching to account for minor variations and different formats.
+## Running the KYC System
 
-### Error Level Analysis (ELA)
-ELA works by saving the image at a known quality level (e.g., 90%), then comparing this re-compressed version with the original. Areas with significant differences often indicate manipulation. The system visualizes these differences and calculates an error level score.
+1.  **Clone the repository.**
+2.  **Create and activate a Python virtual environment.**
+3.  **Install dependencies**: `pip install -r requirements.txt`
+4.  **Set up environment variables**: Create a `.env` file based on `.env_sample` and provide necessary configurations (e.g., `FLASK_APP=app.py`, `FLASK_ENV=development`, any API keys for external services if used).
+5.  **Run the application**: `python run.py` or `flask run` (if `FLASK_APP` is set).
 
-### Metadata Analysis
-The metadata check examines EXIF data for signs of manipulation like:
-- Editing software fingerprints
-- Inconsistent timestamps
-- Missing or altered camera information
-- GPS data anomalies
+    The server will typically start on `http://localhost:5000` (or as configured).
 
-### Forensic Analysis
-Pixel-level forensic analysis includes:
-- Edge detection anomalies
-- Noise pattern inconsistencies
-- Clone detection (copy-paste manipulation)
-- JPEG compression artifact analysis
+## Integration with Main Server
 
-### Decision Engine
-The decision engine weighs all verification results with different priorities:
-1. OCR verification (highest priority)
-2. ELA and forensic analysis (high priority)
-3. Metadata verification (medium priority)
+The Node.js/Express backend (described in the server documentation) acts as a client to this KYC API. The `kyc/api/node_client_example.js` file provides a blueprint for this interaction.
 
-## Output and Visualization
+*   When a user needs KYC verification, the main server collects their data and ID image.
+*   The main server then makes a `POST` request to the `/api/v1/verify` endpoint of this KYC system.
+*   The main server receives the JSON response and updates the user's KYC status in its own database and informs the user.
 
-The system generates visualization files in the `output` directory:
-- `output/analysis`: Contains ELA and forensic analysis visualizations
-- `output/temp`: Temporary files used during processing
+## Dependencies
 
-These visualizations help in understanding the verification results and can be useful for manual review when needed.
+Key Python libraries likely include:
 
-## Testing
+*   Flask (or similar like FastAPI, Bottle) for the web framework.
+*   Pillow (PIL Fork) or OpenCV for image processing.
+*   Pytesseract or other OCR libraries.
+*   Libraries for EXIF data extraction.
+*   Requests (for making calls to external services, if any).
 
-Use the provided testing utilities to verify the system's functionality:
+(Refer to `requirements.txt` for the complete list)
 
-```bash
-# Test the API health endpoint
-python api/test_api.py --test health
+## Security and Considerations
 
-# Test verification with a sample image
-python api/test_api.py --test verify --image /path/to/id_image.jpg
-```
+*   **Data Privacy**: KYC data (personal information and ID images) is highly sensitive. Ensure secure handling, storage (even if temporary), and transmission (HTTPS for the API).
+*   **Temporary File Management**: Ensure that files in `/uploads/` and `/output/` are securely deleted after processing to prevent data leaks.
+*   **Error Handling**: Robust error handling is needed for image processing failures, OCR issues, etc.
+*   **Scalability**: For high-volume KYC requests, consider deploying the KYC system with a production-grade WSGI server (like Gunicorn or uWSGI) and potentially load balancing.
+*   **Engine Accuracy**: The accuracy of the `kyc_engine` modules is critical. Regular testing and updates to the detection algorithms might be necessary to combat new fraud techniques.
+*   **Configuration**: Externalize all sensitive configurations (API keys, thresholds for checks) using environment variables.
 
-## Contributing
-
-To contribute to this project:
-1. Fork the repository
-2. Create a feature branch
-3. Implement your changes with tests
-4. Submit a pull request
-
-## License
-
-This project is proprietary software. All rights reserved.
+This documentation provides a comprehensive guide to the KYC system. 

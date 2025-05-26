@@ -90,7 +90,7 @@ function NoSessionsDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
   )
 }
 
-export function SessionSelector() {
+export function SessionSelector({ userRole = 'team-leader' }: { userRole?: string }) {
   const [mySessions, setMySessions] = useState<SessionItem[]>([])
   const [memberSessions, setMemberSessions] = useState<SessionItem[]>([])
   const [activeSession, setActiveSession] = useState<SessionItem | null>(null)
@@ -244,23 +244,90 @@ export function SessionSelector() {
     debouncedFetchSessions()
   }, [debouncedFetchSessions])
 
-  const getSessionIdFromPath = (sessions: SessionItem[]) => {
+  // Build URL based on session and role
+  const buildSessionUrl = useCallback((sessionId: string, section: string = 'session') => {
+    // Use provided role instead of hardcoded path
+    return `/${userRole}/${section}/${sessionId}`;
+  }, [userRole]);
+
+  const getSessionIdFromPath = useCallback((sessions: SessionItem[]) => {
+    // Extract session ID from the path
     const pathSegments = pathname.split('/')
-    return pathSegments.find(segment => sessions.some(session => session.id === segment))
-  }
+    const possibleSessionId = pathSegments.find(segment => /^[0-9a-fA-F]{24}$/.test(segment))
+    
+    // Find the session in the provided list
+    if (possibleSessionId) {
+      const sessionMatch = sessions.find(session => session.id === possibleSessionId)
+      if (sessionMatch) {
+        setActiveSession(sessionMatch)
+        return possibleSessionId
+      }
+    }
+    
+    // Check if we're on a default page - for both team-leader and team-member paths
+    const isTeamLeaderPath = pathname.includes('/team-leader/')
+    const isTeamMemberPath = pathname.includes('/team-member/')
+    
+    if ((isTeamLeaderPath || isTeamMemberPath) && pathname.includes('/default')) {
+      // Filter sessions based on the current path role
+      const filteredSessions = isTeamMemberPath 
+        ? sessions.filter(s => s.role === 'member')
+        : sessions.filter(s => s.role !== 'member')
+      
+      // Use role-appropriate sessions if available, otherwise fall back to all sessions
+      const relevantSessions = filteredSessions.length > 0 ? filteredSessions : sessions
+      
+      if (relevantSessions.length > 0) {
+        const firstSession = relevantSessions[0]
+        setActiveSession(firstSession)
+        
+        // Determine which role path to use
+        const rolePath = isTeamMemberPath ? 'team-member' : 'team-leader'
+        
+        // Get the section segment (monitoring, session, etc.)
+        const segment = pathname.split('/').filter(p => p !== '')[1] || 'session'
+        
+        // Build the URL with the correct role path
+        const url = `/${rolePath}/${segment}/${firstSession.id}`
+        
+        // Only redirect if we're not already in the process
+        if (!isFetchingRef.current && shouldRedirectOnErrorRef.current) {
+          setTimeout(() => {
+            router.replace(url)
+          }, 100)
+        }
+        
+        return firstSession.id
+      }
+    }
+    
+    return null
+  }, [pathname, router]);
 
   const handleSessionSelect = (session: SessionItem) => {
     setActiveSession(session)
+    
+    // Determine the correct role path based on the session role
+    const sessionRole = session.role === "member" ? "team-member" : "team-leader"
+    
+    // Get the current path segment if available
     const pathSegments = pathname.split('/')
-    const roleSegment = session.role === "member" ? 'team-member' : 'team-leader'
-    let sectionSegment = 'monitoring'
+    let sectionSegment = 'session'
+    
+    // Try to preserve the current section (monitoring, session, etc.) when switching sessions
     if (pathSegments.length > 2) {
-      const thirdSegment = pathSegments[2]
-      if (thirdSegment && !thirdSegment.match(/^[0-9a-fA-F]{24}$/)) {
-        sectionSegment = thirdSegment
+      const possibleSection = pathSegments[2]
+      // Only use the segment if it's not a session ID
+      if (possibleSection && !/^[0-9a-fA-F]{24}$/.test(possibleSection)) {
+        sectionSegment = possibleSection
       }
     }
-    router.push(`/${roleSegment}/${sectionSegment}/${session.id}`)
+    
+    // Build the URL with the correct role and section
+    const url = `/${sessionRole}/${sectionSegment}/${session.id}`
+    
+    // Navigate to the appropriate dashboard based on the session role
+    router.push(url)
   }
 
   const handleCreateNewSession = () => { // Renamed to avoid conflict

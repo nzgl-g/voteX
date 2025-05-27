@@ -240,11 +240,16 @@ export default function VotingSessionForm({ subscription, onSuccess }: VotingSes
         
         sessionLifecycle: {
           // Backend sets createdAt automatically
-          scheduledAt: {
+          scheduledAt: formData.voteType === 'election' && formData.hasNomination ? {
+            // For elections with nomination, scheduledAt holds nomination dates
+            start: formData.nominationStartDate ? formData.nominationStartDate.toISOString() : null,
+            end: formData.nominationEndDate ? formData.nominationEndDate.toISOString() : null
+          } : {
+            // For polls or elections without nomination, scheduledAt matches voting dates
             start: formData.startDate.toISOString(),
             end: formData.endDate.toISOString()
           },
-          // Set startedAt and endedAt properly
+          // startedAt and endedAt always represent the voting period
           startedAt: formData.startDate.toISOString(),
           endedAt: formData.endDate.toISOString()
         },

@@ -4,9 +4,10 @@ import sessionService from './session-service';
 import teamService from './team-service';
 import taskService from './task-service';
 import notificationService from './notification-service';
+import eventService from './event-service';
 
 // Re-export services for easy import
-export { authService, sessionService, teamService, taskService, notificationService };
+export { authService, sessionService, teamService, taskService, notificationService, eventService };
 
 // Re-export interfaces for use in components
 export type {
@@ -59,5 +60,6 @@ export default {
   team: teamService,
   task: taskService,
   notification: notificationService,
+  event: eventService,
   api: baseApi
 }; 

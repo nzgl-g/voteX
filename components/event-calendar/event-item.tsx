@@ -247,12 +247,6 @@ export function EventItem({
             {formatTimeWithOptionalMinutes(displayEnd)}
           </span>
         )}
-        {event.location && (
-          <>
-            <span className="px-1 opacity-35"> · </span>
-            <span>{event.location}</span>
-          </>
-        )}
       </div>
       {event.description && (
         <div className="my-1 text-xs opacity-90">{event.description}</div>

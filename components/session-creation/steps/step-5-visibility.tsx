@@ -228,9 +228,14 @@ export default function Step5Visibility({ formData, updateFormData }: Step5Props
           </div>
 
           <div>
-            <Label className="text-base mb-3 block">CSV Upload (Voter List)</Label>
+            <div className="flex items-center gap-2">
+              <Label className="text-base mb-3 block">CSV Upload (Voter List)</Label>
+              <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                Coming Soon
+              </Badge>
+            </div>
 
-            {formData.csvFile && csvPreview ? (
+            {false && formData.csvFile && csvPreview ? (
               <div className="border rounded-lg overflow-hidden">
                 <div className="flex items-center justify-between bg-gray-100 dark:bg-gray-800 p-3">
                   <div className="flex items-center">
@@ -259,31 +264,23 @@ export default function Step5Visibility({ formData, updateFormData }: Step5Props
               <>
                 <div
                   className={cn(
-                    "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors",
-                    dragActive
-                      ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
-                      : "border-gray-300 hover:border-orange-400 dark:border-gray-600",
+                    "border-2 border-dashed rounded-lg p-6 text-center transition-colors opacity-60",
+                    "border-gray-300 dark:border-gray-600"
                   )}
-                  onDragEnter={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDragOver={handleDrag}
-                  onDrop={handleDrop}
-                  onClick={() => document.getElementById("csv-upload")?.click()}
                 >
                   <Upload className="mx-auto h-12 w-12 text-gray-400" />
                   <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                    Drag and drop a CSV file, or click to select
+                    CSV upload functionality coming soon
                   </p>
                   <p className="text-xs text-gray-500 mt-1">CSV format: Full Name, Email</p>
-                  <input id="csv-upload" type="file" className="hidden" accept=".csv" onChange={handleFileChange} />
                 </div>
 
                 <div className="flex justify-center mt-3">
                   <Button
                     variant="link"
                     size="sm"
-                    onClick={downloadTemplate}
-                    className="text-orange-600 dark:text-orange-400 flex items-center gap-1"
+                    disabled
+                    className="text-gray-400 dark:text-gray-500 flex items-center gap-1 cursor-not-allowed"
                   >
                     <Download size={14} />
                     Download CSV Template
@@ -293,8 +290,7 @@ export default function Step5Visibility({ formData, updateFormData }: Step5Props
             )}
 
             <p className="text-sm text-gray-500 mt-3">
-              Upload a CSV file with the list of authorized voters. Only these individuals will receive access to the
-              voting session.
+              CSV upload for authorized voters list will be available soon. This feature will allow you to restrict access to only specific individuals.
             </p>
           </div>
         </div>

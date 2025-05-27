@@ -8,89 +8,31 @@ import { Button } from "@/components/ui/button"
 import { formatDistanceToNow } from "date-fns"
 import { toast } from "sonner"
 import { useTeam } from "./team-context"
+import baseApi from "@/services/base-api"
 
 // Types for log activity
 interface LogActivity {
-  id: string
-  type: 'member_added' | 'member_removed' | 'task_created' | 'task_completed' | 'task_updated' | 'change_requested'
-  user: {
-    name: string
-    avatar?: string
-  }
-  target: string
+  _id: string
+  action: string
   timestamp: string
+  actor: {
+    _id: string
+    fullName: string
+    username: string
+    email: string
+    profilePic?: string
+  }
 }
 
-// Mock log service (replace with actual API implementation)
+// Real API implementation to fetch activity logs
 const fetchActivityLogs = async (sessionId: string): Promise<LogActivity[]> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500))
-  
-  // In a real app, you would call your API:
-  // return await fetch(`/api/sessions/${sessionId}/logs`).then(res => res.json())
-  
-  return [
-    {
-      id: "1",
-      type: "member_added",
-      user: {
-        name: "John Doe",
-        avatar: "/placeholder.svg?height=32&width=32",
-      },
-      target: "Alice Jones",
-      timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 min ago
-    },
-    {
-      id: "2",
-      type: "task_completed",
-      user: {
-        name: "Jane Doe",
-        avatar: "/placeholder.svg?height=32&width=32",
-      },
-      target: "Fix login bug",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
-    },
-    {
-      id: "3",
-      type: "task_created",
-      user: {
-        name: "Bob Smith",
-        avatar: "/placeholder.svg?height=32&width=32",
-      },
-      target: "Update user interface",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(), // 5 hours ago
-    },
-    {
-      id: "4",
-      type: "member_removed",
-      user: {
-        name: "John Doe",
-        avatar: "/placeholder.svg?height=32&width=32",
-      },
-      target: "Mike Wilson",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
-    },
-    {
-      id: "5",
-      type: "task_updated",
-      user: {
-        name: "Alice Jones",
-        avatar: "/placeholder.svg?height=32&width=32",
-      },
-      target: "Prepare presentation",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(), // 2 days ago
-    },
-    {
-      id: "6",
-      type: "change_requested",
-      user: {
-        name: "Mike Brown",
-        avatar: "/placeholder.svg?height=32&width=32",
-      },
-      target: "Team settings",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(), // 3 days ago
-    },
-  ]
+  try {
+    const response = await baseApi.get(`/activityLogs/${sessionId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch activity logs:", error);
+    throw error;
+  }
 }
 
 export default function LogBlock() {
@@ -125,9 +67,17 @@ export default function LogBlock() {
     }
   }, [sessionId])
 
-  // Load logs on mount and when refreshCounter changes
+  // Set up auto-refresh every 30 seconds
   useEffect(() => {
     loadLogs()
+    
+    // Set up auto-refresh interval
+    const intervalId = setInterval(() => {
+      loadLogs(false) // Don't show loading state on auto-refresh
+    }, 30000) // 30 seconds
+    
+    // Clean up on unmount
+    return () => clearInterval(intervalId)
   }, [loadLogs, refreshCounter])
 
   // Handle manual refresh
@@ -135,41 +85,21 @@ export default function LogBlock() {
     loadLogs(false)
   }
 
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case "member_added":
-        return <UserPlus className="h-5 w-5 text-green-500" />
-      case "member_removed":
-        return <UserMinus className="h-5 w-5 text-red-500" />
-      case "task_created":
-        return <Clock className="h-5 w-5 text-blue-500" />
-      case "task_completed":
-        return <CheckCircle className="h-5 w-5 text-green-500" />
-      case "task_updated":
-        return <Edit className="h-5 w-5 text-yellow-500" />
-      case "change_requested":
-        return <AlertCircle className="h-5 w-5 text-orange-500" />
-      default:
-        return <Edit className="h-5 w-5 text-gray-500" />
-    }
-  }
-
-  const getActivityText = (log: LogActivity) => {
-    switch (log.type) {
-      case "member_added":
-        return `added ${log.target} to the team`
-      case "member_removed":
-        return `removed ${log.target} from the team`
-      case "task_created":
-        return `created a new task: ${log.target}`
-      case "task_completed":
-        return `completed the task: ${log.target}`
-      case "task_updated":
-        return `updated the task: ${log.target}`
-      case "change_requested":
-        return `requested changes to ${log.target}`
-      default:
-        return `performed an action on ${log.target}`
+  const getActivityIcon = (action: string) => {
+    if (action.includes("added") || action.includes("joined")) {
+      return <UserPlus className="h-5 w-5 text-green-500" />
+    } else if (action.includes("removed") || action.includes("left")) {
+      return <UserMinus className="h-5 w-5 text-red-500" />
+    } else if (action.includes("created")) {
+      return <Clock className="h-5 w-5 text-blue-500" />
+    } else if (action.includes("completed")) {
+      return <CheckCircle className="h-5 w-5 text-green-500" />
+    } else if (action.includes("updated") || action.includes("changed")) {
+      return <Edit className="h-5 w-5 text-yellow-500" />
+    } else if (action.includes("requested")) {
+      return <AlertCircle className="h-5 w-5 text-orange-500" />
+    } else {
+      return <Edit className="h-5 w-5 text-gray-500" />
     }
   }
 
@@ -215,23 +145,23 @@ export default function LogBlock() {
           </div>
         ) : (
           activityLogs.map((log) => (
-            <div key={log.id} className="flex items-start gap-4 border-b pb-4 last:border-0 last:pb-0">
+            <div key={log._id} className="flex items-start gap-4 border-b pb-4 last:border-0 last:pb-0">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
-                {getActivityIcon(log.type)}
+                {getActivityIcon(log.action)}
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <Avatar className="h-6 w-6">
-                    <AvatarImage src={log.user.avatar} alt={log.user.name} />
+                    <AvatarImage src={log.actor.profilePic} alt={log.actor.fullName} />
                     <AvatarFallback>
-                      {log.user.name
+                      {log.actor.fullName
                         .split(" ")
                         .map((n: string) => n[0])
                         .join("")}
                     </AvatarFallback>
                   </Avatar>
-                  <p className="text-sm font-medium leading-none">{log.user.name}</p>
-                  <p className="text-sm text-muted-foreground">{getActivityText(log)}</p>
+                  <p className="text-sm font-medium leading-none">{log.actor.fullName}</p>
+                  <p className="text-sm text-muted-foreground">{log.action}</p>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">{formatTimeAgo(log.timestamp)}</p>
               </div>

@@ -156,10 +156,22 @@ export function VotingDialog({
             setSubmitting(true);
             
             // For blockchain sessions, we need to connect to MetaMask first
-            if (isBlockchainSession && !metamaskService.isConnected()) {
-                const connected = await metamaskService.connect();
-                if (!connected) {
-                    throw new Error("Please connect your wallet to cast a vote");
+            if (isBlockchainSession) {
+                console.log("[VotingDialog] Blockchain session detected, connecting to MetaMask...");
+                try {
+                    const connected = await metamaskService.connect();
+                    if (!connected) {
+                        toast({
+                            title: "Wallet Connection Required",
+                            description: "Please connect your MetaMask wallet to cast your vote.",
+                            variant: "destructive"
+                        });
+                        throw new Error("MetaMask connection required");
+                    }
+                    console.log("[VotingDialog] MetaMask connected successfully");
+                } catch (metamaskError) {
+                    console.error("[VotingDialog] MetaMask connection error:", metamaskError);
+                    throw new Error("Failed to connect to MetaMask wallet");
                 }
             }
             
@@ -169,6 +181,8 @@ export function VotingDialog({
                 selectedOptions: selectedOptions
             };
             
+            console.log("[VotingDialog] Submitting vote data:", voteData);
+            
             // Submit the vote through the session service
             const result = await sessionService.castVote(sessionId, voteData);
             
@@ -176,6 +190,8 @@ export function VotingDialog({
             if (!result) {
                 throw new Error("Invalid response received");
             }
+            
+            console.log("[VotingDialog] Vote submission result:", result);
             
             // If there's a blockchain transaction hash, store it
             if (result.txHash) {

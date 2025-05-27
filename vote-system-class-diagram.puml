@@ -1,4 +1,4 @@
-@startuml Vote System Class Diagram
+qdd@startuml Vote System Class Diagram
 
 ' Enumerations
 enum ROLE {

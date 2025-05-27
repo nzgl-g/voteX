@@ -36,6 +36,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+// Handle Stagewise Toolbar errors globally
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', (event) => {
+    // Check if the error is related to Stagewise toolbar
+    if (event.message?.includes('stagewise') || 
+        event.filename?.includes('stagewise') ||
+        event.error?.stack?.includes('stagewise')) {
+      // Prevent the error from breaking the application
+      console.warn('Stagewise error suppressed:', event.message);
+      event.preventDefault();
+      return true;
+    }
+  });
+}
+
 //-----------------------------------------------------
 // TYPE DEFINITIONS
 //-----------------------------------------------------
@@ -76,6 +91,26 @@ export default function VoterPage() {
   const [userId, setUserId] = useState<string>("anonymous");                   // Current user ID
 
   const router = useRouter();
+
+  // Override console.error to prevent Stagewise reconnection errors from breaking the UI
+  useEffect(() => {
+    const originalConsoleError = console.error;
+    console.error = (...args) => {
+      // Ignore Stagewise reconnection errors
+      if (args[0] && (
+        (typeof args[0] === 'string' && args[0].includes('Max reconnection attempts reached')) ||
+        (args[0] instanceof Error && args[0].message.includes('Max reconnection attempts reached'))
+      )) {
+        console.warn('Suppressed Stagewise reconnection error');
+        return;
+      }
+      originalConsoleError(...args);
+    };
+    
+    return () => {
+      console.error = originalConsoleError;
+    };
+  }, []);
 
   //-----------------------------------------------------
   // UTILITY FUNCTIONS
@@ -283,11 +318,24 @@ export default function VoterPage() {
     setLoading(true);
     setError(null);
     try {
-      // Get the current user ID for notifications
-      const user = localStorage.getItem('user');
-      if (user) {
-        const userData = JSON.parse(user);
-        setUserId(userData._id || "anonymous");
+      // Get the current user ID for notifications with better error handling
+      try {
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+          const userData = JSON.parse(userStr);
+          if (userData && userData._id) {
+            setUserId(userData._id);
+          } else {
+            console.warn('User ID not found in user data', userData);
+            setUserId("anonymous");
+          }
+        } else {
+          console.warn('User data not found in localStorage');
+          setUserId("anonymous");
+        }
+      } catch (err) {
+        console.warn('Error parsing user data from localStorage', err);
+        setUserId("anonymous");
       }
       
       // Load secret sessions first

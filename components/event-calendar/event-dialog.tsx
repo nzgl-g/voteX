@@ -63,7 +63,6 @@ export function EventDialog({
   const [startTime, setStartTime] = useState(`${DefaultStartHour}:00`);
   const [endTime, setEndTime] = useState(`${DefaultEndHour}:00`);
   const [allDay, setAllDay] = useState(false);
-  const [location, setLocation] = useState("");
   const [color, setColor] = useState<EventColor>("blue");
   const [error, setError] = useState<string | null>(null);
   const [startDateOpen, setStartDateOpen] = useState(false);
@@ -87,8 +86,7 @@ export function EventDialog({
       setStartTime(formatTimeForInput(start));
       setEndTime(formatTimeForInput(end));
       setAllDay(event.allDay || false);
-      setLocation(event.location || "");
-      setColor((event.color as EventColor) || "sky");
+      setColor((event.color as EventColor) || "blue");
       setError(null); // Reset error when opening dialog
     } else {
       resetForm();
@@ -103,7 +101,6 @@ export function EventDialog({
     setStartTime(`${DefaultStartHour}:00`);
     setEndTime(`${DefaultEndHour}:00`);
     setAllDay(false);
-    setLocation("");
     setColor("blue");
     setError(null);
   };
@@ -169,15 +166,17 @@ export function EventDialog({
     // Use generic title if empty
     const eventTitle = title.trim() ? title : "(no title)";
 
+    // Ensure we have a default color
+    const eventColor = color || "blue";
+
     onSave({
       id: event?.id || "",
-      name: eventTitle,
+      title: eventTitle,
       description,
       start,
       end,
       allDay,
-      location,
-      color,
+      color: eventColor,
     });
   };
 
@@ -365,14 +364,6 @@ export function EventDialog({
             <Label htmlFor="all-day">All day</Label>
           </div>
 
-          <div className="*:not-first:mt-1.5">
-            <Label htmlFor="location">Location</Label>
-            <Input
-              id="location"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-            />
-          </div>
           <fieldset className="space-y-4">
             <legend className="text-foreground text-sm leading-none font-medium">
               Etiquette

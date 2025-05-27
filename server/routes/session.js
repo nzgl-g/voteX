@@ -453,7 +453,55 @@ router.patch("/edit-requests/:requestId/approve", auth, async (req, res) => {
       .json({ error: "Failed to approve edit", details: err.message });
   }
 });
+router.patch("/edit-requests/:requestId/reject", auth, async (req, res) => {
+  try {
+    const requestId = req.params.requestId;
+    const userId = req.user._id;
+    const { reason } = req.body;
 
+    const editRequest = await SessionEditRequest.findById(requestId).populate(
+      "session"
+    );
+    if (!editRequest || editRequest.status !== "pending") {
+      return res
+        .status(404)
+        .json({ error: "Valid edit request not found or not pending" });
+    }
+
+    const team = await Team.findOne({ session: editRequest.session._id });
+    if (!team || !team.leader.equals(userId)) {
+      return res
+        .status(403)
+        .json({ error: "Only the team leader can reject edits" });
+    }
+
+    editRequest.status = "rejected";
+    editRequest.rejectionReason = reason || "No reason provided";
+    await editRequest.save();
+
+    await sendNotification(req, {
+      recipients: [editRequest.proposedBy],
+      type: "session-edit-rejected",
+      message: `Your edit request was rejected: ${editRequest.rejectionReason}`,
+      link: `/sessions/${editRequest.session._id}`,
+      targetType: "user",
+    });
+
+    await logActivity({
+      sessionId: editRequest.session._id,
+      userId: req.user._id,
+      action: `${req.user.username} rejected the requested session edits`,
+    });
+
+    res.status(200).json({ message: "Edit request rejected successfully" });
+  } catch (err) {
+    console.error("Reject edit error:", err);
+    res.status(500).json({
+      error: "Failed to reject edit",
+      details: err.message,
+    });
+  }
+});
 
 //dir ghir contract address f body
 router.patch("/:sessionId/contract-address", async (req, res) => {

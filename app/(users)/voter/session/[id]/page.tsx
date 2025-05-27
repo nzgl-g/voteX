@@ -80,7 +80,10 @@ export default function SessionProfilePage() {
           </div>
         ) : (
           <div className="w-full">
-            <SessionTabs session={session} />
+            <SessionTabs 
+              session={session} 
+              userRole="voter" 
+            />
           </div>
         )}
       </main>

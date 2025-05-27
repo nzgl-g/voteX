@@ -12,9 +12,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
-import { Calendar, Clock, Building2, Users, Vote, CheckCircle2, AlertCircle, Timer, Loader2, LockIcon } from "lucide-react"
+import { Calendar, Clock, Building2, Users, Vote, CheckCircle2, AlertCircle, Timer, Loader2, LockIcon, RefreshCw } from "lucide-react"
 import Image from "next/image"
 import { getSessionLifecycleStatus } from "../session-card"
+import { BlockchainSync } from "@/components/voter-portal/blockchain-sync"
+import { toast } from "@/components/ui/use-toast"
+import sessionService from "@/services/session-service"
 
 interface Candidate {
     _id: string;
@@ -22,6 +25,7 @@ interface Candidate {
     partyName?: string;
     biography?: string;
     voteCount?: number;
+    totalVotes?: number;
 }
 
 interface PollOption {
@@ -29,16 +33,63 @@ interface PollOption {
     name: string;
     description?: string;
     voteCount?: number;
+    totalVotes?: number;
 }
 
 interface SessionTabsProps {
     session: any;
+    userRole?: 'voter' | 'team-leader' | 'team-member';
 }
 
-export default function SessionTabs({ session }: SessionTabsProps) {
+export default function SessionTabs({ session: initialSession, userRole = 'voter' }: SessionTabsProps) {
     const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null)
     const [showCandidateProfile, setShowCandidateProfile] = useState(false)
     const [isLoadingResults, setIsLoadingResults] = useState(false)
+    const [session, setSession] = useState<any>(initialSession)
+    const [isRefreshing, setIsRefreshing] = useState(false)
+    
+    // Handle blockchain sync completion
+    const handleSyncComplete = async (success: boolean) => {
+        if (success && session?._id) {
+            try {
+                // Refresh session data to get updated vote counts
+                const updatedSession = await sessionService.getSessionById(session._id);
+                setSession(updatedSession);
+            } catch (error) {
+                console.error("Failed to refresh session data after blockchain sync:", error);
+            }
+        }
+    };
+    
+    // Manual refresh function
+    const handleRefreshResults = async () => {
+        if (!session?._id || !session?.contractAddress || isRefreshing) return;
+        
+        setIsRefreshing(true);
+        setIsLoadingResults(true);
+        
+        try {
+            // Import blockchain service dynamically
+            const blockchainService = (await import('@/services/blockchain-service')).default;
+            
+            // Sync blockchain results
+            const success = await blockchainService.syncBlockchainResults(
+                session._id,
+                session.contractAddress
+            );
+            
+            if (success) {
+                // Refresh session data
+                const updatedSession = await sessionService.getSessionById(session._id);
+                setSession(updatedSession);
+            }
+        } catch (error) {
+            console.error("Error refreshing results:", error);
+        } finally {
+            setIsRefreshing(false);
+            setIsLoadingResults(false);
+        }
+    };
     
     if (!session) {
         return (
@@ -114,340 +165,397 @@ export default function SessionTabs({ session }: SessionTabsProps) {
     };
 
     return (
-        <Tabs defaultValue="details" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger value="data">Data</TabsTrigger>
-                <TabsTrigger value="results">Results</TabsTrigger>
-            </TabsList>
+        <>
+            {/* Add BlockchainSync component for automatic updates if session has a contract address */}
+            {session.contractAddress && session._id && (
+                <BlockchainSync 
+                    sessionId={session._id} 
+                    syncInterval={30000} 
+                    onSyncComplete={handleSyncComplete}
+                />
+            )}
+            
+            <Tabs defaultValue="details" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="details">Details</TabsTrigger>
+                    <TabsTrigger value="data">Data</TabsTrigger>
+                    <TabsTrigger value="results">Results</TabsTrigger>
+                </TabsList>
 
-            <TabsContent value="details" className="space-y-6">
-                <Card>
-                    <div className="relative h-48 md:h-64 w-full overflow-hidden rounded-t-lg">
-                        <Image
-                            src={session.banner || "/placeholder.svg"}
-                            alt="Session banner"
-                            fill
-                            className="object-cover"
-                        />
-                    </div>
-                    <CardHeader>
-                        <div className="flex items-start justify-between">
-                            <div>
-                                <CardTitle className="text-2xl">{session.name}</CardTitle>
-                                <CardDescription className="mt-2 max-w-3xl">{session.description || "No description provided"}</CardDescription>
-                            </div>
-                            <Badge variant="outline" className={`${lifecycleStatus.color} px-2.5 py-0.5 text-xs font-medium flex items-center shadow-sm backdrop-blur-sm`}>
-                                {lifecycleStatus.icon}
-                                {lifecycleStatus.label}
-                            </Badge>
+                <TabsContent value="details" className="space-y-6">
+                    <Card>
+                        <div className="relative h-48 md:h-64 w-full overflow-hidden rounded-t-lg">
+                            <Image
+                                src={session.banner || "/placeholder.svg"}
+                                alt="Session banner"
+                                fill
+                                className="object-cover"
+                            />
                         </div>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="grid gap-4 md:grid-cols-2">
-                            {session.organizationName && (
-                                <div className="flex items-center gap-2">
-                                    <Building2 className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-sm">
-                                        <span className="font-medium">Organization:</span> {session.organizationName}
-                                    </span>
+                        <CardHeader>
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <CardTitle className="text-2xl">{session.name}</CardTitle>
+                                    <CardDescription className="mt-2 max-w-3xl">{session.description || "No description provided"}</CardDescription>
                                 </div>
-                            )}
-                            <div className="flex items-center gap-2">
-                                <Users className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm">
-                                    <span className="font-medium">Type:</span> {session.type}
-                                </span>
+                                <Badge variant="outline" className={`${lifecycleStatus.color} px-2.5 py-0.5 text-xs font-medium flex items-center shadow-sm backdrop-blur-sm`}>
+                                    {lifecycleStatus.icon}
+                                    {lifecycleStatus.label}
+                                </Badge>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Vote className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm">
-                                    <span className="font-medium">Mode:</span> {session.subtype || "single"} selection
-                                </span>
-                            </div>
-                            {session.resultVisibility && (
-                                <div className="flex items-center gap-2">
-                                    <LockIcon className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-sm">
-                                        <span className="font-medium">Results:</span> {session.resultVisibility === 'real-time' ? 'Available in real-time' : 'Available after completion'}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <h3 className="text-sm font-medium mb-2">Session Timeline</h3>
-                                <div className="relative">
-                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                                        <div className="h-full bg-primary transition-all duration-300" style={{ width: `${getTimelineProgress()}%` }} />
-                                    </div>
-                                    <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                                        <span>{formatDate(session.sessionLifecycle?.startedAt || session.sessionLifecycle?.scheduledAt?.start)}</span>
-                                        <span>{formatDate(session.sessionLifecycle?.endedAt || session.sessionLifecycle?.scheduledAt?.end)}</span>
-                                    </div>
-                                </div>
-                            </div>
-
+                        </CardHeader>
+                        <CardContent className="space-y-6">
                             <div className="grid gap-4 md:grid-cols-2">
+                                {session.organizationName && (
+                                    <div className="flex items-center gap-2">
+                                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm">
+                                            <span className="font-medium">Organization:</span> {session.organizationName}
+                                        </span>
+                                    </div>
+                                )}
                                 <div className="flex items-center gap-2">
-                                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                                    <Users className="h-4 w-4 text-muted-foreground" />
                                     <span className="text-sm">
-                                        <span className="font-medium">Start Date:</span>{" "}
-                                        {formatDate(session.sessionLifecycle?.startedAt || session.sessionLifecycle?.scheduledAt?.start)}
+                                        <span className="font-medium">Type:</span> {session.type}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                                    <Vote className="h-4 w-4 text-muted-foreground" />
                                     <span className="text-sm">
-                                        <span className="font-medium">End Date:</span>{" "}
-                                        {formatDate(session.sessionLifecycle?.endedAt || session.sessionLifecycle?.scheduledAt?.end)}
+                                        <span className="font-medium">Mode:</span> {session.subtype || "single"} selection
                                     </span>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Clock className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-sm">
-                                        <span className="font-medium">Start Time:</span>{" "}
-                                        {formatTime(session.sessionLifecycle?.startedAt || session.sessionLifecycle?.scheduledAt?.start)}
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Clock className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-sm">
-                                        <span className="font-medium">End Time:</span>{" "}
-                                        {formatTime(session.sessionLifecycle?.endedAt || session.sessionLifecycle?.scheduledAt?.end)}
-                                    </span>
-                                </div>
+                                {session.resultVisibility && (
+                                    <div className="flex items-center gap-2">
+                                        <LockIcon className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm">
+                                            <span className="font-medium">Results:</span> {session.resultVisibility === 'real-time' ? 'Available in real-time' : 'Available after completion'}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </TabsContent>
 
-            <TabsContent value="data" className="space-y-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{session.type === "election" ? "Candidates" : "Poll Options"}</CardTitle>
-                        <CardDescription>
-                            {session.type === "election"
-                                ? "View candidate information and profiles"
-                                : "Available options for this poll"}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {session.type === "election" ? (
                             <div className="space-y-4">
-                                {session.candidates && session.candidates.length > 0 ? (
-                                    session.candidates.map((candidate: Candidate) => (
-                                        <Card key={candidate._id}>
-                                            <CardContent className="flex items-center justify-between p-6">
-                                                <div className="space-y-1">
-                                                    <h3 className="font-semibold">{candidate.fullName}</h3>
-                                                    <p className="text-sm text-muted-foreground line-clamp-2">
-                                                        {candidate.partyName || "No party affiliation"}
-                                                    </p>
-                                                </div>
-                                                <Button 
-                                                    variant="outline" 
-                                                    size="sm" 
-                                                    onClick={() => handleViewCandidateProfile(candidate)}
-                                                >
-                                                    View Profile
-                                                </Button>
-                                            </CardContent>
-                                        </Card>
-                                    ))
-                                ) : (
-                                    <div className="text-center py-8">
-                                        <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                                        <h3 className="text-lg font-medium mb-2">No Candidates Yet</h3>
-                                        <p className="text-muted-foreground">
-                                            This session doesn't have any candidates registered yet.
-                                        </p>
+                                <div>
+                                    <h3 className="text-sm font-medium mb-2">Session Timeline</h3>
+                                    <div className="relative">
+                                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                            <div className="h-full bg-primary transition-all duration-300" style={{ width: `${getTimelineProgress()}%` }} />
+                                        </div>
+                                        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                                            <span>{formatDate(session.sessionLifecycle?.startedAt || session.sessionLifecycle?.scheduledAt?.start)}</span>
+                                            <span>{formatDate(session.sessionLifecycle?.endedAt || session.sessionLifecycle?.scheduledAt?.end)}</span>
+                                        </div>
                                     </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {session.options && session.options.length > 0 ? (
-                                    session.options.map((option: PollOption) => (
-                                        <Card key={option._id}>
-                                            <CardContent className="p-6">
-                                                <h3 className="font-semibold">{option.name}</h3>
-                                                <p className="text-sm text-muted-foreground mt-1">
-                                                    {option.description || "No description provided"}
-                                                </p>
-                                            </CardContent>
-                                        </Card>
-                                    ))
-                                ) : (
-                                    <div className="text-center py-8">
-                                        <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                                        <h3 className="text-lg font-medium mb-2">No Options Available</h3>
-                                        <p className="text-muted-foreground">
-                                            This poll doesn't have any options configured yet.
-                                        </p>
+                                </div>
+
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div className="flex items-center gap-2">
+                                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm">
+                                            <span className="font-medium">Start Date:</span>{" "}
+                                            {formatDate(session.sessionLifecycle?.startedAt || session.sessionLifecycle?.scheduledAt?.start)}
+                                        </span>
                                     </div>
-                                )}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </TabsContent>
-
-            <TabsContent value="results" className="space-y-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Session Results</CardTitle>
-                        <CardDescription>Current results for {session.name}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {isLoadingResults ? (
-                            <div className="flex flex-col items-center justify-center py-12">
-                                <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-                                <p className="text-muted-foreground">Loading results...</p>
-                            </div>
-                        ) : canShowResults ? (
-                            <>
-                                {session.type === "election" ? (
-                                    <div className="space-y-4">
-                                        {session.candidates && session.candidates.length > 0 ? (
-                                            session.candidates
-                                                .sort((a: Candidate, b: Candidate) => (b.voteCount || 0) - (a.voteCount || 0))
-                                                .map((candidate: Candidate, index: number) => {
-                                                    const totalVotes = session.candidates.reduce(
-                                                        (sum: number, c: Candidate) => sum + (c.voteCount || 0), 
-                                                        0
-                                                    );
-                                                    const percentage = totalVotes > 0 ? ((candidate.voteCount || 0) / totalVotes) * 100 : 0;
-
-                                                    return (
-                                                        <div key={candidate._id} className="space-y-2">
-                                                            <div className="flex items-center justify-between">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="text-lg font-semibold">#{index + 1}</span>
-                                                                    <span className="font-medium">{candidate.fullName}</span>
-                                                                </div>
-                                                                <span className="text-sm text-muted-foreground">
-                                                                    {candidate.voteCount || 0} votes ({percentage.toFixed(1)}%)
-                                                                </span>
-                                                            </div>
-                                                            <div className="relative h-8 bg-muted rounded-full overflow-hidden">
-                                                                <div
-                                                                    className="h-full bg-primary transition-all duration-300"
-                                                                    style={{ width: `${percentage}%` }}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                })
-                                        ) : (
-                                            <div className="text-center py-8">
-                                                <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                                                <h3 className="text-lg font-medium mb-2">No Candidates</h3>
-                                                <p className="text-muted-foreground">
-                                                    This session doesn't have any candidates to show results for.
-                                                </p>
-                                            </div>
-                                        )}
+                                    <div className="flex items-center gap-2">
+                                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm">
+                                            <span className="font-medium">End Date:</span>{" "}
+                                            {formatDate(session.sessionLifecycle?.endedAt || session.sessionLifecycle?.scheduledAt?.end)}
+                                        </span>
                                     </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        {session.options && session.options.length > 0 ? (
-                                            session.options
-                                                .sort((a: PollOption, b: PollOption) => (b.voteCount || 0) - (a.voteCount || 0))
-                                                .map((option: PollOption) => {
-                                                    const totalVotes = session.options.reduce(
-                                                        (sum: number, o: PollOption) => sum + (o.voteCount || 0), 
-                                                        0
-                                                    );
-                                                    const percentage = totalVotes > 0 ? ((option.voteCount || 0) / totalVotes) * 100 : 0;
-
-                                                    return (
-                                                        <div key={option._id} className="space-y-2">
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="font-medium">{option.name}</span>
-                                                                <span className="text-sm text-muted-foreground">
-                                                                    {option.voteCount || 0} votes ({percentage.toFixed(1)}%)
-                                                                </span>
-                                                            </div>
-                                                            <div className="relative h-8 bg-muted rounded-full overflow-hidden">
-                                                                <div
-                                                                    className="h-full bg-primary transition-all duration-300"
-                                                                    style={{ width: `${percentage}%` }}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                })
-                                        ) : (
-                                            <div className="text-center py-8">
-                                                <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                                                <h3 className="text-lg font-medium mb-2">No Options Available</h3>
-                                                <p className="text-muted-foreground">
-                                                    This poll doesn't have any options to show results for.
-                                                </p>
-                                            </div>
-                                        )}
+                                    <div className="flex items-center gap-2">
+                                        <Clock className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm">
+                                            <span className="font-medium">Start Time:</span>{" "}
+                                            {formatTime(session.sessionLifecycle?.startedAt || session.sessionLifecycle?.scheduledAt?.start)}
+                                        </span>
                                     </div>
-                                )}
-
-                                <div className="mt-6 pt-6 border-t">
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">Total Votes:</span>
-                                        <span className="font-medium">
-                                            {session.type === "election" && session.candidates
-                                                ? session.candidates.reduce((sum: number, c: Candidate) => sum + (c.voteCount || 0), 0)
-                                                : session.type === "poll" && session.options
-                                                ? session.options.reduce((sum: number, o: PollOption) => sum + (o.voteCount || 0), 0)
-                                                : 0}
+                                    <div className="flex items-center gap-2">
+                                        <Clock className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm">
+                                            <span className="font-medium">End Time:</span>{" "}
+                                            {formatTime(session.sessionLifecycle?.endedAt || session.sessionLifecycle?.scheduledAt?.end)}
                                         </span>
                                     </div>
                                 </div>
-                            </>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center py-12">
-                                <LockIcon className="h-12 w-12 text-muted-foreground mb-4" />
-                                <h3 className="text-lg font-medium mb-2">Results Not Available Yet</h3>
-                                <p className="text-muted-foreground text-center max-w-md">
-                                    {session.resultVisibility === 'post-completion' 
-                                        ? "Results will be available after the session has ended."
-                                        : "Results are not available for viewing at this time."}
-                                </p>
                             </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </TabsContent>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
 
-            {/* Candidate Profile Dialog */}
-            <Dialog open={showCandidateProfile} onOpenChange={setShowCandidateProfile}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>{selectedCandidate?.fullName}</DialogTitle>
-                        <DialogDescription>Candidate Profile</DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                        {selectedCandidate?.partyName && (
+                <TabsContent value="data" className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>{session.type === "election" ? "Candidates" : "Poll Options"}</CardTitle>
+                            <CardDescription>
+                                {session.type === "election"
+                                    ? "View candidate information and profiles"
+                                    : "Available options for this poll"}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {session.type === "election" ? (
+                                <div className="space-y-4">
+                                    {session.candidates && session.candidates.length > 0 ? (
+                                        session.candidates.map((candidate: Candidate) => (
+                                            <Card key={candidate._id}>
+                                                <CardContent className="flex items-center justify-between p-6">
+                                                    <div className="space-y-1">
+                                                        <h3 className="font-semibold">{candidate.fullName}</h3>
+                                                        <p className="text-sm text-muted-foreground line-clamp-2">
+                                                            {candidate.partyName || "No party affiliation"}
+                                                        </p>
+                                                    </div>
+                                                    <Button 
+                                                        variant="outline" 
+                                                        size="sm" 
+                                                        onClick={() => handleViewCandidateProfile(candidate)}
+                                                    >
+                                                        View Profile
+                                                    </Button>
+                                                </CardContent>
+                                            </Card>
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-8">
+                                            <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                                            <h3 className="text-lg font-medium mb-2">No Candidates Yet</h3>
+                                            <p className="text-muted-foreground">
+                                                This session doesn't have any candidates registered yet.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {session.options && session.options.length > 0 ? (
+                                        session.options.map((option: PollOption) => (
+                                            <Card key={option._id}>
+                                                <CardContent className="p-6">
+                                                    <h3 className="font-semibold">{option.name}</h3>
+                                                    <p className="text-sm text-muted-foreground mt-1">
+                                                        {option.description || "No description provided"}
+                                                    </p>
+                                                </CardContent>
+                                            </Card>
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-8">
+                                            <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                                            <h3 className="text-lg font-medium mb-2">No Options Available</h3>
+                                            <p className="text-muted-foreground">
+                                                This poll doesn't have any options configured yet.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="results" className="space-y-6">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
                             <div>
-                                <h4 className="font-medium mb-2">Party</h4>
-                                <p className="text-sm text-muted-foreground">{selectedCandidate.partyName}</p>
+                                <CardTitle>Session Results</CardTitle>
+                                <CardDescription>Current results for {session.name}</CardDescription>
                             </div>
-                        )}
-                        {selectedCandidate?.biography && (
-                            <div>
-                                <h4 className="font-medium mb-2">Biography</h4>
-                                <p className="text-sm text-muted-foreground">{selectedCandidate.biography}</p>
-                            </div>
-                        )}
-                        {!selectedCandidate?.biography && !selectedCandidate?.partyName && (
-                            <div className="text-center py-4">
-                                <p className="text-muted-foreground">No additional information available for this candidate.</p>
-                            </div>
-                        )}
-                    </div>
-                </DialogContent>
-            </Dialog>
-        </Tabs>
+                            
+                            {/* Add refresh button for blockchain sessions */}
+                            {session.contractAddress && canShowResults && (
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={handleRefreshResults}
+                                    disabled={isRefreshing}
+                                    className="flex items-center gap-2"
+                                >
+                                    {isRefreshing ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <RefreshCw className="h-4 w-4" />
+                                    )}
+                                    Refresh Results
+                                </Button>
+                            )}
+                        </CardHeader>
+                        <CardContent>
+                            {isLoadingResults ? (
+                                <div className="flex flex-col items-center justify-center py-12">
+                                    <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+                                    <p className="text-muted-foreground">Loading results...</p>
+                                </div>
+                            ) : canShowResults ? (
+                                <>
+                                    {session.type === "election" ? (
+                                        <div className="space-y-4">
+                                            {session.candidates && session.candidates.length > 0 ? (
+                                                session.candidates
+                                                    .sort((a: Candidate, b: Candidate) => 
+                                                        (b.totalVotes || b.voteCount || 0) - (a.totalVotes || a.voteCount || 0)
+                                                    )
+                                                    .map((candidate: Candidate, index: number) => {
+                                                        const voteCount = candidate.totalVotes || candidate.voteCount || 0;
+                                                        const totalVotes = session.candidates.reduce(
+                                                            (sum: number, c: Candidate) => 
+                                                                sum + (c.totalVotes || c.voteCount || 0), 
+                                                            0
+                                                        );
+                                                        const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
+
+                                                        return (
+                                                            <div key={candidate._id} className="space-y-2">
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-lg font-semibold">#{index + 1}</span>
+                                                                        <span className="font-medium">{candidate.fullName}</span>
+                                                                    </div>
+                                                                    <span className="text-sm text-muted-foreground">
+                                                                        {voteCount} votes ({percentage.toFixed(1)}%)
+                                                                    </span>
+                                                                </div>
+                                                                <div className="relative h-8 bg-muted rounded-full overflow-hidden">
+                                                                    <div
+                                                                        className="h-full bg-primary transition-all duration-300"
+                                                                        style={{ width: `${percentage}%` }}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })
+                                            ) : (
+                                                <div className="text-center py-8">
+                                                    <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                                                    <h3 className="text-lg font-medium mb-2">No Candidates</h3>
+                                                    <p className="text-muted-foreground">
+                                                        This session doesn't have any candidates to show results for.
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {session.options && session.options.length > 0 ? (
+                                                session.options
+                                                    .sort((a: PollOption, b: PollOption) => 
+                                                        (b.totalVotes || b.voteCount || 0) - (a.totalVotes || a.voteCount || 0)
+                                                    )
+                                                    .map((option: PollOption) => {
+                                                        const voteCount = option.totalVotes || option.voteCount || 0;
+                                                        const totalVotes = session.options.reduce(
+                                                            (sum: number, o: PollOption) => 
+                                                                sum + (o.totalVotes || o.voteCount || 0), 
+                                                            0
+                                                        );
+                                                        const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
+
+                                                        return (
+                                                            <div key={option._id} className="space-y-2">
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="font-medium">{option.name}</span>
+                                                                    <span className="text-sm text-muted-foreground">
+                                                                        {voteCount} votes ({percentage.toFixed(1)}%)
+                                                                    </span>
+                                                                </div>
+                                                                <div className="relative h-8 bg-muted rounded-full overflow-hidden">
+                                                                    <div
+                                                                        className="h-full bg-primary transition-all duration-300"
+                                                                        style={{ width: `${percentage}%` }}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })
+                                            ) : (
+                                                <div className="text-center py-8">
+                                                    <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                                                    <h3 className="text-lg font-medium mb-2">No Options Available</h3>
+                                                    <p className="text-muted-foreground">
+                                                        This poll doesn't have any options to show results for.
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="mt-6 pt-6 border-t">
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-muted-foreground">Total Votes:</span>
+                                            <span className="font-medium">
+                                                {session.type === "election" && session.candidates
+                                                    ? session.candidates.reduce(
+                                                        (sum: number, c: Candidate) => 
+                                                            sum + (c.totalVotes || c.voteCount || 0), 
+                                                        0
+                                                    )
+                                                    : session.type === "poll" && session.options
+                                                    ? session.options.reduce(
+                                                        (sum: number, o: PollOption) => 
+                                                            sum + (o.totalVotes || o.voteCount || 0), 
+                                                        0
+                                                    )
+                                                    : 0}
+                                            </span>
+                                        </div>
+                                        
+                                        {/* Display last blockchain sync time if available */}
+                                        {session.results?.lastBlockchainSync && (
+                                            <div className="flex items-center justify-between text-sm mt-2">
+                                                <span className="text-muted-foreground">Last Updated:</span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {new Date(session.results.lastBlockchainSync).toLocaleString()}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-12">
+                                    <LockIcon className="h-12 w-12 text-muted-foreground mb-4" />
+                                    <h3 className="text-lg font-medium mb-2">Results Not Available Yet</h3>
+                                    <p className="text-muted-foreground text-center max-w-md">
+                                        {session.resultVisibility === 'post-completion' 
+                                            ? "Results will be available after the session has ended."
+                                            : "Results are not available for viewing at this time."}
+                                    </p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* Candidate Profile Dialog */}
+                <Dialog open={showCandidateProfile} onOpenChange={setShowCandidateProfile}>
+                    <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>{selectedCandidate?.fullName}</DialogTitle>
+                            <DialogDescription>Candidate Profile</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                            {selectedCandidate?.partyName && (
+                                <div>
+                                    <h4 className="font-medium mb-2">Party</h4>
+                                    <p className="text-sm text-muted-foreground">{selectedCandidate.partyName}</p>
+                                </div>
+                            )}
+                            {selectedCandidate?.biography && (
+                                <div>
+                                    <h4 className="font-medium mb-2">Biography</h4>
+                                    <p className="text-sm text-muted-foreground">{selectedCandidate.biography}</p>
+                                </div>
+                            )}
+                            {!selectedCandidate?.biography && !selectedCandidate?.partyName && (
+                                <div className="text-center py-4">
+                                    <p className="text-muted-foreground">No additional information available for this candidate.</p>
+                                </div>
+                            )}
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </Tabs>
+        </>
     )
 }

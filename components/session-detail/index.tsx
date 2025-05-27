@@ -16,6 +16,43 @@ import candidateService from "@/services/candidate-service"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { toast } from "sonner"
 import { BlockchainSync } from "@/components/voter-portal/blockchain-sync"
+import { cn } from "@/lib/utils"
+
+// Timeline event component for the session timeline
+interface TimelineEventProps { 
+  title: string;
+  date: string;
+  isActive?: boolean;
+  isPast?: boolean;
+  isFuture?: boolean;
+}
+
+const TimelineEvent = ({ 
+  title, 
+  date, 
+  isActive = false,
+  isPast = false,
+  isFuture = false
+}: TimelineEventProps) => (
+  <div className={cn(
+    "relative flex items-start p-2 transition-all",
+    isActive ? "border-l-2 border-primary pl-3" : 
+    isPast ? "opacity-90 pl-3" :
+    isFuture ? "opacity-70 pl-3" : "pl-3"
+  )}>
+    <div>
+      <p className={cn(
+        "text-sm font-medium",
+        isActive ? "text-primary" : 
+        isPast ? "text-foreground" :
+        isFuture ? "text-muted-foreground" : "text-foreground"
+      )}>
+        {title}
+      </p>
+      <p className="text-xs text-muted-foreground">{date}</p>
+    </div>
+  </div>
+);
 
 interface SessionDetailProps {
   sessionId: string
@@ -29,99 +66,131 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
   const [editSection, setEditSection] = useState<'details' | 'settings' | null>(null)
   const [candidateRequests, setCandidateRequests] = useState<any[]>([])
   const [loadingRequests, setLoadingRequests] = useState(false)
+  const [processingCandidates, setProcessingCandidates] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const fetchSessionData = async () => {
       try {
-        setLoading(true)
-        const data = await sessionService.getSessionById(sessionId)
-        setSession(data)
-        setError(null)
+        setLoading(true);
+        
+        // Set a timeout to prevent hanging requests
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Session data request timed out")), 15000)
+        );
+        
+        // Primary session data fetch with timeout
+        const sessionPromise = sessionService.getSessionById(sessionId);
+        const data = await Promise.race([sessionPromise, timeoutPromise]) as Session;
+        
+        setSession(data);
+        setError(null);
 
         // Only attempt to get blockchain data if session is deployed or active
         const status = getSessionStatusFromData(data);
         if (status !== "upcoming" && status !== "nomination") {
-          try {
-            const voteMetadata = await sessionService.getVoteMetadata(sessionId)
-            console.log('Vote Metadata loaded:', voteMetadata)
-            
-            // Also log blockchain deployment data for reference
-            const blockchainData = await sessionService.getBlockchainDeploymentData(sessionId)
-            console.log('Blockchain Deployment Data:', blockchainData)
-          } catch (metadataErr) {
-            console.error('Failed to load vote metadata:', metadataErr)
-          }
+          // Load blockchain data in a non-blocking way
+          Promise.all([
+            sessionService.getVoteMetadata(sessionId).catch(err => {
+              console.error('Failed to load vote metadata:', err);
+              return null;
+            }),
+            sessionService.getBlockchainDeploymentData(sessionId).catch(err => {
+              console.error('Failed to load blockchain deployment data:', err);
+              return null;
+            })
+          ]).then(([voteMetadata, blockchainData]) => {
+            if (voteMetadata) console.log('Vote Metadata loaded:', voteMetadata);
+            if (blockchainData) {
+              console.log('Blockchain Deployment Data:', blockchainData);
+              
+              // Warn if no participants found but don't show an error
+              if (blockchainData.participants.length === 0) {
+                console.warn('No participants found for this session. Deployment to blockchain may not be possible.');
+              }
+            }
+          });
         }
         
-        // If this is an election, also load candidate requests
+        // If this is an election, also load candidate requests (non-blocking)
         if (data.type === 'election') {
-          loadCandidateRequests();
+          // Don't wait for this to complete
+          loadCandidateRequests().catch(err => {
+            console.error('Failed to load candidate requests:', err);
+          });
         }
       } catch (err: any) {
-        setError(err.message || "Failed to load session data")
-        toast.error(err.message || "Failed to load session data")
+        setError(err.message || "Failed to load session data");
+        toast.error(err.message || "Failed to load session data");
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
 
     if (sessionId) {
-      fetchSessionData()
+      fetchSessionData();
     }
-  }, [sessionId])
+    
+    // Cleanup function to abort any pending requests when component unmounts
+    return () => {
+      // Any cleanup logic for aborted requests would go here
+    };
+  }, [sessionId]);
 
-  // Helper function to get session status from session data
+  // Helper function to get session status from session data - COMPLETELY REWRITTEN
   const getSessionStatusFromData = (session: Session | null): string => {
     if (!session || !session.sessionLifecycle) {
       return "unknown";
     }
 
-    const now = new Date()
-    const scheduledStart = session.sessionLifecycle.scheduledAt?.start
-      ? new Date(session.sessionLifecycle.scheduledAt.start)
-      : null
-    const scheduledEnd = session.sessionLifecycle.scheduledAt?.end
-      ? new Date(session.sessionLifecycle.scheduledAt.end)
-      : null
-    const startedAt = session.sessionLifecycle.startedAt
-      ? new Date(session.sessionLifecycle.startedAt)
-      : null
-    const endedAt = session.sessionLifecycle.endedAt
-      ? new Date(session.sessionLifecycle.endedAt)
-      : null
-
-    // Check if session has been marked as ended
-    if (session.sessionLifecycle.endedAt) {
+    const now = new Date();
+    
+    // 1. If session is explicitly marked as ended, it's ended regardless of other factors
+    if (session.sessionLifecycle.endedAt && new Date(session.sessionLifecycle.endedAt) <= now) {
       return "ended";
     }
 
-    // Check if session has ended based on scheduled end time
-    if (endedAt && now > endedAt) {
-      return "ended";
+    // 2. If session has a contract address and has started, it's active
+    if (session.contractAddress && session.sessionLifecycle.startedAt && 
+        new Date(session.sessionLifecycle.startedAt) <= now) {
+      return "active";
     }
-
-    // Check if session has a contract address (indicates it's deployed)
-    if (session.contractAddress) {
-      return "started";
-    }
-
-    // Check if session has started by startedAt field
-    if (startedAt && now >= startedAt && (!endedAt || now <= endedAt)) {
+    
+    // 3. If session has been marked as started (startedAt) but no contract address, it's pending deployment
+    if (session.sessionLifecycle.startedAt && !session.contractAddress && 
+        new Date(session.sessionLifecycle.startedAt) <= now) {
       return "pending_deployment";
     }
 
-    // Check for nomination phase (for election type)
-    if (session.type === "election" && scheduledStart && scheduledEnd) {
-      if (now >= scheduledStart && now <= scheduledEnd) {
+    // 4. For elections, check if we're in the nomination phase
+    if (session.type === "election" && 
+        session.sessionLifecycle.scheduledAt?.start && 
+        session.sessionLifecycle.scheduledAt?.end) {
+      
+      const nominationStart = new Date(session.sessionLifecycle.scheduledAt.start);
+      const nominationEnd = new Date(session.sessionLifecycle.scheduledAt.end);
+      
+      if (now >= nominationStart && now <= nominationEnd) {
         return "nomination";
       }
     }
 
-    // Default to coming soon
+    // 5. Check if we're in a scheduled start/end window for polls
+    if (session.type === "poll" && 
+        session.sessionLifecycle.scheduledAt?.start && 
+        !session.sessionLifecycle.startedAt) {
+      
+      const scheduledStart = new Date(session.sessionLifecycle.scheduledAt.start);
+      
+      if (now >= scheduledStart) {
+        return "ready_to_start";
+      }
+    }
+    
+    // 6. Default to upcoming
     return "upcoming";
   }
 
-  const getSessionStatus = (): { status: string; label: string; color: string } => {
+  const getSessionStatus = (): { status: string; label: string; color: string; icon: React.ReactNode } => {
     const status = getSessionStatusFromData(session);
     
     switch (status) {
@@ -130,36 +199,49 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
           status: "ended",
           label: "Ended",
           color: "bg-zinc-800 text-zinc-200",
+          icon: <CheckCircle className="h-4 w-4" />
         };
-      case "started":
+      case "active":
         return {
-          status: "started",
+          status: "active",
           label: "Active",
           color: "bg-emerald-600 text-white",
+          icon: <Vote className="h-4 w-4" />
         };
       case "pending_deployment":
         return {
           status: "pending_deployment",
           label: "Pending Deployment",
           color: "bg-amber-500 text-black dark:text-zinc-900",
+          icon: <Clock className="h-4 w-4" />
         };
       case "nomination":
         return {
           status: "nomination",
-          label: "Nominations",
+          label: "Nominations Open",
           color: "bg-amber-500 text-black dark:text-zinc-900",
+          icon: <UserPlus className="h-4 w-4" />
+        };
+      case "ready_to_start":
+        return {
+          status: "ready_to_start",
+          label: "Ready to Start",
+          color: "bg-indigo-500 text-white",
+          icon: <Clock className="h-4 w-4" />
         };
       case "upcoming":
         return {
           status: "upcoming",
           label: "Coming Soon",
           color: "bg-blue-500 text-white",
+          icon: <Calendar className="h-4 w-4" />
         };
       default:
         return {
           status: "unknown",
           label: "Unknown",
           color: "bg-muted text-muted-foreground",
+          icon: <Calendar className="h-4 w-4" />
         };
     }
   }
@@ -214,22 +296,45 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
           return;
         }
         
+        // Set up a timeout for the blockchain deployment
+        const blockchainTimeoutMs = 30000; // 30 seconds
+        let deploymentTimer: NodeJS.Timeout | null = null;
+        
+        // Create a promise that will reject after the timeout
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          deploymentTimer = setTimeout(() => {
+            reject(new Error("Blockchain deployment timed out"));
+          }, blockchainTimeoutMs);
+        });
+        
         // Deploy the session to the blockchain
         toast.loading("Please confirm the transaction in MetaMask...", { id: toastId });
         const blockchainService = (await import('@/services/blockchain-service')).default;
         
-        // This will trigger the MetaMask popup
-        await blockchainService.createSession(session._id);
-        
-        // Update the session lifecycle - mark it as started now
-        await updateSessionStartTime(session._id);
-        
-        // Refresh session data
-        toast.loading("Updating session status...", { id: toastId });
-        await fetchRefreshedSessionData();
-        
-        // Show success message
-        toast.success("Session successfully deployed to blockchain", { id: toastId });
+        try {
+          // This will trigger the MetaMask popup - race with timeout
+          const deploymentPromise = blockchainService.createSession(session._id);
+          await Promise.race([deploymentPromise, timeoutPromise]);
+          
+          // Clear the timeout if deployment succeeded
+          if (deploymentTimer) clearTimeout(deploymentTimer);
+          
+          // Update the session lifecycle - mark it as started now
+          await updateSessionStartTime(session._id);
+          
+          // Refresh session data
+          toast.loading("Updating session status...", { id: toastId });
+          await fetchRefreshedSessionData();
+          
+          // Show success message
+          toast.success("Session successfully deployed to blockchain", { id: toastId });
+        } catch (deployError: any) {
+          // Clear the timeout if we got an error
+          if (deploymentTimer) clearTimeout(deploymentTimer);
+          
+          // Re-throw to be handled by the outer catch
+          throw deployError;
+        }
       } catch (blockchainError: any) {
         // If the blockchain deployment fails, handle appropriately
         console.error("Blockchain deployment error:", blockchainError);
@@ -239,6 +344,8 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
           toast.error("Transaction was rejected in MetaMask", { id: toastId });
         } else if (blockchainError.message?.includes("token not valid")) {
           toast.error("Authentication error - please refresh the page and try again", { id: toastId });
+        } else if (blockchainError.message?.includes("timed out")) {
+          toast.error("Blockchain deployment timed out. Please try again", { id: toastId });
         } else {
           toast.error(blockchainError.message || "Failed to deploy session to blockchain", { id: toastId });
         }
@@ -466,8 +573,10 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
             const nominationStartInput = document.getElementById('nomination-start') as HTMLInputElement;
             const nominationEndInput = document.getElementById('nomination-end') as HTMLInputElement;
             
+            // Ensure scheduledAt exists
             if (!sessionLifecycle.scheduledAt) sessionLifecycle.scheduledAt = {};
             
+            // For elections, scheduledAt represents nomination period
             if (nominationStartInput && nominationStartInput.value) {
               sessionLifecycle.scheduledAt.start = nominationStartInput.value;
             }
@@ -475,9 +584,25 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
             if (nominationEndInput && nominationEndInput.value) {
               sessionLifecycle.scheduledAt.end = nominationEndInput.value;
             }
+          } else {
+            // For polls, scheduledAt represents the voting period (same as startedAt/endedAt)
+            const sessionStartInput = document.getElementById('session-start') as HTMLInputElement;
+            const sessionEndInput = document.getElementById('session-end') as HTMLInputElement;
+            
+            // Ensure scheduledAt exists
+            if (!sessionLifecycle.scheduledAt) sessionLifecycle.scheduledAt = {};
+            
+            if (sessionStartInput && sessionStartInput.value) {
+              if (!sessionLifecycle.scheduledAt) sessionLifecycle.scheduledAt = {};
+              sessionLifecycle.scheduledAt.start = sessionStartInput.value;
+            }
+            
+            if (sessionEndInput && sessionEndInput.value) {
+              sessionLifecycle.scheduledAt.end = sessionEndInput.value;
+            }
           }
           
-          // Handle session start/end dates
+          // Handle session start/end dates - these always represent the voting period
           const sessionStartInput = document.getElementById('session-start') as HTMLInputElement;
           const sessionEndInput = document.getElementById('session-end') as HTMLInputElement;
           
@@ -535,10 +660,9 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
   }
 
   // Convert candidates to the format expected by CandidateTable
+  // Memoize candidates mapping to prevent unnecessary recalculations
   const mapCandidatesToTableFormat = (candidates: any[] = []): NominationCandidate[] => {
-    console.log("Mapping candidates to table format, count:", candidates?.length || 0);
-    
-    // If candidates is not an array, log and return empty array
+    // If candidates is not an array, return empty array
     if (!Array.isArray(candidates)) {
       console.error("candidateRequests is not an array:", candidates);
       return [];
@@ -547,100 +671,125 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
     // Generate unique IDs for any items missing them
     let uniqueIdCounter = 1;
     
-    const mappedCandidates = candidates.map(candidate => {
-      // Ensure we have a valid ID for each candidate (critical for React keys)
-      const candidateId = candidate._id || candidate.id || `temp-id-${uniqueIdCounter++}`;
-      
-      // Make sure to provide valid values for required fields (especially email)
-      // The email can come from the user object or directly from candidate
-      let email = candidate.email || "No email";
-      
-      if (!candidate.email && candidate.user) {
-        if (typeof candidate.user === 'object') {
-          // If user is an object with email
-          if (candidate.user.email) {
+    try {
+      const mappedCandidates = candidates.map(candidate => {
+        // Ensure we have a valid ID for each candidate (critical for React keys)
+        const candidateId = candidate._id || candidate.id || `temp-id-${uniqueIdCounter++}`;
+        
+        // Get email from candidate or user object
+        let email = candidate.email || "No email";
+        if (!candidate.email && candidate.user) {
+          if (typeof candidate.user === 'object' && candidate.user?.email) {
             email = candidate.user.email;
-          } else if (candidate.user._id) {
+          } else if (typeof candidate.user === 'object' && candidate.user?._id) {
             email = `User ID: ${candidate.user._id}`;
-          }
-        } else {
-          // If user is just a string ID
-          email = `User ID: ${String(candidate.user)}`;
-        }
-      }
-
-      // Format date of birth if it exists
-      let dateOfBirth = "N/A";
-      if (candidate.dobPob && candidate.dobPob.dateOfBirth) {
-        // Handle MongoDB date format ($date)
-        if (typeof candidate.dobPob.dateOfBirth === 'object' && candidate.dobPob.dateOfBirth.$date) {
-          dateOfBirth = new Date(candidate.dobPob.dateOfBirth.$date).toISOString().split('T')[0];
-        } else {
-          // Regular date string
-          try {
-            dateOfBirth = new Date(candidate.dobPob.dateOfBirth).toISOString().split('T')[0];
-          } catch (e) {
-            dateOfBirth = String(candidate.dobPob.dateOfBirth) || "N/A";
+          } else if (candidate.user) {
+            email = `User ID: ${String(candidate.user)}`;
           }
         }
-      }
 
-      // Ensure arrays are actually arrays
-      const nationalities = Array.isArray(candidate.nationalities) ? 
-                          candidate.nationalities : 
-                          (candidate.nationalities ? [String(candidate.nationalities)] : []);
-                          
-      const promises = Array.isArray(candidate.promises) ? 
-                     candidate.promises : 
-                     (candidate.promises ? [String(candidate.promises)] : []);
+        // Format date of birth if it exists
+        let dateOfBirth = "N/A";
+        try {
+          if (candidate.dobPob?.dateOfBirth) {
+            if (typeof candidate.dobPob.dateOfBirth === 'object' && candidate.dobPob.dateOfBirth.$date) {
+              dateOfBirth = new Date(candidate.dobPob.dateOfBirth.$date).toISOString().split('T')[0];
+            } else {
+              dateOfBirth = new Date(candidate.dobPob.dateOfBirth).toISOString().split('T')[0];
+            }
+          }
+        } catch (e) {
+          dateOfBirth = String(candidate.dobPob?.dateOfBirth) || "N/A";
+        }
 
-      return {
-        id: candidateId,
-        fullName: candidate.fullName || "Unknown",
-        email: email,
-        dateOfBirth: dateOfBirth,
-        placeOfBirth: candidate.dobPob?.placeOfBirth || "N/A",
-        nationalities: nationalities,
-        experience: candidate.experience || "",
-        biography: candidate.biography || "",
-        promises: promises,
-        status: (candidate.status as CandidateStatus) || "pending",
-        attachments: candidate.paper 
-          ? [{ name: "Official Paper", size: "Unknown", url: candidate.paper }] 
-          : []
-      };
-    });
-    
-    // Remove any duplicate candidates (based on id)
-    const uniqueCandidates = mappedCandidates.filter((candidate, index, self) => 
-      candidate.id && index === self.findIndex(c => c.id === candidate.id)
-    );
-    
-    return uniqueCandidates;
+        // Ensure arrays are actually arrays
+        const nationalities = Array.isArray(candidate.nationalities) ? 
+                            candidate.nationalities : 
+                            (candidate.nationalities ? [String(candidate.nationalities)] : []);
+                            
+        const promises = Array.isArray(candidate.promises) ? 
+                      candidate.promises : 
+                      (candidate.promises ? [String(candidate.promises)] : []);
+
+        return {
+          id: candidateId,
+          fullName: candidate.fullName || "Unknown",
+          email: email,
+          dateOfBirth: dateOfBirth,
+          placeOfBirth: candidate.dobPob?.placeOfBirth || "N/A",
+          nationalities: nationalities,
+          experience: candidate.experience || "",
+          biography: candidate.biography || "",
+          promises: promises,
+          status: (candidate.status as CandidateStatus) || "pending",
+          attachments: candidate.paper 
+            ? [{ name: "Official Paper", size: "Unknown", url: candidate.paper }] 
+            : []
+        };
+      });
+      
+      // More efficient way to remove duplicates using object lookup
+      const seenIds = new Set<string>();
+      const uniqueCandidates = mappedCandidates.filter(candidate => {
+        if (!candidate.id || seenIds.has(candidate.id)) return false;
+        seenIds.add(candidate.id);
+        return true;
+      });
+      
+      return uniqueCandidates;
+    } catch (error) {
+      console.error("Error mapping candidates:", error);
+      return [];
+    }
   }
 
   // Handle accepting a candidate request
   const handleAcceptCandidate = async (id: string) => {
     if (!session || !session._id) return;
     
+    // If already processing this candidate, prevent duplicate calls
+    if (processingCandidates.has(id)) {
+      console.log(`Already processing candidate ${id}, ignoring duplicate request`);
+      return;
+    }
+    
+    // Create a unique toast ID for this operation
+    const toastId = `accept-candidate-${id}`;
+    
     try {
+      // Mark this candidate as being processed
+      setProcessingCandidates(prev => new Set(prev).add(id));
+      
+      // Dismiss any existing toast with this ID first
+      toast.dismiss(toastId);
+      
       // Show loading toast
-      toast.loading(`Processing candidate request...`);
+      toast.loading(`Processing candidate request...`, { id: toastId });
       
       // Call the API to accept the candidate request
       const result = await candidateService.acceptCandidateRequest(session._id, id);
       
-      // Show success toast
-      toast.success(result.message || "Candidate request accepted");
+      // Show success toast with the same ID to replace the loading toast
+      toast.success(result.message || "Candidate request accepted", { id: toastId });
       
-      // Refresh data
-      await Promise.all([
-        fetchRefreshedSessionData(),  // Refresh session data
-        loadCandidateRequests()       // Reload candidate requests
-      ]);
+      // Add a small delay before refreshing data to allow the API to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Refresh the session data first
+      await fetchRefreshedSessionData();
+      
+      // Then reload the candidate requests
+      await loadCandidateRequests();
     } catch (error: any) {
       console.error("Error accepting candidate:", error);
-      toast.error(error.message || "Failed to accept candidate request");
+      toast.error(error.message || "Failed to accept candidate request", { id: toastId });
+    } finally {
+      // Remove this candidate from the processing set
+      setProcessingCandidates(prev => {
+        const updated = new Set(prev);
+        updated.delete(id);
+        return updated;
+      });
     }
   }
   
@@ -648,24 +797,49 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
   const handleRejectCandidate = async (id: string) => {
     if (!session || !session._id) return;
     
+    // If already processing this candidate, prevent duplicate calls
+    if (processingCandidates.has(id)) {
+      console.log(`Already processing candidate ${id}, ignoring duplicate request`);
+      return;
+    }
+    
+    // Create a unique toast ID for this operation
+    const toastId = `reject-candidate-${id}`;
+    
     try {
+      // Mark this candidate as being processed
+      setProcessingCandidates(prev => new Set(prev).add(id));
+      
+      // Dismiss any existing toast with this ID first
+      toast.dismiss(toastId);
+      
       // Show loading toast
-      toast.loading(`Processing candidate request...`);
+      toast.loading(`Processing candidate request...`, { id: toastId });
       
       // Call the API to reject the candidate request
       const result = await candidateService.rejectCandidateRequest(session._id, id);
       
-      // Show success toast
-      toast.success(result.message || "Candidate request rejected");
+      // Show success toast with the same ID to replace the loading toast
+      toast.success(result.message || "Candidate request rejected", { id: toastId });
       
-      // Refresh data
-      await Promise.all([
-        fetchRefreshedSessionData(),  // Refresh session data
-        loadCandidateRequests()       // Reload candidate requests
-      ]);
+      // Add a small delay before refreshing data to allow the API to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Refresh the session data first
+      await fetchRefreshedSessionData();
+      
+      // Then reload the candidate requests
+      await loadCandidateRequests();
     } catch (error: any) {
       console.error("Error rejecting candidate:", error);
-      toast.error(error.message || "Failed to reject candidate request");
+      toast.error(error.message || "Failed to reject candidate request", { id: toastId });
+    } finally {
+      // Remove this candidate from the processing set
+      setProcessingCandidates(prev => {
+        const updated = new Set(prev);
+        updated.delete(id);
+        return updated;
+      });
     }
   }
 
@@ -697,20 +871,50 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
     );
   };
 
-  // Function to load candidate requests directly
+  // Function to load candidate requests directly with timeout protection
   const loadCandidateRequests = async () => {
     if (!sessionId) return;
     
+    // Create a unique loading ID to prevent multiple simultaneous loads
+    const loadingId = `load-candidates-${Date.now()}`;
+    
     try {
+      // Set loading state
       setLoadingRequests(true);
-      console.log("Directly fetching candidate requests for session:", sessionId);
       
-      const requests = await candidateService.getCandidateRequests(sessionId);
-      console.log("Directly received candidate requests:", requests);
+      // Small delay to prevent rapid loading cycles
+      await new Promise(resolve => setTimeout(resolve, 300));
       
+      // Set a timeout to prevent hanging requests
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Candidate requests fetch timed out")), 10000)
+      );
+      
+      console.log(`[${loadingId}] Fetching candidate requests for session ${sessionId}`);
+      
+      // Primary data fetch with timeout
+      const requestsPromise = candidateService.getCandidateRequests(sessionId);
+      const requests = await Promise.race([requestsPromise, timeoutPromise]) as any[];
+      
+      // Log to help debugging
+      console.log(`[${loadingId}] Fetched ${Array.isArray(requests) ? requests.length : 'non-array'} candidate requests`);
+      
+      // Validate response
+      if (!Array.isArray(requests)) {
+        console.warn(`[${loadingId}] Invalid candidate requests response:`, requests);
+        setCandidateRequests([]);
+      } else {
       setCandidateRequests(requests);
-    } catch (error) {
-      console.error("Error loading candidate requests:", error);
+      }
+    } catch (error: any) {
+      console.error(`[${loadingId}] Error loading candidate requests:`, error);
+      
+      // Show a toast only for network errors, not timeouts
+      if (error.message !== "Candidate requests fetch timed out") {
+        toast.error("Failed to load candidate requests");
+      }
+      
+      setCandidateRequests([]);
     } finally {
       setLoadingRequests(false);
     }
@@ -718,7 +922,7 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
   
   // Load candidate requests when the nominations tab is selected
   const handleTabChange = (value: string) => {
-    if (value === 'nominations' && session && session.type === 'election') {
+    if (value === 'nominations' && session?.type === 'election') {
       loadCandidateRequests();
     }
   };
@@ -760,9 +964,10 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
           <Badge variant="outline" className="capitalize bg-violet-500/80 dark:bg-violet-600/80 backdrop-blur-md text-white border-transparent">
             {session.subtype}
           </Badge>
-          <Badge className={`backdrop-blur-md border-transparent ${statusInfo.status === "started" ? "bg-emerald-500/80 dark:bg-emerald-600/80" : 
+          <Badge className={`backdrop-blur-md border-transparent ${
+            statusInfo.status === "active" ? "bg-emerald-500/80 dark:bg-emerald-600/80" : 
                             statusInfo.status === "ended" ? "bg-zinc-500/80 dark:bg-zinc-600/80" : 
-                            statusInfo.status === "nomination" || statusInfo.status === "pending_deployment" ? "bg-amber-500/80 dark:bg-amber-600/80" : 
+            statusInfo.status === "nomination" || statusInfo.status === "pending_deployment" || statusInfo.status === "ready_to_start" ? "bg-amber-500/80 dark:bg-amber-600/80" : 
                             "bg-blue-500/80 dark:bg-blue-600/80"} text-white`}>
             {statusInfo.label}
           </Badge>
@@ -789,7 +994,7 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
         {/* Action Buttons - Bottom right corner */}
         <div className="absolute bottom-4 right-4 flex flex-wrap gap-3 justify-end z-10">
           {/* Start Session Button */}
-          {(statusInfo.status === "upcoming" || statusInfo.status === "nomination" || statusInfo.status === "pending_deployment") && (
+          {(statusInfo.status === "upcoming" || statusInfo.status === "nomination" || statusInfo.status === "pending_deployment" || statusInfo.status === "ready_to_start") && (
             <Button 
               onClick={handleStartSession} 
               variant="default"
@@ -802,7 +1007,7 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
           )}
 
           {/* End Session Button */}
-          {statusInfo.status === "started" && !session.sessionLifecycle?.endedAt && (
+          {statusInfo.status === "active" && !session.sessionLifecycle?.endedAt && (
             <Button 
               onClick={handleEndSession} 
               variant="secondary"
@@ -957,141 +1162,178 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
           </>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2 mt-2">
-          <div className="backdrop-blur-md bg-background/60 rounded-xl border border-border/50 shadow-lg overflow-hidden hover:shadow-muted/20 transition-all duration-300">
-            <div className="p-5">
-              <h3 className="text-lg font-medium text-foreground mb-4">Session Timeline</h3>
-              
-              <div className="relative">
-                {/* Timeline line - vertical */}
-                <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gradient-to-b from-primary/30 via-primary/20 to-muted-foreground/20 z-0"></div>
+        <div className="backdrop-blur-md bg-background/60 rounded-xl border border-border/50 shadow-lg overflow-hidden hover:shadow-muted/20 transition-all duration-300 py-2 mt-2">
+          <div className="p-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-lg font-medium text-foreground mb-4">
+                  Session Timeline
+                </h3>
                 
-                <div className="relative z-10 flex flex-col space-y-6 pl-12 pr-4">
-                  {/* Created event - always shown */}
-                  <div className="relative flex items-start">
-                    {/* Dot on timeline */}
-                    <div className="absolute left-[-32px] top-1 h-4 w-4 rounded-full bg-primary/20 border border-primary flex items-center justify-center">
-                      <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>
+                <div className="relative">
+                  {/* Timeline line - vertical */}
+                  <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-border z-0"></div>
+                  
+                  <div className="relative z-10 flex flex-col space-y-4 pl-4 pr-4">
+                    {/* Created event - always shown */}
+                    <TimelineEvent 
+                      title="Session Created"
+                      date={formatDate(session.sessionLifecycle?.createdAt)}
+                      isPast={true}
+                    />
+                    
+                    {/* ELECTION SPECIFIC TIMELINE EVENTS */}
+                    {session.type === "election" && (
+                      <>
+                        {/* Nomination phase */}
+                        {session.sessionLifecycle?.scheduledAt?.start && (
+                          <TimelineEvent 
+                            title="Nomination Start"
+                            date={formatDate(session.sessionLifecycle.scheduledAt.start)}
+                            isActive={getSessionStatusFromData(session) === "nomination"}
+                            isPast={new Date() > new Date(session.sessionLifecycle.scheduledAt.start)}
+                            isFuture={new Date() < new Date(session.sessionLifecycle.scheduledAt.start)}
+                          />
+                        )}
+                        
+                        {session.sessionLifecycle?.scheduledAt?.end && (
+                          <TimelineEvent 
+                            title="Nomination End"
+                            date={formatDate(session.sessionLifecycle.scheduledAt.end)}
+                            isPast={new Date() > new Date(session.sessionLifecycle.scheduledAt.end)}
+                            isFuture={new Date() < new Date(session.sessionLifecycle.scheduledAt.end)}
+                          />
+                        )}
+                      </>
+                    )}
+                    
+                    {/* POLL SPECIFIC TIMELINE EVENTS */}
+                    {session.type === "poll" && (
+                      <>
+                        {session.sessionLifecycle?.scheduledAt?.start && !session.sessionLifecycle?.startedAt && (
+                          <TimelineEvent 
+                            title="Scheduled Start"
+                            date={formatDate(session.sessionLifecycle.scheduledAt.start)}
+                            isActive={getSessionStatusFromData(session) === "ready_to_start"}
+                            isPast={new Date() > new Date(session.sessionLifecycle.scheduledAt.start)}
+                            isFuture={new Date() < new Date(session.sessionLifecycle.scheduledAt.start)}
+                          />
+                        )}
+                        
+                        {session.sessionLifecycle?.scheduledAt?.end && !session.sessionLifecycle?.endedAt && (
+                          <TimelineEvent 
+                            title="Scheduled End"
+                            date={formatDate(session.sessionLifecycle.scheduledAt.end)}
+                            isPast={new Date() > new Date(session.sessionLifecycle.scheduledAt.end)}
+                            isFuture={new Date() < new Date(session.sessionLifecycle.scheduledAt.end)}
+                          />
+                        )}
+                      </>
+                    )}
+                    
+                    {/* Blockchain Deployment */}
+                    {session.contractAddress ? (
+                      <TimelineEvent 
+                        title="Blockchain Deployed"
+                        date={`Contract: ${session.contractAddress.substring(0, 6)}...${session.contractAddress.substring(session.contractAddress.length - 4)}`}
+                        isPast={true}
+                      />
+                    ) : getSessionStatusFromData(session) === "pending_deployment" ? (
+                      <TimelineEvent 
+                        title="Blockchain Deployment"
+                        date="Pending deployment to blockchain"
+                        isActive={true}
+                      />
+                    ) : (
+                      <TimelineEvent 
+                        title="Blockchain Deployment"
+                        date="Not deployed yet"
+                        isFuture={true}
+                      />
+                    )}
+                    
+                    {/* Voting start */}
+                    {session.sessionLifecycle?.startedAt ? (
+                      <TimelineEvent 
+                        title="Voting Started"
+                        date={formatDate(session.sessionLifecycle.startedAt)}
+                        isActive={getSessionStatusFromData(session) === "active"}
+                        isPast={getSessionStatusFromData(session) === "ended"}
+                      />
+                    ) : (
+                      <TimelineEvent 
+                        title="Voting Start"
+                        date="Not started yet"
+                        isFuture={true}
+                      />
+                    )}
+                    
+                    {/* Voting end */}
+                    {session.sessionLifecycle?.endedAt ? (
+                      <TimelineEvent 
+                        title="Voting Ended"
+                        date={formatDate(session.sessionLifecycle.endedAt)}
+                        isPast={true}
+                      />
+                    ) : (
+                      <TimelineEvent 
+                        title="Voting End"
+                        date="Not ended yet"
+                        isFuture={true}
+                      />
+                    )}
+                    
+                    {/* Current status indicator */}
+                    <div className="relative flex items-start p-2 border-l-2 border-primary pl-3">
+                      <div>
+                        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">CURRENT STATUS</span>
+                        <div className="mt-1">
+                          <Badge className={`${statusInfo.color} px-2 py-0.5 text-xs`}>
+                            {statusInfo.label}
+                          </Badge>
+                        </div>
+                      </div>
                     </div>
-                    {/* Content */}
-                    <div>
-                      <span className="text-xs font-medium uppercase tracking-wider text-primary">CREATED</span>
-                      <p className="text-sm text-foreground">{formatDate(session.sessionLifecycle?.createdAt)}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Session Stats Card */}
+              <div>
+                <h3 className="text-lg font-medium text-foreground mb-4">
+                  Session Statistics
+                </h3>
+                
+                <div className="grid grid-cols-1 gap-4">
+                  {/* Participants Count */}
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
+                      {session.type === "election" ? "Candidates" : "Options"}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-primary" />
+                      <span className="font-medium">
+                        {session.type === "election" 
+                          ? ((session as Election).candidates?.length || 0) 
+                          : ((session as Poll).options?.length || 0)}
+                      </span>
                     </div>
                   </div>
                   
-                  {/* Nomination phase for elections only */}
-                  {session.type === "election" && session.sessionLifecycle?.scheduledAt?.start && (
-                    <div className="relative flex items-start">
-                      {/* Dot on timeline */}
-                      <div className="absolute left-[-32px] top-1 h-4 w-4 rounded-full bg-amber-500/20 border border-amber-500 flex items-center justify-center">
-                        <div className="h-1.5 w-1.5 rounded-full bg-amber-500"></div>
-                      </div>
-                      {/* Content */}
-                      <div>
-                        <span className="text-xs font-medium uppercase tracking-wider text-amber-500">NOMINATION START</span>
-                        <p className="text-sm text-foreground">{formatDate(session.sessionLifecycle.scheduledAt.start)}</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Nomination end for elections only */}
-                  {session.type === "election" && session.sessionLifecycle?.scheduledAt?.end && (
-                    <div className="relative flex items-start">
-                      {/* Dot on timeline */}
-                      <div className="absolute left-[-32px] top-1 h-4 w-4 rounded-full bg-amber-700/20 border border-amber-700 flex items-center justify-center">
-                        <div className="h-1.5 w-1.5 rounded-full bg-amber-700"></div>
-                      </div>
-                      {/* Content */}
-                      <div>
-                        <span className="text-xs font-medium uppercase tracking-wider text-amber-700">NOMINATION END</span>
-                        <p className="text-sm text-foreground">{formatDate(session.sessionLifecycle.scheduledAt.end)}</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Scheduled start for polls only */}
-                  {session.type === "poll" && !session.sessionLifecycle?.startedAt && session.sessionLifecycle?.scheduledAt?.start && (
-                    <div className="relative flex items-start">
-                      {/* Dot on timeline */}
-                      <div className="absolute left-[-32px] top-1 h-4 w-4 rounded-full bg-blue-500/20 border border-blue-500 flex items-center justify-center">
-                        <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
-                      </div>
-                      {/* Content */}
-                      <div>
-                        <span className="text-xs font-medium uppercase tracking-wider text-blue-500">SCHEDULED START</span>
-                        <p className="text-sm text-foreground">{formatDate(session.sessionLifecycle.scheduledAt.start)}</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Scheduled end for polls only */}
-                  {session.type === "poll" && !session.sessionLifecycle?.endedAt && session.sessionLifecycle?.scheduledAt?.end && (
-                    <div className="relative flex items-start">
-                      {/* Dot on timeline */}
-                      <div className="absolute left-[-32px] top-1 h-4 w-4 rounded-full bg-blue-700/20 border border-blue-700 flex items-center justify-center">
-                        <div className="h-1.5 w-1.5 rounded-full bg-blue-700"></div>
-                      </div>
-                      {/* Content */}
-                      <div>
-                        <span className="text-xs font-medium uppercase tracking-wider text-blue-700">SCHEDULED END</span>
-                        <p className="text-sm text-foreground">{formatDate(session.sessionLifecycle.scheduledAt.end)}</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Voting start */}
-                  {session.sessionLifecycle?.startedAt && (
-                    <div className="relative flex items-start">
-                      {/* Dot on timeline */}
-                      <div className="absolute left-[-32px] top-1 h-4 w-4 rounded-full bg-green-500/20 border border-green-500 flex items-center justify-center">
-                        <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
-                      </div>
-                      {/* Content */}
-                      <div>
-                        <span className="text-xs font-medium uppercase tracking-wider text-green-500">VOTING START</span>
-                        <p className="text-sm text-foreground">{formatDate(session.sessionLifecycle.startedAt)}</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Voting end */}
-                  {session.sessionLifecycle?.endedAt && (
-                    <div className="relative flex items-start">
-                      {/* Dot on timeline */}
-                      <div className="absolute left-[-32px] top-1 h-4 w-4 rounded-full bg-blue-500/20 border border-blue-500 flex items-center justify-center">
-                        <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
-                      </div>
-                      {/* Content */}
-                      <div>
-                        <span className="text-xs font-medium uppercase tracking-wider text-blue-500">VOTING END</span>
-                        <p className="text-sm text-foreground">{formatDate(session.sessionLifecycle.endedAt)}</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Current status indicator */}
-                  <div className="relative flex items-start">
-                    {/* Dot on timeline */}
-                    <div className="absolute left-[-32px] top-1 h-4 w-4 rounded-full bg-gray-500/20 border border-gray-500 flex items-center justify-center">
-                      <div className="h-1.5 w-1.5 rounded-full bg-gray-500"></div>
-                    </div>
-                    {/* Content */}
-                    <div>
-                      <span className="text-xs font-medium uppercase tracking-wider text-gray-500">CURRENT STATUS</span>
-                      <div className="mt-1">
-                        <Badge className={`${statusInfo.color} px-2 py-0.5 text-xs`}>
-                          {statusInfo.label}
-                        </Badge>
-                      </div>
+                  {/* Blockchain Voter Count */}
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Votes Cast</p>
+                    <div className="flex items-center gap-2">
+                      <Vote className="h-4 w-4 text-primary" />
+                      <span className="font-medium">
+                        {session.results?.blockchainVoterCount || 0}
+                      </span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-          
-          {/* Nomination phase information is now integrated into the main timeline */}
         </div>
 
         {/* Blockchain information - Redesigned into a single cohesive block */}
@@ -1161,7 +1403,7 @@ export function SessionDetail({ sessionId }: SessionDetailProps) {
         <TabsList className="w-full mb-4">
           <TabsTrigger value="settings" id="settings-tab" className="flex-1">Settings</TabsTrigger>
           <TabsTrigger value="data" className="flex-1">Vote Data</TabsTrigger>
-          {session.type === "election" && session.candidateRequests && session.candidateRequests.length > 0 && (
+          {session.type === "election" && (
             <TabsTrigger value="nominations" className="flex-1">Candidate Requests</TabsTrigger>
           )}
         </TabsList>

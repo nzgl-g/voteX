@@ -24,6 +24,7 @@ export function CandidateDialog({
   onReject
 }: CandidateDialogProps) {
   const [activeTab, setActiveTab] = useState<"info" | "attachments">("info")
+  const [isProcessing, setIsProcessing] = useState(false)
 
   const getFileIcon = (filename: string) => {
     const extension = filename.split(".").pop()?.toLowerCase()
@@ -33,8 +34,44 @@ export function CandidateDialog({
     return <File className="h-5 w-5 text-gray-500" />
   }
 
+  const handleAccept = async () => {
+    if (!onAccept || isProcessing) return;
+    
+    try {
+      setIsProcessing(true);
+      
+      // Call the accept handler
+      onAccept(candidate.id);
+      
+      // Close the dialog
+      onOpenChange(false);
+    } finally {
+      // We'll set processing back to false after a delay
+      // This prevents rapid clicking even after the dialog closes
+      setTimeout(() => setIsProcessing(false), 1000);
+    }
+  }
+
+  const handleReject = async () => {
+    if (!onReject || isProcessing) return;
+    
+    try {
+      setIsProcessing(true);
+      
+      // Call the reject handler
+      onReject(candidate.id);
+      
+      // Close the dialog
+      onOpenChange(false);
+    } finally {
+      // We'll set processing back to false after a delay
+      // This prevents rapid clicking even after the dialog closes
+      setTimeout(() => setIsProcessing(false), 1000);
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={isProcessing ? undefined : onOpenChange}>
       <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
         <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle className="text-xl">Candidate Details</DialogTitle>
@@ -141,25 +178,21 @@ export function CandidateDialog({
               <Button 
                 variant="outline" 
                 className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
-                onClick={() => {
-                  onReject(candidate.id);
-                  onOpenChange(false);
-                }}
+                onClick={handleReject}
+                disabled={isProcessing}
               >
                 <XCircle className="h-4 w-4 mr-2" />
-                Reject Candidate
+                {isProcessing ? "Processing..." : "Reject Candidate"}
               </Button>
             )}
             {onAccept && (
               <Button 
                 className="bg-green-600 hover:bg-green-700"
-                onClick={() => {
-                  onAccept(candidate.id);
-                  onOpenChange(false);
-                }}
+                onClick={handleAccept}
+                disabled={isProcessing}
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
-                Accept Candidate
+                {isProcessing ? "Processing..." : "Accept Candidate"}
               </Button>
             )}
           </div>

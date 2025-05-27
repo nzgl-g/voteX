@@ -34,6 +34,8 @@ export const getSessionLifecycleStatus = (session: any): SessionLifecycleStatus 
 
   try {
     const now = new Date();
+    
+    // Extract all possible dates from the session lifecycle
     const scheduledStart = session.sessionLifecycle.scheduledAt?.start
         ? new Date(session.sessionLifecycle.scheduledAt.start)
         : null;
@@ -58,28 +60,30 @@ export const getSessionLifecycleStatus = (session: any): SessionLifecycleStatus 
     }
 
     // 2. Check if contract address exists - this indicates the session is active on blockchain
+    // This check is prioritized over other "started" checks to ensure blockchain deployment is detected
     if (session.contractAddress) {
       return {
         status: "started",
-        label: "Active",
+        label: "Active on Blockchain",
         color: "bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-700",
         icon: <Vote className="h-3.5 w-3.5 mr-1" />,
       };
     }
 
-    // 3. Check if session has started and is currently active (fallback if no contract address)
-    if (startedAt && now >= startedAt && (!endedAt || now <= endedAt)) {
+    // 3. Check if session has started but doesn't have a contract address - pending deployment
+    if (startedAt && now >= startedAt && (!endedAt || now <= endedAt) && !session.contractAddress) {
       return {
-        status: "started",
-        label: "Active",
-        color: "bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-700",
-        icon: <Vote className="h-3.5 w-3.5 mr-1" />,
+        status: "pending_deployment",
+        label: "Pending Deployment",
+        color: "bg-amber-500 hover:bg-amber-400 text-black dark:text-zinc-900 border border-amber-600",
+        icon: <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />,
       };
     }
 
-    // 4. Check if in nomination phase (only for election sessions with scheduled dates)
-    if (session.type === "election" && scheduledStart && scheduledEnd) {
-      if (now >= scheduledStart && now <= scheduledEnd) {
+    // 4. Check if in nomination phase (only for election sessions)
+    if (session.type === "election" && scheduledStart && scheduledEnd && startedAt) {
+      // In election type, scheduledAt contains nomination dates, and startedAt contains voting start
+      if (now >= scheduledStart && now <= scheduledEnd && now < startedAt) {
         return {
           status: "nomination",
           label: "Nominations",
@@ -89,18 +93,40 @@ export const getSessionLifecycleStatus = (session: any): SessionLifecycleStatus 
       }
     }
 
-    // 5. Check if session is upcoming (before nomination or start time)
-    if ((session.type === "election" && scheduledStart && now < scheduledStart) || 
-        (!startedAt && !scheduledStart)) {
-      return {
-        status: "upcoming",
-        label: "Coming Soon",
-        color: "bg-blue-500 hover:bg-blue-400 text-white border border-blue-600",
-        icon: <Calendar className="h-3.5 w-3.5 mr-1" />,
-      };
+    // 5. Handle upcoming status differently for poll vs election
+    if (session.type === "election") {
+      // For elections: upcoming if before nomination start
+      if (scheduledStart && now < scheduledStart) {
+        return {
+          status: "upcoming",
+          label: "Coming Soon",
+          color: "bg-blue-500 hover:bg-blue-400 text-white border border-blue-600",
+          icon: <Calendar className="h-3.5 w-3.5 mr-1" />,
+        };
+      }
+      
+      // Also upcoming if after nomination but before voting
+      if (scheduledEnd && startedAt && now > scheduledEnd && now < startedAt) {
+        return {
+          status: "upcoming",
+          label: "Voting Soon",
+          color: "bg-blue-500 hover:bg-blue-400 text-white border border-blue-600",
+          icon: <Calendar className="h-3.5 w-3.5 mr-1" />,
+        };
+      }
+    } else {
+      // For polls: upcoming if before start time
+      if (startedAt && now < startedAt) {
+        return {
+          status: "upcoming",
+          label: "Coming Soon",
+          color: "bg-blue-500 hover:bg-blue-400 text-white border border-blue-600",
+          icon: <Calendar className="h-3.5 w-3.5 mr-1" />,
+        };
+      }
     }
 
-    // 6. Default to pending (created but not yet active)
+    // 6. Default to pending (created but not yet fully scheduled)
     return {
       status: "pending",
       label: "Pending",
@@ -144,10 +170,48 @@ export function SessionCard({
   const [showVoteResults, setShowVoteResults] = useState(false);
   const [isLoadingKYC, setIsLoadingKYC] = useState<boolean>(false);
   const [verificationError, setVerificationError] = useState<any>(null);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   useEffect(() => {
     setSession(initialSession);
   }, [initialSession]);
+
+  useEffect(() => {
+    if (!session || !session._id) return;
+    
+    const status = getSessionLifecycleStatus(session).status;
+    const needsPolling = 
+      (status === 'pending_deployment' || status === 'started') && 
+      !session.contractAddress;
+    
+    if (!needsPolling) return;
+    
+    const intervalId = setInterval(async () => {
+      try {
+        setIsRefreshing(true);
+        console.log(`[SessionCard] Auto-refreshing session ${session._id} status...`);
+        const updatedSession = await sessionService.getSessionById(session._id);
+        
+        if (updatedSession) {
+          if (updatedSession.contractAddress && !session.contractAddress) {
+            console.log(`[SessionCard] Session ${session._id} now has contract address: ${updatedSession.contractAddress}`);
+            toast({
+              title: "Session Deployed",
+              description: "This session is now active on the blockchain.",
+            });
+          }
+          
+          setSession(updatedSession);
+        }
+      } catch (error) {
+        console.error('[SessionCard] Error refreshing session:', error);
+      } finally {
+        setIsRefreshing(false);
+      }
+    }, 10000);
+    
+    return () => clearInterval(intervalId);
+  }, [session]);
 
   if (!session || typeof session !== "object" || !session._id) {
     console.error("Invalid session data provided to SessionCard:", session);
@@ -206,12 +270,11 @@ export function SessionCard({
       // Extract selected option/candidate ID from the data
       let selectedId = '';
       
-      if (data.selections) {
+      if (data.selectedOptions && data.selectedOptions.length > 0) {
+        selectedId = data.selectedOptions[0];
+      } else if (data.selections) {
         // For backward compatibility
         selectedId = extractCandidateId(data.selections);
-      } else if (data.selectedOptions && data.selectedOptions.length > 0) {
-        // For the new format
-        selectedId = data.selectedOptions[0];
       }
 
       if (!selectedId) {
@@ -223,21 +286,58 @@ export function SessionCard({
         return;
       }
 
+      // For blockchain sessions, ensure MetaMask is connected first
+      if (session.contractAddress) {
+        try {
+          // Import and use metamask service
+          const metamaskService = (await import('@/services/metamask-service')).default;
+          
+          // Connect to MetaMask first
+          const connected = await metamaskService.connect();
+          if (!connected) {
+            toast({
+              title: "Wallet Connection Required",
+              description: "Please connect your MetaMask wallet to cast your vote.",
+              variant: "destructive"
+            });
+            return;
+          }
+          
+          console.log("[SessionCard] MetaMask connected successfully");
+        } catch (metamaskError) {
+          console.error("Error connecting to MetaMask:", metamaskError);
+          toast({
+            title: "Wallet Connection Error",
+            description: "Failed to connect to your wallet. Please try again.",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
       // Call the onCastVote callback if provided
       if (onCastVote) {
-        await onCastVote(session._id);
+        try {
+          // Here we're passing the session ID to the callback
+          // This should trigger the blockchain vote transaction
+          await onCastVote(session._id);
+        } catch (castError) {
+          console.error("Error in onCastVote callback:", castError);
+          toast({
+            title: "Vote Error",
+            description: "Failed to submit your vote to the blockchain. Please try again.",
+            variant: "destructive"
+          });
+          return; // Exit early if the blockchain transaction failed
+        }
       }
 
       // Update vote counts locally for immediate feedback
       updateVoteCountsLocally(session, selectedId);
 
-      toast({
-        title: "Vote Submitted",
-        description: "Your vote has been successfully recorded.",
-      });
-
-      // Close the voting dialog
-      setShowVotingDialog(false);
+      // Toast notification is now handled by the VotingDialog component
+      
+      // The VotingDialog will close itself after successful submission
     } catch (error) {
       console.error("Error submitting vote:", error);
       toast({
@@ -528,6 +628,32 @@ export function SessionCard({
       }
     };
 
+    // If session has a contract address, show the appropriate button based on status
+    if (session.contractAddress) {
+      if (lifecycleStatus.status === 'ended') {
+        return (
+          <button
+            onClick={handleShowResults}
+            className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 w-full ${getVariantClasses('outline')}`}
+          >
+            <BarChart3 className="h-4 w-4 mr-2" />
+            View Results
+          </button>
+        );
+      } else {
+        return (
+          <button
+            onClick={handleVoteBtnClick}
+            className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 w-full ${getVariantClasses('emerald')}`}
+          >
+            <Vote className="h-4 w-4 mr-2" />
+            Cast Vote
+          </button>
+        );
+      }
+    }
+
+    // For sessions without contract address, use the original logic
     if (lifecycleStatus.status === 'ended') {
       return (
         <button
@@ -552,10 +678,32 @@ export function SessionCard({
       );
     }
 
+    if (lifecycleStatus.status === 'pending_deployment') {
+      return (
+        <button
+          onClick={handleRefreshSession}
+          className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 w-full ${getVariantClasses('amber')}`}
+          disabled={isRefreshing}
+        >
+          {isRefreshing ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Checking Status...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Check Deployment Status
+            </>
+          )}
+        </button>
+      );
+    }
+
     if (lifecycleStatus.status === 'started') {
       return (
         <button
-          onClick={() => onCastVote(session)}
+          onClick={handleVoteBtnClick}
           className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 w-full ${getVariantClasses('emerald')}`}
         >
           <Vote className="h-4 w-4 mr-2" />
@@ -656,6 +804,34 @@ export function SessionCard({
     }
   };
 
+  const handleRefreshSession = async () => {
+    if (!session || !session._id) return;
+    
+    try {
+      setIsRefreshing(true);
+      const updatedSession = await sessionService.getSessionById(session._id);
+      if (updatedSession) {
+        setSession(updatedSession);
+        
+        if (updatedSession.contractAddress && !session.contractAddress) {
+          toast({
+            title: "Session Deployed",
+            description: "This session is now active on the blockchain.",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error refreshing session:", error);
+      toast({
+        title: "Refresh Error",
+        description: "Failed to get the latest session data.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
       <>
         <Card
@@ -663,8 +839,20 @@ export function SessionCard({
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-          {/* Quick Action Button */}
-          <div className={`absolute top-3 right-3 z-10 transition-opacity duration-200 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+          {/* Quick Action Buttons */}
+          <div className={`absolute top-3 right-3 z-10 transition-opacity duration-200 ${isHovered ? 'opacity-100' : 'opacity-0'} flex gap-2`}>
+            <Button 
+              size="icon" 
+              variant="secondary" 
+              className="h-8 w-8 rounded-full bg-background/90 backdrop-blur-sm shadow-sm transition-all hover:bg-background hover:scale-105"
+              onClick={handleRefreshSession}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? 
+                <Loader2 className="h-4 w-4 animate-spin" /> : 
+                <RefreshCw className="h-4 w-4" />
+              }
+            </Button>
             <Button 
               size="icon" 
               variant="secondary" 

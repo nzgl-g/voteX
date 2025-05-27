@@ -55,10 +55,24 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      // Get the current user ID
-      const currentUserId = JSON.parse(localStorage.getItem('user') || '{}')._id;
-      if (!currentUserId) {
-        console.error('User ID not found');
+      // Get the current user ID - Add better error handling
+      let currentUserId;
+      try {
+        const userStr = localStorage.getItem('user');
+        if (!userStr) {
+          console.warn('User data not found in localStorage');
+          return;
+        }
+        
+        const userData = JSON.parse(userStr);
+        currentUserId = userData?._id;
+        
+        if (!currentUserId) {
+          console.warn('User ID not found in user data', userData);
+          return;
+        }
+      } catch (err) {
+        console.warn('Error parsing user data from localStorage', err);
         return;
       }
 
@@ -117,10 +131,29 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   // Mark notification as read
   const markAsRead = useCallback(async (notification: Notification) => {
     try {
-      // Get the current user ID
-      const currentUserId = JSON.parse(localStorage.getItem('user') || '{}')._id;
-      if (!currentUserId || !notification._id) {
-        console.error('Missing user ID or notification ID');
+      // Get the current user ID - Add better error handling
+      let currentUserId;
+      try {
+        const userStr = localStorage.getItem('user');
+        if (!userStr) {
+          console.warn('User data not found in localStorage');
+          return;
+        }
+        
+        const userData = JSON.parse(userStr);
+        currentUserId = userData?._id;
+        
+        if (!currentUserId) {
+          console.warn('User ID not found in user data', userData);
+          return;
+        }
+      } catch (err) {
+        console.warn('Error parsing user data from localStorage', err);
+        return;
+      }
+
+      if (!notification._id) {
+        console.error('Missing notification ID');
         return;
       }
       
@@ -181,20 +214,26 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      // Get user information
+      // Get user information with better error handling
       let userId;
-      const userStr = localStorage.getItem('user');
-      if (userStr) {
-        try {
-          const user = JSON.parse(userStr);
-          userId = user._id;
-        } catch (e) {
-          console.error('Failed to parse user data from localStorage:', e);
+      try {
+        const userStr = localStorage.getItem('user');
+        if (!userStr) {
+          console.warn('User data not found in localStorage for socket connection');
           return;
         }
+        
+        const userData = JSON.parse(userStr);
+        userId = userData?._id;
+        
+        if (!userId) {
+          console.warn('User ID not found in user data for socket connection', userData);
+          return;
+        }
+      } catch (err) {
+        console.warn('Error parsing user data from localStorage for socket connection', err);
+        return;
       }
-
-      if (!userId) return;
 
       const socketInstance = io('http://localhost:2000', {
         auth: { token },

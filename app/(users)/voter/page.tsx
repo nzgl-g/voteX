@@ -318,11 +318,24 @@ export default function VoterPage() {
     setLoading(true);
     setError(null);
     try {
-      // Get the current user ID for notifications
-      const user = localStorage.getItem('user');
-      if (user) {
-        const userData = JSON.parse(user);
-        setUserId(userData._id || "anonymous");
+      // Get the current user ID for notifications with better error handling
+      try {
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+          const userData = JSON.parse(userStr);
+          if (userData && userData._id) {
+            setUserId(userData._id);
+          } else {
+            console.warn('User ID not found in user data', userData);
+            setUserId("anonymous");
+          }
+        } else {
+          console.warn('User data not found in localStorage');
+          setUserId("anonymous");
+        }
+      } catch (err) {
+        console.warn('Error parsing user data from localStorage', err);
+        setUserId("anonymous");
       }
       
       // Load secret sessions first

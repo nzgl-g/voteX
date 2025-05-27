@@ -179,7 +179,7 @@ export function NotificationSheet({
         </SheetTrigger>
       )}
 
-      <SheetContent side="right" className={cn(contentClassName, "flex flex-col")}>
+      <SheetContent side="right" className={cn(contentClassName, "flex flex-col h-full overflow-hidden")}>
         <SheetHeader className="sticky top-0 z-10 pt-1 pb-3 border-b bg-background">
           <div className="flex justify-between items-center">
             <SheetTitle className="text-xl font-semibold">Notifications</SheetTitle>
@@ -244,8 +244,8 @@ export function NotificationSheet({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value={activeTab} className="mt-0 outline-none">
-            <ScrollArea className="flex-1 pr-3 -mr-3 max-h-[calc(100vh-180px)]">
+          <TabsContent value={activeTab} className="mt-0 outline-none flex-1 overflow-hidden">
+            <ScrollArea className="h-[calc(100vh-220px)] pr-3 -mr-3">
               {filteredNotifications.length > 0 ? (
                 <div className="flex flex-col gap-3 px-1">
                   <AnimatePresence>

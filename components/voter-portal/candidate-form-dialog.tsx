@@ -116,11 +116,12 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
         setIsSubmitting(true);
 
         try {
-            if (!formData.dateOfBirth) {
-                toast.error("Please select your date of birth");
-                setIsSubmitting(false);
-                return;
-            }
+            // Date of birth validation is now optional
+            // if (!formData.dateOfBirth) {
+            //     toast.error("Please select your date of birth");
+            //     setIsSubmitting(false);
+            //     return;
+            // }
 
             // Create application data with just the required fields
             const applicationData: any = {
@@ -128,18 +129,17 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
                 experience: formData.experience,
                 nationalities: formData.nationalities.split(',').map(n => n.trim()),
                 dobPob: {
-                    dateOfBirth: formData.dateOfBirth ? format(formData.dateOfBirth, 'yyyy-MM-dd') : '',
+                    dateOfBirth: formData.dateOfBirth ? format(formData.dateOfBirth, 'yyyy-MM-dd') : null,
                     placeOfBirth: formData.placeOfBirth
                 },
                 promises: formData.promises.split('\n').map(p => p.trim()).filter(p => p),
                 partyName: formData.partyName
             };
 
-            // If there's a file, include the filename as paper for now
-            if (formData.officialPaper) {
-                // Just store the filename as a placeholder
-                applicationData.paper = `file:${formData.officialPaper.name}`;
-            }
+            // Paper upload is disabled/coming soon, so we don't need this code
+            // if (formData.officialPaper) {
+            //     applicationData.paper = `file:${formData.officialPaper.name}`;
+            // }
 
             // Submit the application
             const response = await candidateService.applyAsCandidate(sessionId, applicationData);
@@ -187,34 +187,18 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
                 <form onSubmit={handleSubmit} className="space-y-6 py-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="dateOfBirth">Date of Birth <span className="text-red-500">*</span></Label>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        id="dateOfBirth"
-                                        variant="outline"
-                                        className={cn(
-                                            "w-full justify-start text-left font-normal",
-                                            !formData.dateOfBirth && "text-muted-foreground"
-                                        )}
-                                    >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {formData.dateOfBirth ? format(formData.dateOfBirth, "PPP") : <span>Pick a date</span>}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                        mode="single"
-                                        selected={formData.dateOfBirth}
-                                        onSelect={handleDateChange}
-                                        disabled={(date) =>
-                                            date > new Date() || date < new Date("1900-01-01")
-                                        }
-                                        initialFocus
-                                        className="p-3 pointer-events-auto"
-                                    />
-                                </PopoverContent>
-                            </Popover>
+                            <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                            <Input
+                                id="dateOfBirth"
+                                name="dateOfBirth"
+                                type="date"
+                                className="w-full"
+                                onChange={(e) => {
+                                    const date = e.target.value ? new Date(e.target.value) : undefined;
+                                    handleDateChange(date);
+                                }}
+                                max={new Date().toISOString().split('T')[0]}
+                            />
                         </div>
 
                         <div className="space-y-2">
@@ -297,40 +281,24 @@ const CandidateFormDialog: React.FC<CandidateFormDialogProps> = ({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="officialPaper">Upload Official Papers <span className="text-red-500">*</span></Label>
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="officialPaper">Upload Official Papers</Label>
+                            <span className="text-xs bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 px-2 py-0.5 rounded-full font-medium">Coming Soon</span>
+                        </div>
                         <div
                             className={cn(
-                                "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors",
-                                isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/20",
-                                formData.officialPaper ? "bg-primary/5" : ""
+                                "border-2 border-dashed rounded-lg p-6 text-center transition-colors opacity-70 pointer-events-none",
+                                "border-muted-foreground/20 bg-muted/20"
                             )}
-                            onDragOver={handleDragOver}
-                            onDragLeave={handleDragLeave}
-                            onDrop={handleDrop}
-                            onClick={() => document.getElementById('file-upload')?.click()}
                         >
-                            <input
-                                id="file-upload"
-                                type="file"
-                                className="hidden"
-                                onChange={handleFileChange}
-                                accept=".pdf,.jpg,.jpeg,.png"
-                                required={!formData.officialPaper}
-                            />
                             <div className="flex flex-col items-center justify-center gap-2">
                                 <Upload className="h-8 w-8 text-muted-foreground" />
-                                {formData.officialPaper ? (
-                                    <p className="text-sm font-medium">{formData.officialPaper.name}</p>
-                                ) : (
-                                    <>
-                                        <p className="text-sm font-medium">Drag and drop your file here or click to browse</p>
-                                        <p className="text-xs text-muted-foreground">PDF, JPG, PNG (Max. 2MB)</p>
-                                    </>
-                                )}
+                                <p className="text-sm font-medium">File upload functionality coming soon</p>
+                                <p className="text-xs text-muted-foreground">This feature will be available in a future update</p>
                             </div>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Note: Files are currently processed as placeholders. Full file upload will be implemented in a future update.
+                          Note: You can proceed with your application without uploading papers at this time.
                         </p>
                     </div>
 

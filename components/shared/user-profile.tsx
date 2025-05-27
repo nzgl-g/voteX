@@ -60,18 +60,29 @@ export function UserProfile({
                                 className = "",
                             }: UserProfileProps) {
     const [settingsOpen, setSettingsOpen] = useState(false);
-    const [hasSessions, setHasSessions] = useState(false);
-    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [hasLeaderSessions, setHasLeaderSessions] = useState(false);
+    const [hasMemberSessions, setHasMemberSessions] = useState(false);
+    const [leaderSessionId, setLeaderSessionId] = useState<string | null>(null);
+    const [memberSessionId, setMemberSessionId] = useState<string | null>(null);
     const router = useRouter();
     const pathname = usePathname();
 
     useEffect(() => {
         const checkUserSessions = async () => {
             try {
-                const sessions = await sessionService.getUserSessions();
-                if (sessions?.length > 0) {
-                    setHasSessions(true);
-                    setSessionId(sessions[0]._id || null);
+                // Check for leader sessions
+                const leaderSessions = await sessionService.getUserSessions();
+                if (leaderSessions?.length > 0) {
+                    setHasLeaderSessions(true);
+                    setLeaderSessionId(leaderSessions[0]._id || null);
+                }
+                
+                // Check for member sessions
+                const memberSessionsResponse = await sessionService.getUserSessionsAsMember();
+                const memberSessions = memberSessionsResponse.sessions;
+                if (memberSessions?.length > 0) {
+                    setHasMemberSessions(true);
+                    setMemberSessionId(memberSessions[0]._id || null);
                 }
             } catch (error) {
                 console.error("Error fetching user sessions:", error);
@@ -99,12 +110,20 @@ export function UserProfile({
     };
 
     const navigateToVoterPortal = () => router.push("/voter");
+    
     const navigateToDashboard = () => {
-        if (sessionId) router.push(`/team-leader/monitoring/${sessionId}`);
+        if (hasLeaderSessions && leaderSessionId) {
+            router.push(`/team-leader/monitoring/${leaderSessionId}`);
+        } else if (hasMemberSessions && memberSessionId) {
+            router.push(`/team-member/monitoring/${memberSessionId}`);
+        }
     };
 
     const isVoterPage = pathname?.startsWith("/voter");
     const isTeamLeaderPage = pathname?.startsWith("/team-leader");
+    const isTeamMemberPage = pathname?.startsWith("/team-member");
+    const hasSessions = hasLeaderSessions || hasMemberSessions;
+    const isOnDashboard = isTeamLeaderPage || isTeamMemberPage;
 
     const UserAvatar = (
         <Avatar className="h-8 w-8">
@@ -167,7 +186,7 @@ export function UserProfile({
                             />
                         )}
 
-                        {hasSessions && !isTeamLeaderPage && (
+                        {hasSessions && !isOnDashboard && (
                             <MenuItem
                                 icon={LayoutDashboard}
                                 label="Go to Dashboard"
@@ -251,7 +270,7 @@ export function UserProfile({
                         />
                     )}
 
-                    {hasSessions && !isTeamLeaderPage && (
+                    {hasSessions && !isOnDashboard && (
                         <MenuItem
                             icon={LayoutDashboard}
                             label="Go to Dashboard"

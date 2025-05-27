@@ -362,6 +362,23 @@ router.patch("/:sessionId/edit-request", auth, async (req, res) => {
       .json({ error: "Failed to submit edit request", details: err.message });
   }
 });
+router.get("/sessions/:sessionId/edit-requests", auth, async (req, res) => {
+  try {
+    const sessionId = req.params.sessionId;
+
+    const editRequests = await SessionEditRequest.find({ session: sessionId })
+      .populate("proposedBy", "username")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ editRequests });
+  } catch (err) {
+    console.error("Fetch session edit requests error:", err);
+    res.status(500).json({
+      error: "Failed to fetch session edit requests",
+      details: err.message,
+    });
+  }
+});
 
 router.patch("/edit-requests/:requestId/approve", auth, async (req, res) => {
   try {

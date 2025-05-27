@@ -119,7 +119,7 @@ router.post("/:teamId/invite", auth, isTeamLeader, async (req, res) => {
       recipients: [user._id],
       type: "team-invite",
       message: `You've been invited to join the team of "${team.sessionName}"`,
-      link: `/teams/${teamId}`,
+      link: `/team-member/team/${team.session}`,
       targetType: "user",
       extraData: { invitationId: invitation._id, teamId },
     });

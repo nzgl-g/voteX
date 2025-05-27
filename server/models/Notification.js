@@ -36,6 +36,7 @@ const notificationSchema = new mongoose.Schema(
         "team-member-declined",
         "session-edit-request",
         "session-edit-approved",
+        "session-edit-rejected",
         "task-assigned",
         "task-completed",
         "task-uncompleted",

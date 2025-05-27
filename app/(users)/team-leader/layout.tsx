@@ -21,7 +21,7 @@ const data = {
     // The teams array is kept empty as they will be loaded by the SessionSelector
     teams: [],
     navMain: [
-        /*{title: "Monitoring", url: "/team-leader/monitoring/default", icon: LayoutDashboard },*/
+        {title: "Monitoring", url: "/team-leader/monitoring/default", icon: LayoutDashboard },
         {title: "Session", url: "/team-leader/session/default", icon: CalendarClock },
         {title: "Team", url: "/team-leader/team/default", icon: Users},
         {title: "Scheduler", url: "/team-leader/scheduler/default", icon: CheckSquare},

@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { addDays, setHours, setMinutes, getDay, format, parseISO } from "date-fns";
+import { addDays, getDay, format } from "date-fns";
 import { useCalendarContext } from "@/components/event-calendar/calendar-context";
 import { baseApi } from "@/services";
+import { eventService } from "@/services";
+import { toast } from "@/lib/toast";
 
 import {
   EventCalendar,
@@ -76,8 +78,8 @@ const currentDate = new Date();
 // Calculate the offset once to avoid repeated calculations
 const daysUntilNextSunday = getDaysUntilNextSunday(currentDate);
 
-// Sample events data with hardcoded times
-const votingSystemEvents: CalendarEvent[] = [];
+// Empty initial events array
+const initialEvents: CalendarEvent[] = [];
 
 
 interface BigCalendarProps {
@@ -85,22 +87,59 @@ interface BigCalendarProps {
 }
 
 export default function Component({ sessionId }: BigCalendarProps) {
-  const [events, setEvents] = useState<CalendarEvent[]>(votingSystemEvents);
+  const [events, setEvents] = useState<CalendarEvent[]>(initialEvents);
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   
-  // Fetch session data
+  // Fetch session data and events
   useEffect(() => {
     if (sessionId) {
       setLoading(true);
-      baseApi.get(`/sessions/${sessionId}`)
+      
+      // Fetch session data
+      const fetchSession = baseApi.get(`/sessions/${sessionId}`)
         .then(response => {
           setSession(response.data);
           generateSessionLifecycleEvents(response.data);
         })
         .catch(error => {
           console.error("Error fetching session:", error);
+          toast.error("Failed to fetch session data");
+        });
+      
+      // Fetch custom events
+      const fetchEvents = eventService.getSessionEvents(sessionId)
+        .then(eventsData => {
+          // Map server events to calendar events
+          const mappedEvents = eventsData.map((event: any) => ({
+            id: event._id,
+            title: event.title,
+            description: event.description || "",
+            start: new Date(event.startDate),
+            end: new Date(event.endDate),
+            allDay: event.allDay || false,
+            color: event.color as EventColor || "blue"
+          }));
+          
+          setEvents(prevEvents => {
+            // Keep only lifecycle events
+            const lifecycleEvents = prevEvents.filter(event => 
+              ['session-lifecycle', 'nomination-phase', 'voting-phase'].includes(event.etiquette || ''));
+            
+            // Add the new custom events
+            return [...lifecycleEvents, ...mappedEvents];
+          });
         })
+        .catch(error => {
+          console.error("Error fetching events:", error);
+          // Don't show error toast if it's just that there are no events yet
+          if (!(error.message && error.message.includes("No events for this session"))) {
+            toast.error("Failed to fetch events");
+          }
+        });
+      
+      // Wait for both requests to complete
+      Promise.all([fetchSession, fetchEvents])
         .finally(() => {
           setLoading(false);
         });
@@ -204,20 +243,93 @@ export default function Component({ sessionId }: BigCalendarProps) {
     return events.filter((event) => isColorVisible(event.color));
   }, [events, isColorVisible]);
 
-  const handleEventAdd = (event: CalendarEvent) => {
-    setEvents([...events, event]);
+  // Create a new event
+  const handleEventAdd = async (event: CalendarEvent) => {
+    if (!sessionId) return;
+    
+    try {
+      // Convert event to server format
+      const eventData = {
+        session: sessionId,
+        title: event.title,
+        description: event.description || "",
+        startDate: event.start,
+        endDate: event.end,
+        allDay: event.allDay || false,
+        color: event.color || "blue"
+      };
+      
+      // Call API to create event
+      const createdEvent = await eventService.createEvent(eventData);
+      
+      // Add the created event to state with the real ID from server
+      const newEvent: CalendarEvent = {
+        ...event,
+        id: createdEvent._id,
+        color: event.color || "blue"
+      };
+      
+      setEvents([...events, newEvent]);
+      toast.success("Event created successfully");
+    } catch (error) {
+      console.error("Error creating event:", error);
+      toast.error("Failed to create event");
+    }
   };
 
-  const handleEventUpdate = (updatedEvent: CalendarEvent) => {
-    setEvents(
-      events.map((event) =>
-        event.id === updatedEvent.id ? updatedEvent : event,
-      ),
-    );
+  // Update an existing event
+  const handleEventUpdate = async (updatedEvent: CalendarEvent) => {
+    // Skip for lifecycle events
+    if (updatedEvent.etiquette && ['session-lifecycle', 'nomination-phase', 'voting-phase'].includes(updatedEvent.etiquette)) {
+      return;
+    }
+    
+    try {
+      // Convert event to server format
+      const eventData = {
+        title: updatedEvent.title,
+        description: updatedEvent.description || "",
+        startDate: updatedEvent.start,
+        endDate: updatedEvent.end,
+        allDay: updatedEvent.allDay || false,
+        color: updatedEvent.color || "blue"
+      };
+      
+      // Call API to update event
+      await eventService.updateEvent(updatedEvent.id, eventData);
+      
+      // Update the event in state
+      setEvents(
+        events.map((event) =>
+          event.id === updatedEvent.id ? {...updatedEvent, color: updatedEvent.color || "blue"} : event,
+        ),
+      );
+      toast.success("Event updated successfully");
+    } catch (error) {
+      console.error("Error updating event:", error);
+      toast.error("Failed to update event");
+    }
   };
 
-  const handleEventDelete = (eventId: string) => {
-    setEvents(events.filter((event) => event.id !== eventId));
+  // Delete an event
+  const handleEventDelete = async (eventId: string) => {
+    // Skip for lifecycle events
+    const eventToDelete = events.find(e => e.id === eventId);
+    if (eventToDelete?.etiquette && ['session-lifecycle', 'nomination-phase', 'voting-phase'].includes(eventToDelete.etiquette)) {
+      return;
+    }
+    
+    try {
+      // Call API to delete event
+      await eventService.deleteEvent(eventId);
+      
+      // Remove the event from state
+      setEvents(events.filter((event) => event.id !== eventId));
+      toast.success("Event deleted successfully");
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      toast.error("Failed to delete event");
+    }
   };
 
   return (

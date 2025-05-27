@@ -9,87 +9,11 @@ import { CheckCircle, XCircle, RefreshCw, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
 import { useTeam } from "./team-context"
-
-// Types for change requests
-interface ChangeRequest {
-  id: string
-  user: {
-    name: string
-    avatar?: string
-  }
-  request: string
-  timestamp: string
-  status: 'pending' | 'approved' | 'rejected'
-}
-
-// Mock data fetch function (replace with real API call)
-const fetchChangeRequests = async (sessionId: string): Promise<ChangeRequest[]> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500))
-  
-  // In a real app, you would call your API:
-  // return await fetch(`/api/sessions/${sessionId}/change-requests`).then(res => res.json())
-  
-  return [
-    {
-      id: "1",
-      user: {
-        name: "Jane Doe",
-        avatar: "/placeholder.svg?height=32&width=32",
-      },
-      request: "Request to change team name to 'Innovation Squad'",
-      timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(), // 45 min ago
-      status: "pending",
-    },
-    {
-      id: "2",
-      user: {
-        name: "Bob Smith",
-        avatar: "/placeholder.svg?height=32&width=32",
-      },
-      request: "Request to add a new role: 'Designer'",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(), // 3 hours ago
-      status: "pending",
-    },
-    {
-      id: "3",
-      user: {
-        name: "Alice Jones",
-        avatar: "/placeholder.svg?height=32&width=32",
-      },
-      request: "Request to change project deadline to next month",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 36).toISOString(), // 1.5 days ago
-      status: "approved",
-    },
-    {
-      id: "4",
-      user: {
-        name: "Tom Wilson",
-        avatar: "/placeholder.svg?height=32&width=32",
-      },
-      request: "Request to modify the voting mechanism",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 55).toISOString(), // 2.3 days ago
-      status: "rejected",
-    },
-  ]
-}
-
-// Mock API functions for handling approvals and rejections
-const approveChangeRequest = async (id: string): Promise<void> => {
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 500))
-  // In a real app: return fetch(`/api/change-requests/${id}/approve`, { method: 'POST' })
-}
-
-const rejectChangeRequest = async (id: string): Promise<void> => {
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 500))
-  // In a real app: return fetch(`/api/change-requests/${id}/reject`, { method: 'POST' })
-}
+import { sessionService, EditRequest } from "@/services/session-service"
 
 export default function ChangesRequestedBlock() {
   const { sessionId, refreshCounter } = useTeam()
-  const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([])
+  const [changeRequests, setChangeRequests] = useState<EditRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [processing, setProcessing] = useState<string | null>(null)
@@ -105,8 +29,9 @@ export default function ChangesRequestedBlock() {
     }
     
     try {
-      const data = await fetchChangeRequests(sessionId)
-      setChangeRequests(data)
+      const data = await sessionService.getSessionEditRequests(sessionId)
+      console.log("Received edit requests:", data)
+      setChangeRequests(data || [])
     } catch (error) {
       console.error("Failed to fetch change requests:", error)
       if (showLoadingState) {
@@ -134,18 +59,23 @@ export default function ChangesRequestedBlock() {
   const handleApprove = async (id: string) => {
     try {
       setProcessing(id)
-      await approveChangeRequest(id)
+      await sessionService.approveEditRequest(id)
       
       // Optimistically update UI
       setChangeRequests(prev => 
         prev.map(item => 
-          item.id === id ? { ...item, status: 'approved' } : item
+          item._id === id ? { ...item, status: 'approved' } : item
         )
       )
       
       toast.success("Request approved", {
         description: "The change request has been approved and will be applied.",
       })
+      
+      // Refresh data after a short delay
+      setTimeout(() => {
+        loadChangeRequests(false)
+      }, 1000)
     } catch (error) {
       console.error("Failed to approve request:", error)
       toast.error("Action failed", {
@@ -160,18 +90,23 @@ export default function ChangesRequestedBlock() {
   const handleReject = async (id: string) => {
     try {
       setProcessing(id)
-      await rejectChangeRequest(id)
+      await sessionService.rejectEditRequest(id)
       
       // Optimistically update UI
       setChangeRequests(prev => 
         prev.map(item => 
-          item.id === id ? { ...item, status: 'rejected' } : item
+          item._id === id ? { ...item, status: 'rejected' } : item
         )
       )
       
       toast.success("Request rejected", {
         description: "The change request has been rejected.",
       })
+      
+      // Refresh data after a short delay
+      setTimeout(() => {
+        loadChangeRequests(false)
+      }, 1000)
     } catch (error) {
       console.error("Failed to reject request:", error)
       toast.error("Action failed", {
@@ -198,6 +133,37 @@ export default function ChangesRequestedBlock() {
       case 'rejected': return "destructive"
       default: return "outline"
     }
+  }
+
+  // Format request updates to display in UI
+  const formatRequestMessage = (updates: any): string => {
+    if (!updates) return "Unknown request";
+    
+    const keys = Object.keys(updates);
+    
+    if (keys.length === 0) return "No changes requested";
+    
+    if (keys.includes('name')) {
+      return `Request to change session name to '${updates.name}'`;
+    }
+    
+    if (keys.includes('description')) {
+      return `Request to update session description`;
+    }
+    
+    if (keys.includes('sessionLifecycle')) {
+      return `Request to update session schedule`;
+    }
+    
+    if (keys.includes('securityMethod')) {
+      return `Request to change security method to ${updates.securityMethod}`;
+    }
+    
+    if (keys.includes('secretPhrase')) {
+      return `Request to update secret phrase`;
+    }
+    
+    return `Request to update ${keys.join(', ')}`;
   }
 
   return (
@@ -234,46 +200,50 @@ export default function ChangesRequestedBlock() {
           </div>
         ) : (
           changeRequests.map((request) => (
-            <div key={request.id} className="flex items-start gap-4 border-b pb-4 last:border-0 last:pb-0">
+            <div key={request._id} className="flex items-start gap-4 border-b pb-4 last:border-0 last:pb-0">
               <Avatar className="h-10 w-10">
-                <AvatarImage src={request.user.avatar} alt={request.user.name} />
+                <AvatarImage 
+                  src={`/api/avatar?name=${encodeURIComponent(request.proposedBy?.username || 'U')}`} 
+                  alt={request.proposedBy?.username || "User"} 
+                />
                 <AvatarFallback>
-                  {request.user.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
+                  {request.proposedBy?.username
+                    ? request.proposedBy.username.substring(0, 2).toUpperCase()
+                    : "U"}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">{request.user.name}</p>
+                  <p className="text-sm font-medium">
+                    {request.proposedBy?.username || "User"}
+                  </p>
                   <Badge variant={getStatusVariant(request.status)}>
                     {request.status}
                   </Badge>
                 </div>
-                <p className="text-sm">{request.request}</p>
-                <p className="text-xs text-muted-foreground">{formatTimeAgo(request.timestamp)}</p>
+                <p className="text-sm">{formatRequestMessage(request.updates)}</p>
+                <p className="text-xs text-muted-foreground">{formatTimeAgo(request.createdAt)}</p>
                 {request.status === "pending" && (
                   <div className="flex gap-2 pt-1">
                     <Button
                       size="sm"
                       variant="outline"
                       className="flex items-center gap-1"
-                      onClick={() => handleApprove(request.id)}
+                      onClick={() => handleApprove(request._id)}
                       disabled={!!processing}
                     >
                       <CheckCircle className="h-4 w-4 text-green-500" />
-                      {processing === request.id ? "Processing..." : "Approve"}
+                      {processing === request._id ? "Processing..." : "Approve"}
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
                       className="flex items-center gap-1"
-                      onClick={() => handleReject(request.id)}
+                      onClick={() => handleReject(request._id)}
                       disabled={!!processing}
                     >
                       <XCircle className="h-4 w-4 text-red-500" />
-                      {processing === request.id ? "Processing..." : "Reject"}
+                      {processing === request._id ? "Processing..." : "Reject"}
                     </Button>
                   </div>
                 )}

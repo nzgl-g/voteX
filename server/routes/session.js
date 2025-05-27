@@ -362,12 +362,13 @@ router.patch("/:sessionId/edit-request", auth, async (req, res) => {
       .json({ error: "Failed to submit edit request", details: err.message });
   }
 });
-router.get("/sessions/:sessionId/edit-requests", auth, async (req, res) => {
+router.get("/:sessionId/edit-requests", auth, async (req, res) => {
   try {
     const sessionId = req.params.sessionId;
 
     const editRequests = await SessionEditRequest.find({ session: sessionId })
-      .populate("proposedBy", "username")
+      .populate("proposedBy", "username email _id")
+      .populate("session", "name")
       .sort({ createdAt: -1 });
 
     res.status(200).json({ editRequests });
@@ -452,6 +453,7 @@ router.patch("/edit-requests/:requestId/approve", auth, async (req, res) => {
       .json({ error: "Failed to approve edit", details: err.message });
   }
 });
+
 
 //dir ghir contract address f body
 router.patch("/:sessionId/contract-address", async (req, res) => {

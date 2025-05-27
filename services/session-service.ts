@@ -136,6 +136,23 @@ export interface SessionEditResult {
   needsApproval: boolean;
 }
 
+export interface EditRequest {
+  _id: string;
+  proposedBy: {
+    _id: string;
+    username: string;
+    email?: string;
+    avatar?: string;
+  };
+  session: {
+    _id: string;
+    name: string;
+  };
+  updates: any;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
 class SessionService {
   /**
    * Get all sessions
@@ -415,6 +432,34 @@ class SessionService {
       return response.data;
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || `Failed to approve edit request`;
+      throw new Error(errorMessage);
+    }
+  }
+
+  /**
+   * Get all edit requests for a session
+   */
+  async getSessionEditRequests(sessionId: string): Promise<EditRequest[]> {
+    try {
+      const response = await baseApi.get(`/sessions/${sessionId}/edit-requests`);
+      return response.data.editRequests;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Failed to fetch edit requests';
+      throw new Error(errorMessage);
+    }
+  }
+
+  /**
+   * Reject a session edit request
+   */
+  async rejectEditRequest(requestId: string): Promise<{ message: string }> {
+    try {
+      const response = await baseApi.patch<{ message: string }>(
+        `/sessions/edit-requests/${requestId}/reject`
+      );
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || `Failed to reject edit request`;
       throw new Error(errorMessage);
     }
   }

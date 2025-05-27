@@ -80,10 +80,6 @@ export function BlockchainSync({
       
       if (success) {
         setLastSync(new Date());
-        toast({
-          title: "Blockchain Data Synced",
-          description: "Vote counts have been updated from the blockchain.",
-        });
       }
       
       if (onSyncComplete) {

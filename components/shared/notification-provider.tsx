@@ -335,7 +335,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': token || ''
-              }
+              },
+              body: JSON.stringify({ invitationId })
             });
             
             // Dismiss the loading toast
@@ -355,6 +356,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                   sessionId = responseData.sessionId;
                 } else if (responseData && responseData.invitation && responseData.invitation.sessionId) {
                   sessionId = responseData.invitation.sessionId;
+                } else if (responseData && responseData.session && responseData.session._id) {
+                  sessionId = responseData.session._id;
                 }
                 
                 if (responseData && responseData.teamId) {
@@ -364,6 +367,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                 } else if (responseData && responseData._id) {
                   // Some APIs might return the team ID directly
                   teamId = responseData._id;
+                } else if (responseData && responseData.team && responseData.team._id) {
+                  teamId = responseData.team._id;
                 }
                 
                 console.log('Extracted sessionId:', sessionId);
@@ -384,19 +389,27 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                 // Log notification link for debugging
                 console.log('Notification link:', notification.link);
                 
-                // First priority: If we have both team ID and session ID, construct the proper URL
-                if (teamId && sessionId) {
-                  const url = `/team-member/team/session/${sessionId}`;
-                  console.log('Navigating to constructed URL:', url);
-                  window.location.href = url;
+                // Try to extract sessionId from notification if not available from response
+                if (!sessionId && notification.extraData && notification.extraData.sessionId) {
+                  sessionId = notification.extraData.sessionId;
+                  console.log('Using sessionId from notification extraData:', sessionId);
                 }
-                // Second priority: If we just have session ID
-                else if (sessionId) {
+                
+                // First priority: If we have session ID, use it
+                if (sessionId) {
                   const url = `/team-member/session/${sessionId}`;
                   console.log('Navigating to session URL:', url);
                   window.location.href = url;
+                  return; // Ensure we don't execute further navigation code
                 }
-                // Third priority: Use the notification link if available
+                // Second priority: If we have team ID but no session ID
+                else if (teamId) {
+                  const url = `/team-member/team/sessions`;
+                  console.log('Navigating to team sessions URL:', url);
+                  window.location.href = url;
+                  return; // Ensure we don't execute further navigation code
+                }
+                // Third priority: Use notification link if available
                 else if (notification.link) {
                   console.log('Navigating to notification link:', notification.link);
                   
@@ -407,17 +420,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                       const url = `/team-member/team/sessions`;
                       console.log('Converted team link to proper URL:', url);
                       window.location.href = url;
-                    } else {
-                      window.location.href = notification.link;
+                      return; // Ensure we don't execute further navigation code
                     }
-                  } else {
-                    window.location.href = notification.link;
                   }
+                  
+                  window.location.href = notification.link;
+                  return; // Ensure we don't execute further navigation code
                 }
-                // Last resort: Reload the page if we're already on a team page
-                else if (window.location.pathname.includes('/team')) {
-                  console.log('Reloading current page');
-                  window.location.reload();
+                // Last resort: Just go to team member dashboard
+                else {
+                  console.log('No specific redirect info, going to team member dashboard');
+                  window.location.href = '/team-member/dashboard';
+                  return; // Ensure we don't execute further navigation code
                 }
               }, 800);
             } else {
@@ -547,7 +561,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': token || ''
-              }
+              },
+              body: JSON.stringify({ invitationId })
             });
             
             // Dismiss the loading toast

@@ -18,6 +18,5 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="Python 3.11 (vote-system) interpreter library" level="application" />
   </component>
 </module>

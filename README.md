@@ -89,7 +89,7 @@ This system enables secure, transparent, and decentralized voting using blockcha
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-org/vote-system.git
+git clone https://github.com/nzgl-g/voteX.git
 cd vote-system
 ```
 

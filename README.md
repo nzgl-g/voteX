@@ -1,36 +1,207 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Blockchain Vote System
+
+A full-stack, blockchain-based voting platform with robust KYC, role-based access, and transparent, tamper-proof voting sessions.
+
+---
+
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Architecture](#architecture)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Directory Structure](#directory-structure)
+- [Getting Started](#getting-started)
+- [Frontend](#frontend)
+- [Backend](#backend)
+- [Blockchain](#blockchain)
+- [KYC Service](#kyc-service)
+- [Security](#security)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## Project Overview
+
+This system enables secure, transparent, and decentralized voting using blockchain technology. It supports multiple user roles (Team Leader, Team Member, Candidate, Voter) and integrates a KYC process for identity verification.
+
+---
+
+## Architecture
+
+- **Frontend**: Next.js app for user interaction, dashboards, and voting.
+- **Backend**: Node.js/Express API for business logic, user/session management, and blockchain interaction.
+- **Blockchain**: Solidity smart contracts for vote sessions and vote recording.
+- **KYC**: Python microservice for document and identity verification.
+
+---
+
+## Features
+
+- **Role-based Dashboards**: Custom interfaces for each user type.
+- **Session Management**: Create, edit, and manage voting sessions.
+- **Blockchain Voting**: All votes are recorded on-chain for transparency.
+- **KYC Integration**: Secure identity verification for voters and candidates.
+- **Team Management**: Team leaders can invite/manage members.
+- **Notifications**: Real-time updates for session events, KYC status, and more.
+
+---
+
+## Tech Stack
+
+- **Frontend**: Next.js, TypeScript, Tailwind CSS, Shadcn UI
+- **Backend**: Node.js, Express, MongoDB, Socket.IO
+- **Blockchain**: Solidity, Hardhat, Ethers.js
+- **KYC**: Python, Flask, OCR, image forensics
+
+---
+
+## Directory Structure
+```
+.
+├── app/           # Next.js frontend  
+├── server/        # Node.js/Express backend  
+├── blockchain/    # Solidity smart contracts & deployment  
+├── kyc/           # Python KYC microservice  
+├── components/    # Shared frontend components  
+├── services/      # Frontend service modules (API calls)  
+├── docs/          # Additional documentation  
+├── public/        # Static assets  
+├── utils/         # Utility functions  
+├── types/         # TypeScript types  
+└── ...
+```
+
+
+
+---
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js (v16+)
+- Python 3.8+
+- MongoDB
+- Docker (optional, for containerized setup)
+
+### 1. Clone the Repository
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/your-org/vote-system.git
+cd vote-system
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Install Dependencies
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+#### Frontend & Backend
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+pnpm install
+# or
+npm install
+```
 
-## Learn More
+#### KYC Service
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+cd kyc
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 3. Environment Variables
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Copy `.env-docker.example` and `.env_sample` (in `kyc/`) to `.env` files and fill in required values.
 
-## Deploy on Vercel
+### 4. Running the System
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+#### Docker (Recommended)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+docker-compose up --build
+```
+
+#### Manual
+
+- **Frontend**: `pnpm run dev`
+- **Backend**: `cd server && npm start`
+- **KYC**: `cd kyc && python app.py`
+- **Blockchain**: Deploy contracts with Hardhat (`cd blockchain && npx hardhat run scripts/deploy.js`)
+
+---
+
+## Frontend
+
+- Built with Next.js, TypeScript, Tailwind CSS, and Shadcn UI.
+- Role-based dashboards: `/app/team-leader`, `/app/team-member`, `/app/voter-portal`, `/app/candidate-portal`.
+- Session creation, voting, KYC, and notifications.
+
+See [FRONTEND_README.md](FRONTEND_README.md) for details.
+
+---
+
+## Backend
+
+- Node.js/Express REST API.
+- Handles authentication, session/team management, notifications, and blockchain interaction.
+- MongoDB for data storage.
+- Socket.IO for real-time updates.
+
+See [server/README.md](server/README.md) for details.
+
+---
+
+## Blockchain
+
+- Solidity smart contracts: `VoteSessionFactory`, `VoteSession`.
+- Hardhat for deployment/testing.
+- All votes and session data are recorded on-chain for transparency.
+
+See [blockchain/README.md](blockchain/README.md) for details.
+
+---
+
+## KYC Service
+
+- Python Flask microservice for document and identity verification.
+- Integrates with backend for user KYC checks.
+- Uses OCR, image forensics, and metadata analysis.
+
+See [kyc/README.md](kyc/README.md) for details.
+
+---
+
+## Security
+
+- JWT-based authentication and role-based access control.
+- All sensitive data managed via environment variables.
+- KYC data is handled securely and deleted after processing.
+- Blockchain private keys are never exposed in the codebase.
+
+---
+
+## Contributing
+
+1. Fork the repo
+2. Create your feature branch (`git checkout -b feature/YourFeature`)
+3. Commit your changes (`git commit -am 'Add some feature'`)
+4. Push to the branch (`git push origin feature/YourFeature`)
+5. Create a new Pull Request
+
+---
+
+## License
+
+[MIT](LICENSE)
+
+---
+
+## Documentation
+
+- [Frontend](FRONTEND_README.md)
+- [Backend](server/README.md)
+- [Blockchain](blockchain/README.md)
+- [KYC](kyc/README.md)

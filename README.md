@@ -29,6 +29,8 @@ This project was developed as part of the requirements for obtaining a Bachelor'
 
 Note: The project is still under development and may contain some issues, which will be addressed as soon as we have the availability.
 
+For deeper documentation u can check this link [here](https://deepwiki.com/nzgl-g/vote-system).
+
 ---
 
 ## Architecture

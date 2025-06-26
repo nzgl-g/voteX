@@ -25,7 +25,9 @@ A full-stack, blockchain-based voting platform with robust KYC, role-based acces
 ## Project Overview
 
 This system enables secure, transparent, and decentralized voting using blockchain technology. It supports multiple user roles (Team Leader, Team Member, Candidate, Voter) and integrates a KYC process for identity verification.
-This project was developed as part of the requirements for obtaining a Bachelor's degree in Computer Science. The academic report is included [here](https://www.mediafire.com/file/naxybhevwjx1gli/votex.pdf/file).
+This project was developed as part of the requirements for obtaining a Bachelor's degree in Computer Science. The academic report is available here.
+
+Note: The project is still under development and may contain some issues, which will be addressed as soon as we have the availability.
 
 ---
 
